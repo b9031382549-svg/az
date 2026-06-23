@@ -27,7 +27,7 @@ class ClassifyItem extends Command
         $this->line('  Kind:       <info>'.($r['kind'] ?? '—').'</info>');
         $this->line('  Code:       <info>'.($r['code'] ?? '—').'</info>');
         $this->line('  Name:       '.($r['name'] ?? '—'));
-        $this->line('  Confidence: '.($r['confidence'] ?? '—'));
+        $this->line('  Confidence: '.($r['confidence'] ?? '—').'   Semantic: '.($r['semantic_sim'] ?? '—'));
         $this->line('  Status:     <comment>'.$r['status'].'</comment>');
         $this->line('  Reason:     '.($r['reason'] ?? '—'));
         if ($r['usage']) {

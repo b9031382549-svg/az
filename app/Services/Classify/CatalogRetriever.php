@@ -21,17 +21,52 @@ class CatalogRetriever
         $kindSql = $kind ? 'AND kind = ?' : '';
         $kindBind = $kind ? [$kind] : [];
 
-        $semantic = $this->semantic($text, $per, $kindSql, $kindBind);
+        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($text)));
+
+        $semantic = $this->semantic($vector, $per, $kindSql, $kindBind);
         $lexical = $this->lexical($text, $per, $kindSql, $kindBind);
 
-        return $this->fuse($semantic, $lexical, $limit);
+        $fused = $this->fuse($semantic, $lexical, $limit);
+        $this->attachSemanticSim($fused, $vector);
+
+        return $fused;
+    }
+
+    /**
+     * Cosine similarity of the query to every candidate's embedding — the
+     * retrieval signal used to gate auto-confirmation against an over-confident
+     * LLM, regardless of which retriever surfaced the candidate.
+     *
+     * @param  array<int, object>  $candidates
+     */
+    private function attachSemanticSim(array $candidates, string $vector): void
+    {
+        if (empty($candidates)) {
+            return;
+        }
+
+        $ids = array_map(fn ($c) => $c->id, $candidates);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        $sims = DB::select(
+            "SELECT id, 1 - (embedding <=> ?::vector) AS sim
+             FROM catalog WHERE id IN ({$placeholders}) AND embedding IS NOT NULL",
+            array_merge([$vector], $ids),
+        );
+
+        $map = [];
+        foreach ($sims as $row) {
+            $map[$row->id] = round((float) $row->sim, 4);
+        }
+
+        foreach ($candidates as $candidate) {
+            $candidate->semantic_sim = $map[$candidate->id] ?? null;
+        }
     }
 
     /** @return array<int, object> */
-    private function semantic(string $text, int $per, string $kindSql, array $kindBind): array
+    private function semantic(string $vector, int $per, string $kindSql, array $kindBind): array
     {
-        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($text)));
-
         return DB::select(
             "SELECT id, code, name, kind, 1 - (embedding <=> ?::vector) AS sim
              FROM catalog

@@ -31,6 +31,7 @@ class ClassifierService
             'catalog_id' => null,
             'name' => null,
             'confidence' => null,
+            'semantic_sim' => null,
             'status' => 'no_match',
             'reason' => null,
             'candidates' => [],
@@ -54,7 +55,8 @@ class ClassifierService
             }
 
             $result['candidates'] = array_map(fn ($c) => [
-                'code' => $c->code, 'kind' => $c->kind, 'name' => $c->name, 'score' => $c->score,
+                'code' => $c->code, 'kind' => $c->kind, 'name' => $c->name,
+                'score' => $c->score, 'semantic_sim' => $c->semantic_sim ?? null,
             ], array_slice($candidates, 0, 10));
 
             $picked = $this->rerank($text, $candidates);
@@ -75,15 +77,22 @@ class ClassifierService
             }
 
             $confidence = round((float) $picked['confidence'], 3);
+            $semanticSim = $match->semantic_sim ?? null;
+
             $result['kind'] = $match->kind; // authoritative: derived from the code (99 => service)
             $result['code'] = $match->code;
             $result['catalog_id'] = $match->id;
             $result['name'] = $match->name;
             $result['confidence'] = $confidence;
+            $result['semantic_sim'] = $semanticSim;
             $result['reason'] = $picked['reason'] ?? null;
-            $result['status'] = $confidence >= (float) config('classify.auto_confirm')
-                ? 'auto_confirmed'
-                : 'needs_review';
+
+            // Auto-confirm needs BOTH the model's confidence AND retrieval (cosine)
+            // agreement — an over-confident pick with weak semantic backing goes
+            // to review instead of being auto-confirmed.
+            $confident = $confidence >= (float) config('classify.auto_confirm');
+            $backed = $semanticSim !== null && $semanticSim >= (float) config('classify.min_semantic');
+            $result['status'] = ($confident && $backed) ? 'auto_confirmed' : 'needs_review';
         } catch (Throwable $e) {
             $result['error'] = $e->getMessage();
             $result['status'] = 'error';
@@ -122,7 +131,7 @@ class ClassifierService
         $response = $this->llm->jsonWithUsage([
             ['role' => 'system', 'content' => $this->prompt()],
             ['role' => 'user', 'content' => "ITEM: {$text}\n\nCANDIDATES:\n{$list}"],
-        ]);
+        ], ['model' => config('services.openrouter.classify_model')]);
 
         $d = $response['data'];
 
