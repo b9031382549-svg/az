@@ -10,8 +10,8 @@ class CatalogRetriever
     public function __construct(private readonly OllamaEmbedder $embedder) {}
 
     /**
-     * Hybrid candidate retrieval: semantic (pgvector cosine) + lexical (trigram
-     * word similarity), fused with Reciprocal Rank Fusion.
+     * Hybrid candidate retrieval: semantic (pgvector cosine) + lexical (token
+     * overlap ranked by trigram similarity), fused with Reciprocal Rank Fusion.
      *
      * @return array<int, object{id:int, code:string, name:string, kind:string, score:float}>
      */
@@ -21,9 +21,18 @@ class CatalogRetriever
         $kindSql = $kind ? 'AND kind = ?' : '';
         $kindBind = $kind ? [$kind] : [];
 
-        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($text));
+        $semantic = $this->semantic($text, $per, $kindSql, $kindBind);
+        $lexical = $this->lexical($text, $per, $kindSql, $kindBind);
 
-        $semantic = DB::select(
+        return $this->fuse($semantic, $lexical, $limit);
+    }
+
+    /** @return array<int, object> */
+    private function semantic(string $text, int $per, string $kindSql, array $kindBind): array
+    {
+        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($text)));
+
+        return DB::select(
             "SELECT id, code, name, kind, 1 - (embedding <=> ?::vector) AS sim
              FROM catalog
              WHERE embedding IS NOT NULL {$kindSql}
@@ -31,17 +40,94 @@ class CatalogRetriever
              LIMIT {$per}",
             array_merge([$vector], $kindBind, [$vector]),
         );
+    }
 
-        $lexical = DB::select(
-            "SELECT id, code, name, kind, word_similarity(?, name) AS sim
-             FROM catalog
-             WHERE TRUE {$kindSql}
-             ORDER BY word_similarity(?, name) DESC
-             LIMIT {$per}",
-            array_merge([$text], $kindBind, [$text]),
+    /**
+     * Lexical retrieval gated on the query's significant tokens, so codes whose
+     * name literally contains a key word (e.g. "şpris") always reach the LLM,
+     * then ranked by trigram word similarity. Falls back to pure trigram when
+     * the query has no usable tokens.
+     *
+     * @return array<int, object>
+     */
+    private function lexical(string $text, int $per, string $kindSql, array $kindBind): array
+    {
+        $tokens = $this->tokens($text);
+
+        if (empty($tokens)) {
+            return DB::select(
+                "SELECT id, code, name, kind, word_similarity(?, name) AS sim
+                 FROM catalog
+                 WHERE TRUE {$kindSql}
+                 ORDER BY word_similarity(?, name) DESC
+                 LIMIT {$per}",
+                array_merge([$text], $kindBind, [$text]),
+            );
+        }
+
+        // Process tokens rarest-first: a code matched by a distinctive word
+        // (e.g. "şpris", in 5 names) is far more relevant than one matched by a
+        // common word (e.g. "rezin", in hundreds). Each token contributes its
+        // best matches, so the rare-but-decisive code is not crowded out.
+        $freq = [];
+        foreach ($tokens as $token) {
+            $freq[$token] = (int) DB::table('catalog')->where('name', 'ILIKE', '%'.$token.'%')->count();
+        }
+        $freq = array_filter($freq, fn ($c) => $c > 0);
+        asort($freq);
+        $ordered = array_keys($freq);
+
+        $perToken = max(4, (int) ceil($per / max(1, count($ordered))));
+        $list = [];
+        $seen = [];
+
+        foreach ($ordered as $token) {
+            $rows = DB::select(
+                "SELECT id, code, name, kind, word_similarity(?, name) AS sim
+                 FROM catalog
+                 WHERE name ILIKE ? {$kindSql}
+                 ORDER BY word_similarity(?, name) DESC
+                 LIMIT {$perToken}",
+                array_merge([$text, '%'.$token.'%'], $kindBind, [$text]),
+            );
+            foreach ($rows as $row) {
+                if (! isset($seen[$row->id])) {
+                    $seen[$row->id] = true;
+                    $list[] = $row;
+                }
+            }
+        }
+
+        return array_slice($list, 0, $per);
+    }
+
+    /**
+     * Drop measurement/spec tokens (anything containing a digit) before
+     * embedding the query, so noise like "5ml 23G Х32" doesn't dominate the
+     * semantic signal. Keeps the meaningful words.
+     */
+    private function normalize(string $text): string
+    {
+        $words = array_filter(
+            preg_split('/\s+/u', trim($text)) ?: [],
+            fn ($w) => $w !== '' && ! preg_match('/\d/u', $w),
         );
+        $clean = trim(implode(' ', $words));
 
-        return $this->fuse($semantic, $lexical, $limit);
+        return $clean !== '' ? $clean : trim($text);
+    }
+
+    /**
+     * Significant alphabetic tokens (length >= 4) used to gate lexical search.
+     *
+     * @return array<int, string>
+     */
+    private function tokens(string $text): array
+    {
+        $words = preg_split('/[^\p{L}]+/u', mb_strtolower($text)) ?: [];
+        $words = array_filter($words, fn ($w) => mb_strlen($w) >= 4);
+
+        return array_values(array_unique($words));
     }
 
     /**

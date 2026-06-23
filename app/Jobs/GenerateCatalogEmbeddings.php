@@ -22,13 +22,23 @@ class GenerateCatalogEmbeddings implements ShouldQueue
 
     public int $timeout = 600;
 
-    public function __construct(public int $chunk = 16) {}
+    public function __construct(public int $chunk = 16, public ?string $refreshBefore = null) {}
 
     public function handle(CatalogEmbeddingRunner $runner): void
     {
-        $embedded = $runner->embedBatch($this->chunk);
+        if ($this->refreshBefore !== null) {
+            $done = $runner->refreshBatch($this->refreshBefore, $this->chunk);
 
-        if ($embedded > 0 && $runner->pendingCount() > 0) {
+            if ($done > 0 && $runner->staleCount($this->refreshBefore) > 0) {
+                self::dispatch($this->chunk, $this->refreshBefore);
+            }
+
+            return;
+        }
+
+        $done = $runner->embedBatch($this->chunk);
+
+        if ($done > 0 && $runner->pendingCount() > 0) {
             self::dispatch($this->chunk);
         }
     }

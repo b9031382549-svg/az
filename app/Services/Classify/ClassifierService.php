@@ -161,8 +161,15 @@ class ClassifierService
         Rules:
         - Codes that start with "99" are SERVICES; all other codes are GOODS.
         - Choose only from the provided candidates. Do not invent codes.
+        - Classify by what the item IS (its function / purpose), NOT merely by the
+          material it is made of. E.g. a syringe with a rubber plunger is a medical
+          syringe, not a rubber article; a plastic water bottle is a beverage
+          container, not a plastics product.
+        - Prefer the most specific code that fits the item's actual purpose.
         - If none of the candidates is a reasonable match, set "code" to null.
-        - "confidence" is your calibrated certainty from 0 to 1.
+        - Calibrate "confidence" (0..1) honestly: use > 0.85 only when a candidate
+          clearly and specifically matches the item; if you can only find a generic
+          or material-based fallback, keep confidence below 0.7.
 
         Respond with a strict JSON object only:
         {"kind":"good|service","code":"<chosen code or null>","confidence":0.0,"reason":"<short justification>"}

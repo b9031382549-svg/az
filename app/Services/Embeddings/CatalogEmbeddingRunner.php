@@ -26,8 +26,36 @@ class CatalogEmbeddingRunner
      */
     public function embedBatch(int $size): int
     {
-        $rows = DB::table('catalog')
-            ->whereNull('embedding')
+        return $this->embedWhere(fn ($q) => $q->whereNull('embedding'), $size);
+    }
+
+    /** Rows still needing a refresh (never embedded, or embedded before $before). */
+    public function staleCount(string $before): int
+    {
+        return (int) DB::table('catalog')
+            ->where(fn ($q) => $q->whereNull('embedding')->orWhere('embedded_at', '<', $before))
+            ->count();
+    }
+
+    /**
+     * Re-embed a batch of rows in place (no NULL gap): picks rows not embedded
+     * since $before and overwrites their vector. Lets a full re-embed run in the
+     * background while the old vectors keep serving search until overwritten.
+     */
+    public function refreshBatch(string $before, int $size): int
+    {
+        return $this->embedWhere(
+            fn ($q) => $q->where(fn ($w) => $w->whereNull('embedding')->orWhere('embedded_at', '<', $before)),
+            $size,
+        );
+    }
+
+    private function embedWhere(callable $scope, int $size): int
+    {
+        $query = DB::table('catalog');
+        $scope($query);
+
+        $rows = $query
             ->orderBy('id')
             ->limit(max(1, $size))
             ->get(['id', 'name']);
@@ -36,7 +64,7 @@ class CatalogEmbeddingRunner
             return 0;
         }
 
-        $vectors = $this->embedder->embed($rows->map(fn ($r) => $this->leaf($r->name))->all());
+        $vectors = $this->embedder->embed($rows->map(fn ($r) => $this->embedText($r->name))->all());
 
         DB::transaction(function () use ($rows, $vectors) {
             foreach ($rows->values() as $i => $row) {
@@ -51,19 +79,26 @@ class CatalogEmbeddingRunner
     }
 
     /**
-     * The registry repeats the full HS path in every name; the discriminative
-     * term is the last "–"-separated segment. Embedding that leaf is faster and
-     * more specific than embedding the whole boilerplate.
+     * The registry repeats the full HS path in every name. We embed the HEAD
+     * segment (the category, e.g. "medical devices") plus the LEAF segment (the
+     * specific term) — keeping category context while dropping the repeated
+     * mid-path boilerplate. This improves recall for items whose meaning depends
+     * on the category, not just the leaf word.
      */
-    private function leaf(string $name): string
+    private function embedText(string $name): string
     {
         $segments = array_values(array_filter(array_map(
             'trim',
             preg_split('/–/u', $name) ?: [$name],
         )));
 
+        if (count($segments) <= 1) {
+            return trim($name);
+        }
+
+        $head = $segments[0];
         $leaf = end($segments);
 
-        return is_string($leaf) && $leaf !== '' ? $leaf : trim($name);
+        return $head === $leaf ? $leaf : $head.' — '.$leaf;
     }
 }

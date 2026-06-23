@@ -7,6 +7,6 @@ return [
     // Confidence >= auto_confirm  -> auto_confirmed
     // Confidence >= review_floor  -> needs_review
     // otherwise                   -> needs_review (low confidence, flagged)
-    'auto_confirm' => (float) env('CLASSIFY_AUTO_CONFIRM', 0.85),
+    'auto_confirm' => (float) env('CLASSIFY_AUTO_CONFIRM', 0.8),
     'review_floor' => (float) env('CLASSIFY_REVIEW_FLOOR', 0.5),
 ];
