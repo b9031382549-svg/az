@@ -8,11 +8,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         libicu-dev \
         libonig-dev \
+        libpng-dev \
+        libjpeg-dev \
+        libfreetype6-dev \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions: Postgres (pdo_pgsql/pgsql), plus the usual Laravel set
-RUN docker-php-ext-install -j"$(nproc)" \
+# PHP extensions: Postgres (pdo_pgsql/pgsql), the usual Laravel set, plus gd
+# (required by phpoffice/phpspreadsheet for .xlsx/.xls import).
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" \
         pdo_pgsql \
         pgsql \
         zip \
@@ -20,7 +25,8 @@ RUN docker-php-ext-install -j"$(nproc)" \
         bcmath \
         mbstring \
         opcache \
-        pcntl
+        pcntl \
+        gd
 
 # Composer (copied from the official image)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

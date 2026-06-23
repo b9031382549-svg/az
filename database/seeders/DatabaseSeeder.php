@@ -20,5 +20,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'admin'],
             ['name' => 'Administrator', 'password' => 'admin'],
         );
+
+        $this->call(MetadataCatalogSeeder::class);
     }
 }
