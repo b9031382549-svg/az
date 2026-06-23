@@ -47,8 +47,11 @@ class ClassifierService
         }
 
         try {
-            $candidates = $this->retriever->candidates($text, (int) config('classify.candidates'));
+            [$retrievalText, $expandUsage] = $this->expandForRetrieval($text);
+
+            $candidates = $this->retriever->candidates($retrievalText, (int) config('classify.candidates'));
             if (empty($candidates)) {
+                $result['usage'] = $expandUsage;
                 $result['reason'] = 'No catalog candidates found.';
 
                 return $result;
@@ -60,9 +63,9 @@ class ClassifierService
             ], array_slice($candidates, 0, 10));
 
             $picked = $this->rerank($text, $candidates);
+            $this->logUsage($picked['usage'], $picked['model'], $text, 'rerank');
 
-            $this->logUsage($picked['usage'], $picked['model'], $text);
-            $result['usage'] = $picked['usage'];
+            $result['usage'] = $this->sumUsage($expandUsage, $picked['usage']);
 
             $match = $picked['code']
                 ? Arr::first($candidates, fn ($c) => $c->code === $picked['code'])
@@ -145,16 +148,80 @@ class ClassifierService
         ];
     }
 
-    private function logUsage(array $usage, string $model, string $text): void
+    /**
+     * Normalize a noisy item into a canonical product description (via the cheap
+     * default model) and append it to the original, so brand/coded names still
+     * retrieve the right candidates. Returns [retrievalText, usage].
+     *
+     * @return array{0: string, 1: array<string, int>}
+     */
+    private function expandForRetrieval(string $text): array
+    {
+        $zero = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
+
+        if (! config('classify.expand_query', true)) {
+            return [$text, $zero];
+        }
+
+        try {
+            $response = $this->llm->jsonWithUsage([
+                ['role' => 'system', 'content' => $this->expandPrompt()],
+                ['role' => 'user', 'content' => $text],
+            ]);
+
+            $this->logUsage($response['usage'], $response['model'], $text, 'expand');
+
+            $description = trim((string) ($response['data']['description'] ?? ''));
+            $retrievalText = $description !== '' ? $description.' '.$text : $text;
+
+            return [$retrievalText, $response['usage']];
+        } catch (Throwable) {
+            return [$text, $zero]; // graceful: fall back to the raw item
+        }
+    }
+
+    /**
+     * @param  array<string, int>  $a
+     * @param  array<string, int>  $b
+     * @return array<string, int>
+     */
+    private function sumUsage(array $a, array $b): array
+    {
+        return [
+            'prompt_tokens' => ($a['prompt_tokens'] ?? 0) + ($b['prompt_tokens'] ?? 0),
+            'completion_tokens' => ($a['completion_tokens'] ?? 0) + ($b['completion_tokens'] ?? 0),
+            'total_tokens' => ($a['total_tokens'] ?? 0) + ($b['total_tokens'] ?? 0),
+        ];
+    }
+
+    private function logUsage(array $usage, string $model, string $text, string $purpose): void
     {
         LlmUsage::create([
-            'purpose' => 'rerank',
+            'purpose' => $purpose,
             'model' => $model,
             'prompt_tokens' => $usage['prompt_tokens'] ?? 0,
             'completion_tokens' => $usage['completion_tokens'] ?? 0,
             'total_tokens' => $usage['total_tokens'] ?? 0,
             'meta' => ['item' => mb_substr($text, 0, 120)],
         ]);
+    }
+
+    private function expandPrompt(): string
+    {
+        return <<<'PROMPT'
+        You normalize a noisy e-invoice line item into a canonical product or
+        service description for catalogue lookup. The item is usually Azerbaijani
+        and may contain brand names, article numbers, sizes and packaging.
+
+        Output what the item fundamentally IS, in 2-6 words IN AZERBAIJANI,
+        dropping brand names, article numbers and sizes. Examples:
+        - "5337 ZEWA DELUXE BRT 8 3PLY CAMOMILE" -> "tualet kağızı"
+        - "Şpris 5ml 23G BLİSSET" -> "tibbi şpris"
+        - "PANNAKOTA" -> "süd deserti pannakotta"
+        - "Su (Pizza Hut)" -> "içməli su"
+
+        Respond with strict JSON only: {"description": "..."}
+        PROMPT;
     }
 
     private function prompt(): string

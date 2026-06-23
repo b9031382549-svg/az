@@ -4,6 +4,10 @@ return [
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 
+    // Normalize a noisy item into a canonical product description (via the cheap
+    // model) before retrieval, so branded/coded names still find candidates.
+    'expand_query' => (bool) env('CLASSIFY_EXPAND_QUERY', true),
+
     // Confidence >= auto_confirm  -> auto_confirmed
     // Confidence >= review_floor  -> needs_review
     // otherwise                   -> needs_review (low confidence, flagged)
