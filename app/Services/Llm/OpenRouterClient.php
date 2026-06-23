@@ -106,12 +106,29 @@ class OpenRouterClient
     public function jsonWithUsage(array $messages, array $options = []): array
     {
         $options['response_format'] ??= ['type' => 'json_object'];
-        $result = $this->complete($messages, $options);
 
-        return [
-            'data' => JsonExtractor::decode($result['content']),
-            'usage' => $result['usage'],
-            'model' => $result['model'],
-        ];
+        // Retry the whole call: covers transient API errors AND the occasional
+        // unparseable (non-JSON / truncated) response a fresh call usually fixes.
+        $attempts = 3;
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            try {
+                $result = $this->complete($messages, $options);
+
+                return [
+                    'data' => JsonExtractor::decode($result['content']),
+                    'usage' => $result['usage'],
+                    'model' => $result['model'],
+                ];
+            } catch (RuntimeException $e) {
+                $lastError = $e;
+                if ($attempt < $attempts) {
+                    usleep(400000 * $attempt);
+                }
+            }
+        }
+
+        throw $lastError;
     }
 }

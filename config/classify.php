@@ -13,5 +13,5 @@ return [
     // Auto-confirm also requires the chosen code's semantic (cosine) similarity
     // to the item to clear this bar — so an over-confident LLM pick that retrieval
     // does not back gets routed to review instead of auto-confirmed.
-    'min_semantic' => (float) env('CLASSIFY_MIN_SEMANTIC', 0.55),
+    'min_semantic' => (float) env('CLASSIFY_MIN_SEMANTIC', 0.6),
 ];
