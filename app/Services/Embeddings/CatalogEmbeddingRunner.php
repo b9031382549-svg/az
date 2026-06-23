@@ -93,12 +93,22 @@ class CatalogEmbeddingRunner
         )));
 
         if (count($segments) <= 1) {
-            return trim($name);
+            return $this->clip($segments[0] ?? trim($name), 16);
         }
 
-        $head = $segments[0];
-        $leaf = end($segments);
+        // Keep a short category head (first words) + the specific leaf. The full
+        // head can be very long; clipping it keeps the signal while cutting the
+        // token count (and embedding time) several-fold.
+        $head = $this->clip($segments[0], 8);
+        $leaf = $this->clip(end($segments), 16);
 
         return $head === $leaf ? $leaf : $head.' — '.$leaf;
+    }
+
+    private function clip(string $text, int $words): string
+    {
+        $parts = preg_split('/\s+/u', trim($text)) ?: [];
+
+        return implode(' ', array_slice($parts, 0, $words));
     }
 }
