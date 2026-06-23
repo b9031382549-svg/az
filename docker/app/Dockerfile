@@ -42,6 +42,9 @@ ARG GID=1000
 RUN groupadd -g "${GID}" app 2>/dev/null || true \
     && useradd -u "${UID}" -g "${GID}" -m -s /bin/bash app 2>/dev/null || true
 
+# Raise PHP limits so the UI can accept real invoice/catalog file uploads.
+COPY uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 ENV COMPOSER_HOME=/tmp/composer \
     COMPOSER_MEMORY_LIMIT=-1
 

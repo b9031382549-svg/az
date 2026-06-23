@@ -8,6 +8,7 @@ use App\Livewire\Catalog;
 use App\Livewire\Classify;
 use App\Livewire\Invoices;
 use App\Livewire\ReviewQueue;
+use App\Livewire\UploadInvoices;
 use Illuminate\Support\Facades\Route;
 
 // Guest
@@ -24,7 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/overview', [DashboardController::class, 'index'])->name('overview');
     Route::get('/invoices', Invoices::class)->name('invoices');
     Route::get('/ask', AskAi::class)->name('ask');
-    Route::get('/upload', [PageController::class, 'upload'])->name('upload');
+    Route::get('/upload', UploadInvoices::class)->name('upload');
 
     // Task 2 — goods/services classifier
     Route::get('/classify', Classify::class)->name('classify');
