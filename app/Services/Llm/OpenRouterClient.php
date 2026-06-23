@@ -25,12 +25,13 @@ class OpenRouterClient
     }
 
     /**
-     * Send a chat completion request and return the assistant message content.
+     * Send a chat completion and return content together with token usage.
      *
      * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
+     * @return array{content: string, usage: array<string, int>, model: string}
      */
-    public function chat(array $messages, array $options = []): string
+    public function complete(array $messages, array $options = []): array
     {
         if (empty($this->apiKey)) {
             throw new RuntimeException('OPENROUTER_API_KEY is not configured.');
@@ -63,7 +64,26 @@ class OpenRouterClient
             throw new RuntimeException('OpenRouter returned an empty response.');
         }
 
-        return $content;
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => (int) $response->json('usage.prompt_tokens', 0),
+                'completion_tokens' => (int) $response->json('usage.completion_tokens', 0),
+                'total_tokens' => (int) $response->json('usage.total_tokens', 0),
+            ],
+            'model' => (string) $response->json('model', $payload['model']),
+        ];
+    }
+
+    /**
+     * Send a chat completion request and return the assistant message content.
+     *
+     * @param  array<int, array{role: string, content: string}>  $messages
+     * @param  array<string, mixed>  $options
+     */
+    public function chat(array $messages, array $options = []): string
+    {
+        return $this->complete($messages, $options)['content'];
     }
 
     /**
@@ -74,9 +94,24 @@ class OpenRouterClient
      */
     public function json(array $messages, array $options = []): array
     {
-        $options['response_format'] ??= ['type' => 'json_object'];
-        $raw = $this->chat($messages, $options);
+        return $this->jsonWithUsage($messages, $options)['data'];
+    }
 
-        return JsonExtractor::decode($raw);
+    /**
+     * JSON prompt that also returns token usage for accounting.
+     *
+     * @param  array<int, array{role: string, content: string}>  $messages
+     * @return array{data: array<string, mixed>, usage: array<string, int>, model: string}
+     */
+    public function jsonWithUsage(array $messages, array $options = []): array
+    {
+        $options['response_format'] ??= ['type' => 'json_object'];
+        $result = $this->complete($messages, $options);
+
+        return [
+            'data' => JsonExtractor::decode($result['content']),
+            'usage' => $result['usage'],
+            'model' => $result['model'],
+        ];
     }
 }
