@@ -1,7 +1,14 @@
 <section class="p-5 sm:p-8 max-w-[920px]">
-  <div class="mb-6">
-    <p class="kicker mb-1.5">Data import</p>
-    <h1 class="font-display text-4xl">Upload invoices</h1>
+  <div class="flex items-end justify-between flex-wrap gap-3 mb-6">
+    <div>
+      <p class="kicker mb-1.5">Data import</p>
+      <h1 class="font-display text-4xl">Upload invoices</h1>
+    </div>
+    <div class="card-flat px-4 py-2.5 text-sm">
+      <span class="text-muted">In the database now:</span>
+      <span class="font-display text-lg tnum ml-1">{{ number_format($existing, 0, '.', ' ') }}</span>
+      <span class="text-muted">invoices</span>
+    </div>
   </div>
 
   @php
@@ -36,6 +43,12 @@
       <span class="text-amber">ℹ</span>
       <span>The file must have the 15 standard columns: No., supplier/recipient TIN, issue &amp; approval dates, series, number, the VAT amount columns and total.</span>
     </div>
+    @if($existing > 0)
+      <div class="mt-3 flex items-start gap-2.5 text-sm card-flat p-3.5 border-amber/40">
+        <span class="text-amber">⚠</span>
+        <span>The database already holds <b>{{ number_format($existing, 0, '.', ' ') }}</b> invoices. A new import is <b>added on top</b> unless you tick <b>“Replace existing data”</b> on the next step — re-importing the same file would create duplicates.</span>
+      </div>
+    @endif
   @endif
 
   {{-- STEP 2 — preview --}}
@@ -82,9 +95,21 @@
       </div>
       <p class="text-faint text-xs mt-2">Preview of the first {{ count($preview['sample']) }} rows.</p>
 
+      @if($existing > 0)
+        <div class="mt-4 card-flat p-3.5 text-sm flex items-start gap-2.5 {{ $fresh ? 'border-ledger/40' : 'border-amber/40' }}">
+          @if($fresh)
+            <span class="text-ledger">↻</span>
+            <span>The existing <b>{{ number_format($existing, 0, '.', ' ') }}</b> invoices will be removed, then <b>{{ number_format($preview['count'], 0, '.', ' ') }}</b> imported. Final total: <b>{{ number_format($preview['count'], 0, '.', ' ') }}</b>.</span>
+          @else
+            <span class="text-amber">⚠</span>
+            <span><b>{{ number_format($preview['count'], 0, '.', ' ') }}</b> rows will be <b>added</b> on top of {{ number_format($existing, 0, '.', ' ') }} → total <b>{{ number_format($existing + $preview['count'], 0, '.', ' ') }}</b> (duplicates if it's the same file). Tick “Replace existing data” to overwrite instead.</span>
+          @endif
+        </div>
+      @endif
+
       <div class="flex items-center justify-between mt-5">
         <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-          <input type="checkbox" wire:model="fresh" class="accent-stamp"> Replace existing data (truncate first)
+          <input type="checkbox" wire:model.live="fresh" class="accent-stamp"> Replace existing data (truncate first)
         </label>
         <div class="flex gap-2">
           <button wire:click="startOver" class="btn btn-ghost btn-sm">Choose another</button>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\EInvoice;
 use App\Services\Import\InvoiceImporter;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -57,6 +58,9 @@ class UploadInvoices extends Component
     {
         $step = $this->report ? 3 : ($this->preview ? 2 : 1);
 
-        return view('livewire.upload-invoices', compact('step'));
+        return view('livewire.upload-invoices', [
+            'step' => $step,
+            'existing' => (int) EInvoice::count(),
+        ]);
     }
 }
