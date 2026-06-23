@@ -4,7 +4,10 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PageController;
 use App\Livewire\AskAi;
+use App\Livewire\Catalog;
+use App\Livewire\Classify;
 use App\Livewire\Invoices;
+use App\Livewire\ReviewQueue;
 use Illuminate\Support\Facades\Route;
 
 // Guest
@@ -22,5 +25,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/invoices', Invoices::class)->name('invoices');
     Route::get('/ask', AskAi::class)->name('ask');
     Route::get('/upload', [PageController::class, 'upload'])->name('upload');
+
+    // Task 2 — goods/services classifier
+    Route::get('/classify', Classify::class)->name('classify');
+    Route::get('/review', ReviewQueue::class)->name('review');
+    Route::get('/catalog', Catalog::class)->name('catalog');
+
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');
 });

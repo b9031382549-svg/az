@@ -30,6 +30,15 @@
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M3.5 13.5v2a1 1 0 001 1h11a1 1 0 001-1v-2"/></svg>Upload</a>
       <a href="{{ route('ask') }}" class="{{ $nav('ask') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linejoin="round"><path d="M3 4.5h14v9H8l-4 3v-3H3z"/></svg>AI Chat</a>
+
+      <div class="px-5 pt-4 pb-1.5"><p class="kicker">Classifier</p></div>
+      <a href="{{ route('classify') }}" class="{{ $nav('classify') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l4 4 10-10"/><path d="M3 16h7"/></svg>Classify</a>
+      <a href="{{ route('review') }}" class="{{ $nav('review') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.5 2"/></svg>Review queue</a>
+      <a href="{{ route('catalog') }}" class="{{ $nav('catalog') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17"/></svg>Catalog</a>
+
       <div class="mx-5 my-3 border-t hair"></div>
       <a href="{{ route('settings') }}" class="{{ $nav('settings') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.5v2M10 16.5v2M3.5 3.5l1.4 1.4M15.1 15.1l1.4 1.4M1.5 10h2M16.5 10h2M3.5 16.5l1.4-1.4M15.1 4.9l1.4-1.4"/></svg>Settings</a>
