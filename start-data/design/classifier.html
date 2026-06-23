@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tariff Intelligence · prototype</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        paper:   '#F2EEE3',
+        surface: '#FCFBF6',
+        ink:     '#17150F',
+        inkpanel:'#1C1A14',
+        muted:   '#6E6757',
+        faint:   '#9A9384',
+        line:    '#DAD3C2',
+        hair:    '#E6E0D1',
+        stamp:   '#BE3A22',
+        ledger:  '#1F6B4A',
+        amber:   '#A9761A',
+      },
+      fontFamily: {
+        display: ['Fraunces','Georgia','serif'],
+        sans:    ['"Spline Sans"','system-ui','sans-serif'],
+        mono:    ['"Spline Sans Mono"','ui-monospace','monospace'],
+      },
+    }
+  }
+}
+</script>
+
+<style>
+  :root{ color-scheme:light; }
+  html,body{ height:100%; }
+  body{ background:#F2EEE3; color:#17150F; font-family:"Spline Sans",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:.045;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode:multiply;
+  }
+  .tnum{ font-variant-numeric:tabular-nums; }
+  .kicker{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#6E6757; }
+  .hair{ border-color:#E6E0D1; }
+  ::-webkit-scrollbar{ width:10px; height:10px }
+  ::-webkit-scrollbar-thumb{ background:#D5CEBD; border:3px solid #F2EEE3; border-radius:8px }
+  ::selection{ background:#BE3A22; color:#FCFBF6; }
+
+  .card{ background:#FCFBF6; border:1px solid #E6E0D1; border-radius:18px; }
+  .card-flat{ background:#FCFBF6; border:1px solid #E6E0D1; border-radius:14px; }
+
+  .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; border-radius:11px;
+        padding:11px 18px; font-size:14px; font-weight:500; line-height:1; transition:.15s; cursor:pointer; white-space:nowrap; }
+  .btn-ink{ background:#17150F; color:#F2EEE3; } .btn-ink:hover{ background:#000; }
+  .btn-stamp{ background:#BE3A22; color:#FCFBF6; } .btn-stamp:hover{ filter:brightness(.94); }
+  .btn-ghost{ background:#FCFBF6; border:1px solid #DAD3C2; color:#17150F; } .btn-ghost:hover{ border-color:#17150F; }
+  .btn-sm{ padding:8px 13px; font-size:13px; border-radius:10px; }
+
+  .chip{ display:inline-flex; align-items:center; gap:6px; border:1px solid #DAD3C2; background:#FCFBF6; border-radius:10px; transition:.15s; cursor:pointer; }
+  .chip:hover{ border-color:#17150F; }
+  .tag{ display:inline-flex; align-items:center; gap:5px; border:1px solid #DAD3C2; background:#F7F3E9; border-radius:8px; padding:3px 9px; font-size:12px; color:#3A352B; }
+
+  .field-label{ display:block; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#6E6757; margin-bottom:7px; font-weight:500; }
+  .field-input{ width:100%; height:46px; background:#FCFBF6; border:1px solid #DAD3C2; border-radius:11px; padding:0 14px; font-size:14px; color:#17150F; outline:none; transition:border-color .15s, box-shadow .15s; }
+  .field-input::placeholder{ color:#9A9384; }
+  .field-input:focus{ border-color:#17150F; box-shadow:0 0 0 3px rgba(23,21,15,.06); }
+  select.field-input{ appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236E6757' stroke-width='1.6'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 13px center; padding-right:36px; }
+
+  .nav-item{ display:flex; align-items:center; gap:11px; margin:2px 12px; padding:10px 13px; border-radius:11px; cursor:pointer; color:#3A352B; font-size:14.5px; transition:.15s; }
+  .nav-item:hover{ background:#EBE5D6; }
+  .nav-item.active{ background:#17150F; color:#F4F0E6; }
+  .nav-item svg{ width:18px; height:18px; flex:none; }
+
+  @keyframes fadeup{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+  .fadeup{ animation:fadeup .5s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes slidein{ from{transform:translateX(100%)} to{transform:none} }
+  .slidein{ animation:slidein .32s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes stampin{ 0%{opacity:0; transform:scale(1.7) rotate(-26deg)} 55%{opacity:1} 100%{opacity:1; transform:scale(1) rotate(-9deg)} }
+  .stampin{ animation:stampin .55s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes blink{ 50%{opacity:.25} }
+  .blink{ animation:blink 1s steps(2) infinite; }
+  @keyframes grow{ from{width:0} }
+  .grow{ animation:grow .7s cubic-bezier(.2,.7,.2,1) both; }
+
+  .stamp-seal{ border:2.5px solid #BE3A22; color:#BE3A22; border-radius:8px;
+    font-family:"Spline Sans Mono",monospace; letter-spacing:.18em; text-transform:uppercase; transform:rotate(-9deg); opacity:.92; }
+
+  .hide-sub  [data-col=sub]{display:none}
+  .hide-brand[data-col=brand]{display:none}
+  .hide-raw  [data-col=raw]{display:none}
+  .hide-alt  [data-col=alt]{display:none}
+
+  .dropzone.drag{ background:#FCFBF6; border-color:#BE3A22; }
+  .link-under{ text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
+  .row-hover:hover{ background:#FAF8F1; }
+  .meter{ height:6px; border-radius:6px; background:#E6E0D1; overflow:hidden; }
+  .meter > i{ display:block; height:100%; border-radius:6px; }
+</style>
+</head>
+<body class="font-sans">
+
+<!-- ======================= AUTH ======================= -->
+<div id="auth" class="min-h-screen grid md:grid-cols-2">
+  <div class="flex flex-col px-7 sm:px-14 py-10 bg-paper">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 grid place-items-center bg-ink text-paper rounded-lg font-display font-semibold text-lg leading-none">T</div>
+      <span class="font-display text-xl tracking-tight">Tariff<span class="text-stamp">·</span>Intelligence</span>
+    </div>
+
+    <div class="flex-1 grid place-items-center py-10">
+      <div class="w-full max-w-[380px]">
+        <!-- SIGN IN -->
+        <div data-auth="login">
+          <p class="kicker mb-3">Account</p>
+          <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Welcome back.</h1>
+          <p class="text-muted mb-9">Sign in to classify your invoice items.</p>
+          <div class="space-y-5">
+            <div><label class="field-label">Email</label><input type="email" value="rufat@tribes.az" class="field-input"></div>
+            <div><label class="field-label">Password</label>
+              <div class="relative">
+                <input type="password" value="placeholder" class="field-input pr-12">
+                <button class="absolute right-0 top-0 h-full px-3.5 text-faint hover:text-ink" onclick="const i=this.previousElementSibling; i.type=i.type==='password'?'text':'password'">view</button>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-sm mt-4 mb-7">
+            <label class="flex items-center gap-2 text-muted cursor-pointer"><input type="checkbox" class="accent-stamp"> Remember me</label>
+            <a class="link-under text-muted hover:text-ink cursor-pointer" onclick="authView('forgot')">Forgot password?</a>
+          </div>
+          <button class="btn btn-ink w-full" onclick="enterApp()">Sign in</button>
+          <p class="text-sm text-muted mt-6">No account? <a class="link-under text-ink cursor-pointer" onclick="authView('register')">Sign up</a></p>
+        </div>
+
+        <!-- SIGN UP -->
+        <div data-auth="register" class="hidden">
+          <p class="kicker mb-3">New account</p>
+          <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Create your account.</h1>
+          <p class="text-muted mb-9">Upload items and get tariff codes in minutes.</p>
+          <div class="space-y-5">
+            <div><label class="field-label">Name</label><input class="field-input" placeholder="Rufat Burjaliyev"></div>
+            <div><label class="field-label">Company · VÖEN</label><input class="field-input" placeholder="Tribes LLC · 1234567890"></div>
+            <div><label class="field-label">Email</label><input class="field-input" placeholder="you@company.az"></div>
+            <div><label class="field-label">Password</label>
+              <input type="password" class="field-input" placeholder="At least 8 characters" oninput="pwStrength(this.value)">
+              <div class="flex gap-1.5 mt-3" id="pwbars">
+                <span class="h-1 flex-1 rounded bg-line"></span><span class="h-1 flex-1 rounded bg-line"></span>
+                <span class="h-1 flex-1 rounded bg-line"></span><span class="h-1 flex-1 rounded bg-line"></span>
+              </div>
+            </div>
+          </div>
+          <label class="flex items-start gap-2 text-sm text-muted my-6 cursor-pointer">
+            <input type="checkbox" class="accent-stamp mt-0.5"> I accept the terms of use and the data processing policy.</label>
+          <button class="btn btn-ink w-full" onclick="enterApp()">Create account</button>
+          <p class="text-sm text-muted mt-6">Already have an account? <a class="link-under text-ink cursor-pointer" onclick="authView('login')">Sign in</a></p>
+        </div>
+
+        <!-- FORGOT -->
+        <div data-auth="forgot" class="hidden">
+          <p class="kicker mb-3">Recovery</p>
+          <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Reset your password.</h1>
+          <p class="text-muted mb-9">We'll send a recovery link to your email.</p>
+          <div><label class="field-label">Email</label><input class="field-input" placeholder="you@company.az"></div>
+          <button class="btn btn-ink w-full mt-7" onclick="alert('Recovery link sent (demo)')">Send link</button>
+          <p class="text-sm text-muted mt-6"><a class="link-under text-ink cursor-pointer" onclick="authView('login')">Back to sign in</a></p>
+        </div>
+      </div>
+    </div>
+    <p class="text-xs text-faint">© 2026 Tariff Intelligence · interface prototype</p>
+  </div>
+
+  <!-- editorial panel -->
+  <div class="hidden md:flex relative bg-inkpanel text-paper overflow-hidden">
+    <div class="absolute inset-0 opacity-[0.07]" style="background-image:linear-gradient(#F2EEE3 1px,transparent 1px),linear-gradient(90deg,#F2EEE3 1px,transparent 1px);background-size:34px 34px"></div>
+    <div class="relative z-10 flex flex-col justify-between p-14 w-full">
+      <p class="kicker text-faint">EQM classifier · HS codes · confidence</p>
+      <div>
+        <p class="font-display text-[2.9rem] leading-[1.08]">“What's the<br>tariff code for<br>this item?”</p>
+        <p class="text-faint mt-5 max-w-sm leading-relaxed">Upload your goods &amp; services — and every line gets matched to the official classifier, with a confidence score you can verify.</p>
+        <div class="mt-8 space-y-2 font-mono text-sm">
+          <div class="flex items-center gap-3"><span class="flex-1 text-paper/90">Şpris 5 ml 23G</span><span class="text-paper/60">9018 31 000 0</span><span class="text-ledger bg-ledger/15 px-1.5 rounded">96%</span></div>
+          <div class="flex items-center gap-3"><span class="flex-1 text-paper/90">Kəpənək 23 (mavi)</span><span class="text-paper/60">9018 32 100 0</span><span class="text-amber bg-amber/15 px-1.5 rounded">62%</span></div>
+          <div class="flex items-center gap-3"><span class="flex-1 text-paper/90">Qrelka 2 000 ml</span><span class="text-paper/60">4014 90 000 0</span><span class="text-stamp bg-stamp/20 px-1.5 rounded">41%</span></div>
+        </div>
+      </div>
+      <div class="flex items-end justify-between">
+        <div class="font-mono text-sm text-faint leading-relaxed">
+          <div>01 — upload file</div><div>02 — auto-match</div><div>03 — review &amp; confirm</div>
+        </div>
+        <div class="stamp-seal text-sm font-semibold px-4 py-2.5">code<br>matched</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================= APP ======================= -->
+<div id="app" class="hidden min-h-screen flex">
+
+  <!-- SIDEBAR -->
+  <aside class="hidden md:flex flex-col w-60 shrink-0 bg-paper border-r hair">
+    <div class="h-16 flex items-center gap-2.5 px-5 border-b hair">
+      <div class="w-7 h-7 grid place-items-center bg-ink text-paper rounded-md font-display font-semibold leading-none">T</div>
+      <span class="font-display text-lg tracking-tight">Tariff<span class="text-stamp">·</span>Intel</span>
+    </div>
+    <nav class="flex-1 py-4">
+      <a class="nav-item active" data-nav="dashboard" onclick="navigate('dashboard')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1.2"/><rect x="11.5" y="2.5" width="6" height="6" rx="1.2"/><rect x="2.5" y="11.5" width="6" height="6" rx="1.2"/><rect x="11.5" y="11.5" width="6" height="6" rx="1.2"/></svg>Overview</a>
+      <a class="nav-item" data-nav="items" onclick="navigate('items')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round"><path d="M3 5h14M3 10h14M3 15h9"/></svg>Classifications</a>
+      <a class="nav-item" data-nav="upload" onclick="navigate('upload')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M3.5 13.5v2a1 1 0 001 1h11a1 1 0 001-1v-2"/></svg>Upload</a>
+      <a class="nav-item" data-nav="classifier" onclick="navigate('classifier')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><path d="M3 7l7-3 7 3-7 3-7-3z" stroke-linejoin="round"/><path d="M3 10.5l7 3 7-3M3 14l7 3 7-3"/></svg>Classifier</a>
+      <div class="mx-5 my-3 border-t hair"></div>
+      <a class="nav-item" data-nav="settings" onclick="navigate('settings')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.5v2M10 16.5v2M3.5 3.5l1.4 1.4M15.1 15.1l1.4 1.4M1.5 10h2M16.5 10h2M3.5 16.5l1.4-1.4M15.1 4.9l1.4-1.4"/></svg>Settings</a>
+    </nav>
+    <div class="p-4 border-t hair">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-ledger/15 text-ledger grid place-items-center font-semibold">R</div>
+        <div class="text-sm leading-tight"><div class="font-medium">Rufat B.</div><div class="text-faint text-xs">Tribes LLC</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <!-- TOPBAR -->
+    <header class="h-16 shrink-0 flex items-center gap-4 px-5 sm:px-7 border-b hair bg-paper/80 backdrop-blur sticky top-0 z-30">
+      <button class="md:hidden text-xl" onclick="document.querySelector('aside').classList.toggle('hidden')">≡</button>
+      <div class="flex-1 max-w-md flex items-center gap-2 bg-surface border hair rounded-xl px-3.5 h-10">
+        <svg width="16" height="16" fill="none" stroke="#9A9384" stroke-width="1.8" viewBox="0 0 20 20"><circle cx="9" cy="9" r="6"/><path d="m17 17-3.2-3.2"/></svg>
+        <input id="topSearch" placeholder="Search items or codes…" class="w-full bg-transparent outline-none text-sm"
+               onkeydown="if(event.key==='Enter'){navigate('items'); document.getElementById('itemSearch').value=this.value; renderItems();}">
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <button class="btn btn-stamp btn-sm hidden sm:inline-flex" onclick="navigate('upload')">Upload</button>
+        <button class="flex items-center gap-2 border hair rounded-xl bg-surface px-2.5 h-10 hover:border-ink transition" onclick="logout()">
+          <span class="w-6 h-6 rounded-full bg-ledger/15 text-ledger grid place-items-center text-xs font-semibold">R</span>
+          <span class="text-sm hidden sm:inline">Sign out</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto">
+
+      <!-- ===== DASHBOARD ===== -->
+      <section data-view="dashboard" class="p-5 sm:p-8 max-w-[1180px]">
+        <div class="flex items-end justify-between flex-wrap gap-3 mb-7">
+          <div><p class="kicker mb-1.5">Last import · goods_short.csv</p><h1 class="font-display text-4xl">Overview</h1></div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="navigate('upload')">Upload</button>
+            <button class="btn btn-stamp btn-sm" onclick="navigate('items')">Review queue</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7" id="kpis"></div>
+
+        <div class="grid lg:grid-cols-5 gap-5">
+          <div class="lg:col-span-3 card p-6 fadeup">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="font-display text-xl">Confidence distribution</h2>
+              <span class="kicker">13 items</span>
+            </div>
+            <div id="chart" class="flex items-end gap-6 h-52"></div>
+            <div class="flex gap-5 mt-5 text-sm text-muted">
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-ledger"></span> High ≥ 85% — auto-matched</span>
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-amber"></span> Medium 60–84%</span>
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-sm bg-stamp"></span> Low &lt; 60%</span>
+            </div>
+          </div>
+          <div class="lg:col-span-2 card p-6 fadeup" style="animation-delay:.08s">
+            <h2 class="font-display text-xl mb-5">By group</h2>
+            <ul class="space-y-4 text-sm" id="byGroup"></ul>
+            <div class="border-t hair mt-5 pt-4">
+              <h3 class="kicker mb-3">Recent imports</h3>
+              <ul class="space-y-3 text-sm" id="recentUploads"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ITEMS / CLASSIFICATIONS ===== -->
+      <section data-view="items" class="hidden p-5 sm:p-8">
+        <div class="flex items-end justify-between flex-wrap gap-3 mb-6">
+          <div><p class="kicker mb-1.5">e-invoice_goods_short.csv · matched against EQM v1</p><h1 class="font-display text-4xl">Classifications</h1></div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="confirmAllHigh()">Confirm all high</button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('Exported 13 rows with codes')">Export</button>
+          </div>
+        </div>
+
+        <!-- filter bar -->
+        <div class="card-flat p-3 flex flex-wrap items-center gap-2 mb-4">
+          <div class="flex items-center gap-2 bg-paper border hair rounded-xl px-3.5 h-10 flex-1 min-w-[220px]">
+            <svg width="16" height="16" fill="none" stroke="#9A9384" stroke-width="1.8" viewBox="0 0 20 20"><circle cx="9" cy="9" r="6"/><path d="m17 17-3.2-3.2"/></svg>
+            <input id="itemSearch" placeholder="Search: item name or code…" class="w-full bg-transparent outline-none text-sm" oninput="renderItems()">
+          </div>
+          <select id="fType" class="field-input !h-10 !w-auto" onchange="renderItems()">
+            <option value="">Type: all</option><option value="goods">Goods</option><option value="service">Services</option>
+          </select>
+          <select id="fConf" class="field-input !h-10 !w-auto" onchange="renderItems()">
+            <option value="">Confidence: all</option><option value="high">High ≥ 85%</option><option value="med">Medium 60–84%</option><option value="low">Low &lt; 60%</option>
+          </select>
+          <div class="relative">
+            <button class="chip px-3.5 h-10 text-sm" onclick="document.getElementById('colsPop').classList.toggle('hidden')">Columns ▾</button>
+            <div id="colsPop" class="hidden absolute right-0 mt-1.5 w-52 card-flat shadow-lg z-20 p-3.5 text-sm space-y-2.5">
+              <p class="kicker mb-1">Extra columns</p>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('sub',this.checked)"> Subgroup</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" checked onchange="toggleCol('brand',this.checked)"> Brand</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('alt',this.checked)"> Alt. candidates</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('raw',this.checked)"> Raw text</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- summary -->
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-2 px-1 mb-3 text-sm">
+          <span><span class="font-mono tnum font-semibold" id="sumCount">0</span> <span class="text-muted">items</span></span>
+          <span class="text-muted">Auto-matched <span class="font-mono tnum font-semibold text-ledger" id="sumAuto">0</span></span>
+          <span class="text-muted">Needs review <span class="font-mono tnum font-semibold text-amber" id="sumReview">0</span></span>
+          <span class="text-muted">Avg confidence <span class="font-mono tnum font-semibold text-ink" id="sumAvg">0%</span></span>
+        </div>
+
+        <!-- bulk bar -->
+        <div id="bulkBar" class="hidden items-center gap-3 bg-ink text-paper rounded-xl px-4 py-2.5 mb-2 text-sm">
+          <span id="bulkCount">0</span> selected
+          <button class="link-under" onclick="confirmSelected()">Confirm selected</button>
+          <button class="link-under" onclick="toast('Re-matching selected…')">Re-match</button>
+          <button class="ml-auto text-paper/60 hover:text-paper" onclick="clearSel()">Clear selection</button>
+        </div>
+
+        <!-- table -->
+        <div id="itemTableWrap" class="card-flat overflow-hidden hide-sub hide-alt hide-raw">
+          <div class="overflow-x-auto">
+          <table class="w-full text-sm whitespace-nowrap">
+            <thead>
+              <tr class="text-left border-b-2 border-ink/80">
+                <th class="px-3 py-3 w-8"><input type="checkbox" class="accent-stamp" onchange="selectAll(this.checked)"></th>
+                <th class="px-3 py-3 kicker font-sans">Invoice item</th>
+                <th class="px-3 py-3 kicker font-sans" data-col="brand">Brand</th>
+                <th class="px-3 py-3 kicker font-sans" data-col="sub">Subgroup</th>
+                <th class="px-3 py-3 kicker font-sans" data-col="raw">Raw text</th>
+                <th class="px-3 py-3 kicker font-sans">Suggested code</th>
+                <th class="px-3 py-3 kicker font-sans text-center" data-col="alt">Alt.</th>
+                <th class="px-3 py-3 kicker font-sans">Confidence</th>
+                <th class="px-3 py-3 kicker font-sans">Status</th>
+                <th class="px-3 py-3 w-6"></th>
+              </tr>
+            </thead>
+            <tbody id="itemBody"></tbody>
+          </table>
+          </div>
+        </div>
+        <p class="text-center text-muted text-sm mt-4">Click any row to open candidates, match signals &amp; override the code.</p>
+      </section>
+
+      <!-- ===== UPLOAD ===== -->
+      <section data-view="upload" class="hidden p-5 sm:p-8 max-w-[920px]">
+        <div class="mb-6"><p class="kicker mb-1.5">Data import</p><h1 class="font-display text-4xl">Upload items</h1></div>
+
+        <div class="flex items-center gap-3 mb-6">
+          <span class="text-sm text-muted">Classifier:</span>
+          <div class="inline-flex p-1 bg-paper border hair rounded-xl text-sm">
+            <button id="clsGoods" class="px-3.5 py-1.5 rounded-lg bg-ink text-paper" onclick="setClassifier('goods')">Goods · mal</button>
+            <button id="clsServ" class="px-3.5 py-1.5 rounded-lg text-muted" onclick="setClassifier('service')">Services · xidmət</button>
+          </div>
+          <span class="tag">EQM v1 · 21,400 codes</span>
+        </div>
+
+        <!-- stepper -->
+        <ol class="flex items-center gap-3 mb-7 text-sm" id="stepper">
+          <li class="flex items-center gap-2" data-step-dot="1"><span class="w-6 h-6 grid place-items-center bg-stamp text-paper rounded-md font-mono text-xs">1</span> File</li>
+          <li class="w-8 border-t hair"></li>
+          <li class="flex items-center gap-2 text-muted" data-step-dot="2"><span class="w-6 h-6 grid place-items-center border hair rounded-md font-mono text-xs">2</span> Mapping</li>
+          <li class="w-8 border-t hair"></li>
+          <li class="flex items-center gap-2 text-muted" data-step-dot="3"><span class="w-6 h-6 grid place-items-center border hair rounded-md font-mono text-xs">3</span> Result</li>
+        </ol>
+
+        <!-- step 1 -->
+        <div data-step="1">
+          <div class="dropzone card bg-surface border-2 border-dashed hair p-12 text-center transition cursor-pointer"
+               onclick="goStep(2)" ondragover="event.preventDefault(); this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')" ondrop="event.preventDefault(); this.classList.remove('drag'); goStep(2)">
+            <div class="w-14 h-14 mx-auto mb-3 grid place-items-center rounded-2xl bg-paper text-stamp">
+              <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+            </div>
+            <p class="font-display text-2xl mb-1">Drag your file here</p>
+            <p class="text-muted mb-5">or click to choose a CSV / XLSX export</p>
+            <span class="btn btn-ink">Choose file</span>
+            <p class="text-xs text-faint mt-5">Supported: .csv, .xlsx, .xls · up to 20&nbsp;MB · UTF-8 / Win-1251 auto-detect</p>
+          </div>
+          <div class="mt-4 flex items-start gap-2.5 text-sm text-muted card-flat p-3.5">
+            <span class="text-amber">ⓘ</span>
+            <span>The file needs at least an <b>item name</b> column (e.g. <span class="font-mono">MƏHSULUN ADI</span>). Optional: <span class="font-mono">GROUP</span>, <span class="font-mono">AĞ QRUP</span> — used as matching hints.</span>
+          </div>
+        </div>
+
+        <!-- step 2 -->
+        <div data-step="2" class="hidden">
+          <div class="card-flat p-5 mb-4">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2"><span class="font-mono text-sm">e-invoice_goods_short.csv</span><span class="text-xs text-faint">· 4 KB</span></div>
+              <span class="text-ledger text-sm">19 rows → 9 unique items</span>
+            </div>
+            <p class="text-sm text-muted">Auto-mapped 3 of 3 columns.</p>
+          </div>
+
+          <div class="card-flat divide-y hair mb-4 overflow-hidden">
+            <div class="grid grid-cols-[1.2fr_1.4fr_1.1fr] gap-3 px-4 py-2.5 kicker"><span>File column</span><span>System field</span><span>Example</span></div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1.1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">MƏHSULUN ADI</span>
+              <select class="field-input !h-10"><option>Item name</option><option>— do not import</option></select>
+              <span class="font-mono text-xs">Şpris 5 ml 23G…</span>
+            </div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1.1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">GROUP</span>
+              <select class="field-input !h-10"><option>Group</option><option>— do not import</option></select>
+              <span class="font-mono text-xs">MED.SYRINGES…</span>
+            </div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1.1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">AĞ QRUP</span>
+              <select class="field-input !h-10"><option>Subgroup</option><option>— do not import</option></select>
+              <span class="font-mono text-xs">MED.SYRINGES</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-2.5 text-sm bg-amber/10 border border-amber/30 rounded-xl p-3.5 mb-4">
+            <span class="text-amber">⚠</span>
+            <span>Detected <b>Latin-1 mis-encoding</b> — auto-fixed to UTF-8 (<span class="font-mono">Åpris → Şpris</span>, <span class="font-mono">KÉpÉnÉk → Kəpənək</span>). Units, brands and <span class="font-mono">№</span>-quantities are split out before matching.</span>
+          </div>
+
+          <p class="kicker mb-2">Preview — cleaned text that will be matched</p>
+          <div class="card-flat overflow-hidden mb-6">
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm whitespace-nowrap">
+              <thead><tr class="text-left border-b hair">
+                <th class="px-3 py-2 kicker font-sans">Raw (file)</th><th class="px-3 py-2 kicker font-sans">Cleaned</th><th class="px-3 py-2 kicker font-sans">Group</th></tr></thead>
+              <tbody id="previewBody"></tbody>
+            </table>
+            </div>
+          </div>
+
+          <div class="flex justify-between">
+            <button class="btn btn-ghost" onclick="goStep(1)">Back</button>
+            <button class="btn btn-stamp" onclick="runMatch()">Match 9 items →</button>
+          </div>
+        </div>
+
+        <!-- step 3 -->
+        <div data-step="3" class="hidden">
+          <div class="card p-10 text-center relative overflow-hidden">
+            <div class="stamp-seal stampin inline-block text-base font-semibold px-6 py-4 mb-6">classified</div>
+            <h2 class="font-display text-3xl mb-1">9 items matched</h2>
+            <p class="text-muted mb-1">5 auto-matched · 3 need review · 1 low confidence</p>
+            <p class="text-amber mb-7">Avg confidence 74% · 1 item below threshold</p>
+            <div class="flex flex-wrap gap-3 justify-center">
+              <button class="btn btn-ink" onclick="navigate('items')">Review results</button>
+              <button class="btn btn-ghost" onclick="goStep(1)">Upload more</button>
+              <button class="btn btn-ghost" onclick="toast('Report generated')">Import report</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- history -->
+        <div class="mt-10">
+          <h2 class="font-display text-xl mb-3">Upload history</h2>
+          <div class="card-flat overflow-hidden">
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm whitespace-nowrap">
+              <thead><tr class="text-left border-b hair">
+                <th class="px-4 py-2.5 kicker font-sans">File</th><th class="px-4 py-2.5 kicker font-sans">Classifier</th>
+                <th class="px-4 py-2.5 kicker font-sans text-right">Items</th><th class="px-4 py-2.5 kicker font-sans text-right">Auto %</th>
+                <th class="px-4 py-2.5 kicker font-sans">Status</th><th class="px-4 py-2.5 kicker font-sans w-10"></th></tr></thead>
+              <tbody class="divide-y hair">
+                <tr class="row-hover"><td class="px-4 py-3 font-mono text-xs">e-invoice_goods_short.csv</td><td class="px-4 py-3 text-muted">Goods</td><td class="px-4 py-3 text-right font-mono tnum">9</td><td class="px-4 py-3 text-right font-mono tnum">56%</td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-ledger"><span class="w-1.5 h-1.5 rounded-full bg-ledger"></span> Done</span></td><td class="px-4 py-3 text-faint">···</td></tr>
+                <tr class="row-hover"><td class="px-4 py-3 font-mono text-xs">services_april.csv</td><td class="px-4 py-3 text-muted">Services</td><td class="px-4 py-3 text-right font-mono tnum">312</td><td class="px-4 py-3 text-right font-mono tnum">—</td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-amber blink"><span class="w-1.5 h-1.5 rounded-full bg-amber"></span> Matching…</span></td><td class="px-4 py-3 text-faint">···</td></tr>
+                <tr class="row-hover"><td class="px-4 py-3 font-mono text-xs">broken_export.csv</td><td class="px-4 py-3 text-muted">Goods</td><td class="px-4 py-3 text-right font-mono tnum">0</td><td class="px-4 py-3 text-right font-mono tnum">—</td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-stamp"><span class="w-1.5 h-1.5 rounded-full bg-stamp"></span> Failed</span></td><td class="px-4 py-3 text-faint">···</td></tr>
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CLASSIFIER CATALOG ===== -->
+      <section data-view="classifier" class="hidden p-5 sm:p-8 max-w-[1080px]">
+        <div class="mb-6"><p class="kicker mb-1.5">Reference · EQM v1 · 21,400 codes</p><h1 class="font-display text-4xl">Classifier catalog</h1></div>
+        <div class="flex items-center gap-2 bg-surface border hair rounded-xl px-3.5 h-11 mb-4 max-w-lg">
+          <svg width="16" height="16" fill="none" stroke="#9A9384" stroke-width="1.8" viewBox="0 0 20 20"><circle cx="9" cy="9" r="6"/><path d="m17 17-3.2-3.2"/></svg>
+          <input id="codeSearch" placeholder="Search code or description (AZ)…" class="w-full bg-transparent outline-none text-sm" oninput="renderCodes()">
+        </div>
+        <div class="card-flat overflow-hidden">
+          <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-left border-b-2 border-ink/80">
+              <th class="px-4 py-3 kicker font-sans w-44">Code</th><th class="px-4 py-3 kicker font-sans">Description</th>
+              <th class="px-4 py-3 kicker font-sans w-20">Unit</th><th class="px-4 py-3 kicker font-sans w-24 text-right">Status</th></tr></thead>
+            <tbody id="codeBody"></tbody>
+          </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section data-view="settings" class="hidden p-5 sm:p-8 max-w-[760px]">
+        <div class="mb-6"><p class="kicker mb-1.5">Account</p><h1 class="font-display text-4xl">Settings</h1></div>
+        <div class="flex gap-1 border-b hair mb-6 text-sm">
+          <button class="px-4 py-2.5 border-b-2 border-ink -mb-px font-medium">Profile</button>
+          <button class="px-4 py-2.5 border-b-2 border-transparent text-muted hover:text-ink">Matching</button>
+          <button class="px-4 py-2.5 border-b-2 border-transparent text-muted hover:text-ink">Security</button>
+        </div>
+        <div class="card p-7 mb-5">
+          <div class="grid sm:grid-cols-2 gap-5">
+            <div><label class="field-label">Name</label><input value="Rufat Burjaliyev" class="field-input"></div>
+            <div><label class="field-label">Email</label><input value="rufat@tribes.az" class="field-input"></div>
+            <div><label class="field-label">Company · VÖEN</label><input value="Tribes LLC · 1234567890" class="field-input"></div>
+            <div><label class="field-label">Default classifier</label><select class="field-input"><option>Goods · mal</option><option>Services · xidmət</option></select></div>
+          </div>
+        </div>
+        <div class="card p-7">
+          <h3 class="font-display text-lg mb-1">Auto-confirm threshold</h3>
+          <p class="text-sm text-muted mb-5">Items at or above this confidence are auto-matched without manual review.</p>
+          <div class="flex items-center gap-4">
+            <input type="range" min="50" max="99" value="85" class="flex-1 accent-stamp" oninput="document.getElementById('thr').textContent=this.value+'%'">
+            <span id="thr" class="font-mono tnum text-xl w-16 text-right">85%</span>
+          </div>
+          <div class="pt-7"><button class="btn btn-ink" onclick="toast('Settings saved')">Save changes</button></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ======================= DRAWER ======================= -->
+<div id="drawerBackdrop" class="hidden fixed inset-0 bg-ink/40 z-40" onclick="closeDrawer()"></div>
+<aside id="drawer" class="hidden fixed top-0 right-0 h-full w-full max-w-md bg-surface border-l hair z-50 overflow-y-auto"></aside>
+
+<!-- toast -->
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-ink text-paper text-sm px-4 py-2.5 rounded-xl opacity-0 pointer-events-none transition-all duration-300"></div>
+
+<script>
+/* ============ DATA ============ */
+const ITEMS = [
+ {id:1, type:'goods', name:'Şpris 5 ml 23G ×32 mm 3 hissəli', raw:'Åpris 5ml 23G Ð¥32 MM 3H rezin porÅenli â 1 (Åpris) (B&Braumann)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'B.Braun', unit:'ədəd', pct:96, status:'auto', chosen:0,
+   attrs:['5 ml','23G','32 mm','3-hissəli','rezin porşen'],
+   signals:['Term <mark>şpris</mark> → syringe','Volume + needle gauge present','Single dominant candidate'],
+   cands:[{code:'9018310000',desc:'Şprislər, iynəli və ya iynəsiz',pct:96,unit:'ədəd'},{code:'9018321000',desc:'Borulu metal iynələr',pct:28,unit:'ədəd'},{code:'9018390000',desc:'Digər alət və cihazlar',pct:15,unit:'ədəd'}]},
+ {id:2, type:'goods', name:'Kateter venadaxili 24G', raw:'Kateter venadaxili 24G (DigÉrlÉr) (Fada Medical)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'Fada Medical', unit:'ədəd', pct:92, status:'auto', chosen:0,
+   attrs:['24G','venadaxili / IV'],
+   signals:['Term <mark>kateter</mark> → catheter / cannula','Gauge 24G typical of IV cannula'],
+   cands:[{code:'9018390000',desc:'Kateterlər, kanülalar və oxşar alətlər',pct:92,unit:'ədəd'},{code:'9018310000',desc:'Şprislər, iynəli və ya iynəsiz',pct:24,unit:'ədəd'},{code:'3926909790',desc:'Plastik kütlədən digər məmulatlar',pct:11,unit:'kq'}]},
+ {id:3, type:'goods', name:'Kateter venadaxili 22G', raw:'Kateter venadaxili 22G (DigÉrlÉr) (Fada Medical)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'Fada Medical', unit:'ədəd', pct:90, status:'auto', chosen:0,
+   attrs:['22G','venadaxili / IV'],
+   signals:['Term <mark>kateter</mark> → catheter / cannula','Matches sibling line 24G'],
+   cands:[{code:'9018390000',desc:'Kateterlər, kanülalar və oxşar alətlər',pct:90,unit:'ədəd'},{code:'9018310000',desc:'Şprislər, iynəli və ya iynəsiz',pct:21,unit:'ədəd'},{code:'3926909790',desc:'Plastik kütlədən digər məmulatlar',pct:10,unit:'kq'}]},
+ {id:4, type:'goods', name:'Kateter Foley 22', raw:'Kateter Foley 22 (DigÉrlÉr) (<>)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'—', unit:'ədəd', pct:88, status:'auto', chosen:0,
+   attrs:['Foley','ölçü 22','sidik kateteri'],
+   signals:['<mark>Foley</mark> → indwelling urinary catheter','No brand — name match only'],
+   cands:[{code:'9018390000',desc:'Kateterlər, kanülalar və oxşar alətlər',pct:88,unit:'ədəd'},{code:'4014900000',desc:'Rezindən gigiyena əşyaları',pct:19,unit:'ədəd'},{code:'9018908409',desc:'Digər tibbi alət və cihazlar',pct:14,unit:'ədəd'}]},
+ {id:5, type:'goods', name:'Şpris insulin 1 ml 100 ED 30G×8 mm', raw:'Åpris insulin 1ml 100 ED 30Gx8mm â 1 (Åpris) (B.Braun)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'B.Braun', unit:'ədəd', pct:85, status:'auto', chosen:0,
+   attrs:['1 ml','insulin','30G','100 ED'],
+   signals:['<mark>şpris</mark> + fixed needle 30G','Insulin variant → sub-heading 31 10'],
+   cands:[{code:'9018311000',desc:'Şprislər, iynəli',pct:85,unit:'ədəd'},{code:'9018310000',desc:'Şprislər, iynəli və ya iynəsiz',pct:71,unit:'ədəd'},{code:'9018321000',desc:'Borulu metal iynələr',pct:26,unit:'ədəd'}]},
+ {id:6, type:'goods', name:'Sistem qan filtirli №1', raw:'Sistem Ålanq filtirli (B&Braumann) â 1 (DigÉrlÉr) (B&Braumann)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'B.Braun', unit:'ədəd', pct:66, status:'review', chosen:0,
+   attrs:['transfuziya sistemi','filtrli'],
+   signals:['<mark>sistem … filtirli</mark> → infusion / transfusion set','Two close candidates — 9018 39 vs 9018 90','Generic noun, no clear sub-type'],
+   cands:[{code:'9018390000',desc:'Kateterlər, kanülalar və oxşar alətlər',pct:66,unit:'ədəd'},{code:'9018908409',desc:'Digər tibbi alət və cihazlar',pct:58,unit:'ədəd'},{code:'3926909790',desc:'Plastik kütlədən digər məmulatlar',pct:22,unit:'kq'}]},
+ {id:7, type:'goods', name:'Kəpənək 23 (mavi)', raw:'KÉpÉnÉk 23 (mavi) â 1 (DigÉrlÉr) (B&Braumann)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'B.Braun', unit:'ədəd', pct:62, status:'review', chosen:0,
+   attrs:['23G','butterfly','mavi'],
+   signals:['<mark>kəpənək</mark> (“butterfly”) → winged needle set','Slang term — low classifier coverage','Colour “mavi” = gauge 23'],
+   cands:[{code:'9018321000',desc:'Borulu metal iynələr',pct:62,unit:'ədəd'},{code:'9018390000',desc:'Kateterlər, kanülalar və oxşar alətlər',pct:49,unit:'ədəd'},{code:'9018310000',desc:'Şprislər, iynəli və ya iynəsiz',pct:24,unit:'ədəd'}]},
+ {id:8, type:'goods', name:'İmalə B9 sərt uclu 230 ml', raw:'imalÉ B9 sÉrt uclu(0417)(qutulu) 230 ml â 1 (Ä°malÉ) (Alpina plast)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'Alpina plast', unit:'ədəd', pct:60, status:'review', chosen:0,
+   attrs:['230 ml','imalə / enema','sərt uclu','plastik'],
+   signals:['<mark>imalə</mark> → enema device','Plastic maker hints non-9018 heading','Material vs use ambiguity'],
+   cands:[{code:'9018908409',desc:'Digər tibbi alət və cihazlar',pct:60,unit:'ədəd'},{code:'3924900009',desc:'Plastik kütlədən təsərrüfat və tualet əşyaları',pct:47,unit:'ədəd'},{code:'4014900000',desc:'Rezindən gigiyena / əczaçılıq əşyaları',pct:25,unit:'ədəd'}]},
+ {id:9, type:'goods', name:'Qrelka (isidici) 2 000 ml', raw:'Qrelka (isidici) 2Â 000 Ð¼Ð» â 3 (DigÉrlÉr) (Dr.Para)', group:'MED.SYRINGES', sub:'MED.SYRINGES', brand:'Dr.Para', unit:'ədəd', pct:41, status:'review', chosen:0,
+   attrs:['2 000 ml','qrelka / isidici','material?'],
+   signals:['<mark>qrelka / isidici</mark> → hot-water bottle','Material unknown — rubber vs plastic vs textile','No close match — top score &lt; 50%'],
+   cands:[{code:'4014900000',desc:'Vulkanlaşdırılmış rezindən gigiyena / əczaçılıq əşyaları',pct:41,unit:'ədəd'},{code:'3924900009',desc:'Plastik kütlədən təsərrüfat və tualet əşyaları',pct:36,unit:'ədəd'},{code:'6307909900',desc:'Hazır tekstil məmulatları, digərləri',pct:14,unit:'ədəd'}]},
+ {id:10, type:'service', name:'Razetka quraşdırılması', raw:'Razetka quraÅdÄ±rÄ±lmasÄ±', group:'ELECTRICAL', sub:'MONTAJ', brand:'—', unit:'iş', pct:93, status:'auto', chosen:0,
+   attrs:['elektrik','montaj','rozetka'],
+   signals:['<mark>quraşdırılması</mark> → installation work','“razetka” → socket — electrical works norm'],
+   cands:[{code:'SMR-09-04-015',desc:'Elektrik montaj işləri: rozetka quraşdırılması',pct:93,unit:'iş'},{code:'SMR-09-04-018',desc:'Açar / şalterin quraşdırılması',pct:44,unit:'iş'},{code:'SMR-09-07-002',desc:'Kabel çəkilişi işləri',pct:21,unit:'m'}]},
+ {id:11, type:'service', name:'Metal qapı blokunun quraşdırılması', raw:'Metal qapÄ± blokunun quraÅdÄ±rÄ±lmasÄ±', group:'CONSTRUCTION', sub:'MONTAJ', brand:'—', unit:'ədəd', pct:88, status:'auto', chosen:0,
+   attrs:['qapı bloku','metal','quraşdırma'],
+   signals:['<mark>qapı bloku … quraşdırılması</mark> → door-block install','Material “metal” selects sub-norm'],
+   cands:[{code:'SMR-15-02-003',desc:'Qapı bloklarının quraşdırılması: metal',pct:88,unit:'ədəd'},{code:'SMR-15-02-005',desc:'Dekorativ giriş metal qapı blokları',pct:57,unit:'ədəd'},{code:'SMR-15-02-009',desc:'M/plastik qapı bloklarının quraşdırılması',pct:33,unit:'ədəd'}]},
+ {id:12, type:'service', name:'Nəqletmə məsafəsinə düzəlişlər (70 km)', raw:'NÉqletmÉ mÉsafÉsinin dÉyiÅmÉsinÉ dÃ¼zÉliÅlÉr ... (70km)', group:'TRANSPORT', sub:'SMETA', brand:'—', unit:'km', pct:58, status:'review', chosen:0,
+   attrs:['nəqletmə','70 km','düzəliş norması'],
+   signals:['Construction estimate norm correction','Distance 70 km between two adjacent norms','Two candidates differ by &lt; 7%'],
+   cands:[{code:'SMR-25-06-012-11',desc:'Nəqletmə məsafəsinə düzəliş (hər 1 km əlavə)',pct:58,unit:'km'},{code:'SMR-25-06-012-12',desc:'Nəqletmə məsafəsinə düzəliş (hər 1 km çıxma)',pct:51,unit:'km'},{code:'SMR-25-06-010',desc:'Yük daşınması, avtomobil',pct:19,unit:'t·km'}]},
+ {id:13, type:'service', name:'Aviabilet satışından hasilat', raw:'AVIABILET SATISINDAN HASILAT', group:'FINANCE', sub:'—', brand:'—', unit:'AZN', pct:37, status:'review', chosen:0,
+   attrs:['aviabilet','hasilat / revenue','maliyyə'],
+   signals:['Revenue line, not a billable service','<mark>hasilat</mark> → income — weak classifier signal','No close match — manual review needed'],
+   cands:[{code:'XID-62-10-004',desc:'Səyahət agentliyi xidmətləri: bilet satışı',pct:37,unit:'xidmət'},{code:'XID-62-10-001',desc:'Turoperator xidmətləri',pct:33,unit:'xidmət'},{code:'XID-99-00-000',desc:'Təsnif edilməmiş digər xidmət',pct:22,unit:'xidmət'}]},
+];
+
+const CODES = [
+ {code:'9018310000', name:'Şprislər, iynəli və ya iynəsiz', unit:'ədəd', used:true},
+ {code:'9018311000', name:'Şprislər, iynəli', unit:'ədəd', used:true},
+ {code:'9018321000', name:'Borulu metal iynələr və cərrahi tikiş iynələri', unit:'ədəd', used:true},
+ {code:'9018390000', name:'Kateterlər, kanülalar və oxşar alətlər', unit:'ədəd', used:true},
+ {code:'9018908409', name:'Tibbdə işlədilən digər alət və cihazlar, digərləri', unit:'ədəd', used:true},
+ {code:'4014900000', name:'Vulkanlaşdırılmış rezindən gigiyena / əczaçılıq əşyaları', unit:'ədəd', used:true},
+ {code:'3924900009', name:'Plastik kütlədən təsərrüfat və tualet əşyaları, digərləri', unit:'ədəd', used:true},
+ {code:'3926909790', name:'Plastik kütlədən digər məmulatlar, digərləri', unit:'kq', used:true},
+ {code:'6307909900', name:'Hazır tekstil məmulatları, digərləri', unit:'ədəd', used:true},
+ {code:'2921450000', name:'1-naftilamin, 2-naftilamin və onların törəmələri; duzları', unit:'kq', used:false},
+ {code:'2922120000', name:'Dietanolamin və onun duzları', unit:'kq', used:false},
+ {code:'2922131000', name:'Trietanolamin', unit:'kq', used:false},
+ {code:'SMR-09-04-015', name:'Elektrik montaj işləri: rozetka quraşdırılması', unit:'iş', used:true},
+ {code:'SMR-15-02-003', name:'Qapı bloklarının quraşdırılması: metal', unit:'ədəd', used:true},
+ {code:'SMR-25-06-012-11', name:'Nəqletmə məsafəsinə düzəliş (hər 1 km əlavə)', unit:'km', used:true},
+ {code:'XID-62-10-004', name:'Səyahət agentliyi xidmətləri: bilet satışı', unit:'xidmət', used:true},
+];
+
+/* ============ helpers ============ */
+const fmtInt = n => new Intl.NumberFormat('en-US').format(n);
+function band(pct){ return pct>=85 ? {k:'high',c:'#1F6B4A',label:'High'} : pct>=60 ? {k:'med',c:'#A9761A',label:'Medium'} : {k:'low',c:'#BE3A22',label:'Low'}; }
+function fmtCode(code){
+  if(/^\d{10}$/.test(code)){ return code.slice(0,4)+' '+code.slice(4,6)+' '+code.slice(6,9)+' '+code.slice(9); }
+  return code;
+}
+function meter(pct, grow){
+  const b=band(pct);
+  return `<div class="flex items-center gap-2.5"><div class="meter w-[70px]"><i class="${grow?'grow':''}" style="width:${pct}%;background:${b.c}"></i></div><span class="font-mono tnum text-xs font-semibold" style="color:${b.c}">${pct}%</span></div>`;
+}
+function statusPill(s){
+  if(s==='confirmed') return `<span class="inline-flex items-center gap-1.5 text-ledger text-xs font-medium"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 20 20"><path d="M4 10l4 4 8-9"/></svg>Confirmed</span>`;
+  if(s==='review')    return `<span class="inline-flex items-center gap-1.5 text-amber text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-amber"></span>Review</span>`;
+  return `<span class="inline-flex items-center gap-1.5 text-muted text-xs font-medium"><span class="w-1.5 h-1.5 rounded-full bg-ledger"></span>Auto</span>`;
+}
+
+/* ============ auth ============ */
+function authView(v){ document.querySelectorAll('[data-auth]').forEach(e=>e.classList.toggle('hidden', e.dataset.auth!==v)); }
+function enterApp(){ document.getElementById('auth').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); navigate('dashboard'); }
+function logout(){ document.getElementById('app').classList.add('hidden'); document.getElementById('auth').classList.remove('hidden'); authView('login'); }
+function pwStrength(v){
+  const bars=document.querySelectorAll('#pwbars span'); let s=0;
+  if(v.length>=6)s++; if(/[A-Z]/.test(v))s++; if(/[0-9]/.test(v))s++; if(/[^A-Za-z0-9]/.test(v))s++;
+  const col=['#DAD3C2','#BE3A22','#A9761A','#A9761A','#1F6B4A'][s];
+  bars.forEach((b,i)=> b.style.background = i<s? col : '#DAD3C2');
+}
+
+/* ============ navigation ============ */
+function navigate(view){
+  document.querySelectorAll('[data-view]').forEach(s=>s.classList.toggle('hidden', s.dataset.view!==view));
+  document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active', n.dataset.nav===view));
+  if(view==='dashboard') renderDashboard();
+  if(view==='items') renderItems();
+  if(view==='upload') goStep(1);
+  if(view==='classifier') renderCodes();
+  document.querySelector('main').scrollTo(0,0);
+}
+
+/* ============ dashboard ============ */
+function renderDashboard(){
+  const n=ITEMS.length;
+  const auto=ITEMS.filter(i=>i.pct>=85).length;
+  const review=n-auto;
+  const avg=Math.round(ITEMS.reduce((a,b)=>a+b.pct,0)/n);
+  const kpi=[['Items classified',fmtInt(n),''],['Auto-matched',auto+' / '+n,'ledger'],['Needs review',fmtInt(review),'amber'],['Avg confidence',avg+'%','']];
+  document.getElementById('kpis').innerHTML = kpi.map((k,i)=>`
+    <div class="card p-5 fadeup" style="animation-delay:${i*.06}s">
+      <p class="kicker mb-2">${k[0]}</p>
+      <p class="font-mono tnum text-2xl ${k[2]==='ledger'?'text-ledger':k[2]==='amber'?'text-amber':''}">${k[1]}</p>
+    </div>`).join('');
+
+  const bands={high:0,med:0,low:0}; ITEMS.forEach(i=>bands[band(i.pct).k]++);
+  const max=Math.max(...Object.values(bands));
+  const conf=[['high','High','#1F6B4A'],['med','Medium','#A9761A'],['low','Low','#BE3A22']];
+  document.getElementById('chart').innerHTML=conf.map(([k,label,c])=>{
+    const h=Math.round(bands[k]/max*100);
+    return `<div class="flex-1 flex flex-col items-center justify-end gap-2 h-full">
+      <span class="font-mono text-sm font-semibold tnum" style="color:${c}">${bands[k]}</span>
+      <div class="w-full rounded-t-md" style="height:${h}%;background:${c};transition:height .6s cubic-bezier(.2,.7,.2,1)"></div>
+      <span class="kicker">${label}</span></div>`;
+  }).join('');
+
+  const groups={}; ITEMS.forEach(i=>groups[i.group]=(groups[i.group]||0)+1);
+  const gmax=Math.max(...Object.values(groups));
+  document.getElementById('byGroup').innerHTML=Object.entries(groups).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`
+    <li><div class="flex justify-between mb-1"><span class="font-mono text-xs">${g}</span><span class="font-mono tnum text-xs text-muted">${c}</span></div>
+    <div class="meter"><i style="width:${Math.round(c/gmax*100)}%;background:#17150F"></i></div></li>`).join('');
+
+  document.getElementById('recentUploads').innerHTML=`
+    <li class="flex items-center justify-between"><span class="font-mono text-xs">goods_short.csv</span><span class="text-ledger text-xs">Done</span></li>
+    <li class="flex items-center justify-between"><span class="font-mono text-xs">services_april.csv</span><span class="text-amber text-xs blink">Matching</span></li>
+    <li class="flex items-center justify-between"><span class="font-mono text-xs">broken_export.csv</span><span class="text-stamp text-xs">Failed</span></li>`;
+}
+
+/* ============ items ============ */
+let selected=new Set();
+function filteredItems(){
+  const q=document.getElementById('itemSearch').value.trim().toLowerCase();
+  const t=document.getElementById('fType').value;
+  const c=document.getElementById('fConf').value;
+  return ITEMS.filter(i=>{
+    const code=i.cands[i.chosen].code.toLowerCase();
+    const mq=!q || i.name.toLowerCase().includes(q) || code.includes(q) || i.raw.toLowerCase().includes(q);
+    const mt=!t || i.type===t;
+    const mc=!c || band(i.pct).k===c;
+    return mq&&mt&&mc;
+  });
+}
+function renderItems(){
+  const rows=filteredItems();
+  document.getElementById('itemBody').innerHTML = rows.map(i=>{
+    const cc=i.cands[i.chosen];
+    return `<tr class="border-b hair row-hover cursor-pointer" onclick="if(event.target.type!=='checkbox')openDrawer(${i.id})">
+      <td class="px-3 py-3"><input type="checkbox" class="accent-stamp" ${selected.has(i.id)?'checked':''} onchange="toggleSel(${i.id},this.checked)"></td>
+      <td class="px-3 py-3"><div class="font-medium">${i.name}</div><div class="text-faint text-xs">${i.type==='service'?'Service':'Goods'} · ${i.group}</div></td>
+      <td class="px-3 py-3 text-muted text-xs" data-col="brand">${i.brand}</td>
+      <td class="px-3 py-3 text-muted text-xs" data-col="sub">${i.sub}</td>
+      <td class="px-3 py-3 text-faint font-mono text-xs max-w-[180px] truncate" data-col="raw" title="${i.raw}">${i.raw}</td>
+      <td class="px-3 py-3 font-mono">${fmtCode(cc.code)}</td>
+      <td class="px-3 py-3 text-center" data-col="alt"><span class="tag !px-2 !py-0.5 text-xs">+${i.cands.length-1}</span></td>
+      <td class="px-3 py-3">${meter(i.pct)}</td>
+      <td class="px-3 py-3">${statusPill(i.status)}</td>
+      <td class="px-3 py-3 text-faint">›</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="10" class="px-3 py-10 text-center text-muted">Nothing found for this filter.</td></tr>`;
+
+  const auto=rows.filter(i=>i.pct>=85).length;
+  document.getElementById('sumCount').textContent=fmtInt(rows.length);
+  document.getElementById('sumAuto').textContent=fmtInt(auto);
+  document.getElementById('sumReview').textContent=fmtInt(rows.length-auto);
+  document.getElementById('sumAvg').textContent=(rows.length?Math.round(rows.reduce((a,b)=>a+b.pct,0)/rows.length):0)+'%';
+}
+function toggleCol(col,show){ document.getElementById('itemTableWrap').classList.toggle('hide-'+col, !show); }
+function toggleSel(id,on){ on?selected.add(id):selected.delete(id); updateBulk(); }
+function selectAll(on){ filteredItems().forEach(i=> on?selected.add(i.id):selected.delete(i.id)); renderItems(); updateBulk(); }
+function clearSel(){ selected.clear(); renderItems(); updateBulk(); }
+function updateBulk(){
+  const bar=document.getElementById('bulkBar');
+  bar.classList.toggle('hidden', selected.size===0); bar.classList.toggle('flex', selected.size>0);
+  document.getElementById('bulkCount').textContent=selected.size;
+}
+function confirmSelected(){
+  let n=0; ITEMS.forEach(i=>{ if(selected.has(i.id) && i.status!=='confirmed'){ i.status='confirmed'; n++; }});
+  clearSel(); renderItems(); toast('Confirmed '+n+' item'+(n===1?'':'s'));
+}
+function confirmAllHigh(){
+  let n=0; ITEMS.forEach(i=>{ if(i.pct>=85 && i.status!=='confirmed'){ i.status='confirmed'; n++; }});
+  renderItems(); toast(n?('Confirmed '+n+' high-confidence items'):'All high-confidence items already confirmed');
+}
+
+/* ============ drawer ============ */
+function openDrawer(id){
+  const i=ITEMS.find(x=>x.id===id);
+  const b=band(i.pct);
+  const cands=i.cands.map((c,ci)=>{
+    const cb=band(c.pct);
+    return `<div class="p-3.5 rounded-xl border ${ci===i.chosen?'border-ink bg-paper':'hair bg-surface'} cursor-pointer transition" onclick="chooseCand(${id},${ci})">
+      <div class="flex items-center gap-3">
+        <span class="w-4 h-4 rounded-full border-2 ${ci===i.chosen?'border-stamp':'border-line'} grid place-items-center shrink-0">${ci===i.chosen?'<span class="w-2 h-2 rounded-full bg-stamp"></span>':''}</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-mono text-sm font-semibold">${fmtCode(c.code)}</div>
+          <div class="text-xs text-muted leading-snug">${c.desc}</div>
+        </div>
+        <div class="w-[78px] shrink-0">
+          <div class="meter mb-1"><i style="width:${c.pct}%;background:${cb.c}"></i></div>
+          <div class="font-mono tnum text-xs text-right" style="color:${cb.c}">${c.pct}%</div>
+        </div>
+      </div>
+      <div class="text-[11px] text-faint mt-1.5 pl-7">unit: <span class="font-mono">${c.unit}</span></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('drawer').innerHTML=`
+    <div class="sticky top-0 bg-surface border-b hair px-6 py-4 flex items-start justify-between gap-3">
+      <div><p class="kicker mb-0.5">${i.type==='service'?'Service':'Goods'} · ${i.group}</p><p class="font-display text-xl leading-tight">${i.name}</p></div>
+      <button class="text-2xl text-faint hover:text-ink leading-none" onclick="closeDrawer()">×</button>
+    </div>
+    <div class="p-6 space-y-6">
+
+      <div class="flex items-center justify-between p-4 rounded-xl" style="background:${b.c}14;border:1px solid ${b.c}55">
+        <div><p class="kicker mb-1">Suggested code</p><p class="font-mono text-lg font-semibold" id="dwCode">${fmtCode(i.cands[i.chosen].code)}</p></div>
+        <div class="text-right"><p class="kicker mb-1">Confidence</p><p class="font-mono tnum text-2xl font-semibold" style="color:${b.c}" id="dwPct">${i.pct}%</p></div>
+      </div>
+
+      <div>
+        <p class="kicker mb-2.5">Candidate codes — pick the correct one</p>
+        <div class="space-y-2.5" id="dwCands">${cands}</div>
+      </div>
+
+      <div>
+        <p class="kicker mb-2">Why this match</p>
+        <ul class="space-y-1.5 text-sm text-muted">${i.signals.map(s=>`<li class="flex gap-2"><span class="text-stamp">•</span><span>${s}</span></li>`).join('')}</ul>
+      </div>
+
+      <div>
+        <p class="kicker mb-2">Detected attributes</p>
+        <div class="flex flex-wrap gap-1.5">${i.attrs.map(a=>`<span class="tag">${a}</span>`).join('')}</div>
+      </div>
+
+      <div>
+        <p class="kicker mb-1.5">Source line (raw)</p>
+        <div class="font-mono text-xs text-muted bg-paper border hair rounded-lg p-3 break-words leading-relaxed">${i.raw}</div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button class="btn btn-ink flex-1" onclick="confirmFromDrawer(${id})">Confirm code</button>
+        <button class="btn btn-ghost" onclick="navigate('classifier'); closeDrawer();">Search classifier</button>
+      </div>
+    </div>`;
+  document.getElementById('drawer').classList.remove('hidden'); document.getElementById('drawer').classList.add('slidein');
+  document.getElementById('drawerBackdrop').classList.remove('hidden');
+}
+function chooseCand(id,ci){
+  const i=ITEMS.find(x=>x.id===id); i.chosen=ci; i.pct=i.cands[ci].pct;
+  openDrawer(id); renderItems();
+}
+function confirmFromDrawer(id){
+  const i=ITEMS.find(x=>x.id===id); i.status='confirmed'; renderItems(); closeDrawer(); toast('Code confirmed for “'+i.name+'”');
+}
+function closeDrawer(){ document.getElementById('drawer').classList.add('hidden'); document.getElementById('drawerBackdrop').classList.add('hidden'); }
+
+/* ============ upload wizard ============ */
+let classifierType='goods';
+function setClassifier(t){
+  classifierType=t;
+  document.getElementById('clsGoods').className='px-3.5 py-1.5 rounded-lg '+(t==='goods'?'bg-ink text-paper':'text-muted');
+  document.getElementById('clsServ').className ='px-3.5 py-1.5 rounded-lg '+(t==='service'?'bg-ink text-paper':'text-muted');
+}
+function goStep(s){
+  document.querySelectorAll('[data-step]').forEach(e=>e.classList.toggle('hidden', e.dataset.step!=s));
+  document.querySelectorAll('[data-step-dot]').forEach(e=>{
+    const k=e.dataset.stepDot, dot=e.querySelector('span'), on=k<=s;
+    e.classList.toggle('text-muted', !on);
+    dot.className = `w-6 h-6 grid place-items-center font-mono text-xs rounded-md ${on?'bg-ink text-paper':'border hair'}`;
+    if(k==s) dot.className='w-6 h-6 grid place-items-center font-mono text-xs rounded-md bg-stamp text-paper';
+  });
+  if(s==2){
+    document.getElementById('previewBody').innerHTML=ITEMS.filter(x=>x.type==='goods').slice(0,5).map(i=>`
+      <tr class="border-b hair"><td class="px-3 py-1.5 font-mono text-xs text-faint max-w-[200px] truncate" title="${i.raw}">${i.raw}</td>
+      <td class="px-3 py-1.5">${i.name}</td><td class="px-3 py-1.5 text-muted text-xs">${i.group}</td></tr>`).join('');
+  }
+}
+function runMatch(){
+  goStep(3);
+}
+
+/* ============ classifier catalog ============ */
+function renderCodes(){
+  const q=(document.getElementById('codeSearch').value||'').trim().toLowerCase();
+  const rows=CODES.filter(c=>!q || c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+  document.getElementById('codeBody').innerHTML=rows.map(c=>`
+    <tr class="border-b hair row-hover">
+      <td class="px-4 py-3 font-mono text-sm font-semibold">${fmtCode(c.code)}</td>
+      <td class="px-4 py-3">${c.name}</td>
+      <td class="px-4 py-3 font-mono text-xs text-muted">${c.unit}</td>
+      <td class="px-4 py-3 text-right">${c.used?'<span class="text-ledger text-xs">in use</span>':'<span class="text-faint text-xs">—</span>'}</td>
+    </tr>`).join('') || `<tr><td colspan="4" class="px-4 py-10 text-center text-muted">No codes match “${q}”.</td></tr>`;
+}
+
+/* ============ toast ============ */
+let toastT;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg;
+  t.style.opacity='1';
+  clearTimeout(toastT); toastT=setTimeout(()=>{ t.style.opacity='0'; },2400);
+}
+
+/* ============ init ============ */
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDrawer(); document.getElementById('colsPop')?.classList.add('hidden'); }});
+renderDashboard();
+</script>
+</body>
+</html>

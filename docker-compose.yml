@@ -1,0 +1,54 @@
+services:
+  app:
+    build:
+      context: ./docker/app
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /var/www/html
+    # WSL2's container resolver hangs on AAAA lookups; use public upstreams and
+    # skip IPv6 queries so curl/composer connect without a ~10s DNS timeout.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    dns_opt:
+      - "no-aaaa"
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "8000:8000"
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    tty: true
+
+  pgsql:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-app}
+      POSTGRES_USER: ${DB_USERNAME:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-app} -d ${DB_DATABASE:-app}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  pgdata:
+  ollama:

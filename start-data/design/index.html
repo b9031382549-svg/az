@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoice Intelligence — prototype</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        paper:   '#F2EEE3',
+        surface: '#FCFBF6',
+        ink:     '#17150F',
+        inkpanel:'#1C1A14',
+        muted:   '#6E6757',
+        faint:   '#9A9384',
+        line:    '#DAD3C2',
+        hair:    '#E6E0D1',
+        stamp:   '#BE3A22',
+        ledger:  '#1F6B4A',
+        amber:   '#A9761A',
+      },
+      fontFamily: {
+        display: ['Fraunces','Georgia','serif'],
+        sans:    ['"Spline Sans"','system-ui','sans-serif'],
+        mono:    ['"Spline Sans Mono"','ui-monospace','monospace'],
+      },
+    }
+  }
+}
+</script>
+
+<style>
+  :root{ color-scheme:light; }
+  html,body{ height:100%; }
+  body{
+    background:#F2EEE3; color:#17150F;
+    font-family:"Spline Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:.045;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode:multiply;
+  }
+  .tnum{ font-variant-numeric:tabular-nums; }
+  .kicker{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#6E6757; }
+  .hair{ border-color:#E6E0D1; }
+  ::-webkit-scrollbar{ width:10px; height:10px }
+  ::-webkit-scrollbar-thumb{ background:#D5CEBD; border:3px solid #F2EEE3; border-radius:8px }
+  ::selection{ background:#BE3A22; color:#FCFBF6; }
+
+  /* ---- modern component layer ---- */
+  .card{ background:#FCFBF6; border:1px solid #E6E0D1; border-radius:18px; }
+  .card-flat{ background:#FCFBF6; border:1px solid #E6E0D1; border-radius:14px; }
+
+  .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px;
+        border-radius:11px; padding:11px 18px; font-size:14px; font-weight:500;
+        line-height:1; transition:.15s; cursor:pointer; white-space:nowrap; }
+  .btn-ink{ background:#17150F; color:#F2EEE3; }
+  .btn-ink:hover{ background:#000; }
+  .btn-stamp{ background:#BE3A22; color:#FCFBF6; }
+  .btn-stamp:hover{ filter:brightness(.94); }
+  .btn-ghost{ background:#FCFBF6; border:1px solid #DAD3C2; color:#17150F; }
+  .btn-ghost:hover{ border-color:#17150F; }
+  .btn-sm{ padding:8px 13px; font-size:13px; border-radius:10px; }
+
+  .chip{ display:inline-flex; align-items:center; gap:6px; border:1px solid #DAD3C2;
+         background:#FCFBF6; border-radius:10px; transition:.15s; cursor:pointer; }
+  .chip:hover{ border-color:#17150F; }
+
+  /* unified form fields — every form aligns to this */
+  .field-label{ display:block; font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+                color:#6E6757; margin-bottom:7px; font-weight:500; }
+  .field-input{ width:100%; height:46px; background:#FCFBF6; border:1px solid #DAD3C2;
+                border-radius:11px; padding:0 14px; font-size:14px; color:#17150F;
+                outline:none; transition:border-color .15s, box-shadow .15s; }
+  .field-input::placeholder{ color:#9A9384; }
+  .field-input:focus{ border-color:#17150F; box-shadow:0 0 0 3px rgba(23,21,15,.06); }
+  select.field-input{ appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236E6757' stroke-width='1.6'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 13px center; padding-right:36px; }
+  textarea.field-input{ height:auto; padding:12px 14px; resize:none; }
+
+  /* nav */
+  .nav-item{ display:flex; align-items:center; gap:11px; margin:2px 12px; padding:10px 13px;
+             border-radius:11px; cursor:pointer; color:#3A352B; font-size:14.5px; transition:.15s; }
+  .nav-item:hover{ background:#EBE5D6; }
+  .nav-item.active{ background:#17150F; color:#F4F0E6; }
+  .nav-item svg{ width:18px; height:18px; flex:none; }
+
+  /* animations */
+  @keyframes fadeup{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+  .fadeup{ animation:fadeup .5s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes slidein{ from{transform:translateX(100%)} to{transform:none} }
+  .slidein{ animation:slidein .32s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes stampin{ 0%{opacity:0; transform:scale(1.7) rotate(-26deg)} 55%{opacity:1} 100%{opacity:1; transform:scale(1) rotate(-9deg)} }
+  .stampin{ animation:stampin .55s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes blink{ 50%{opacity:.25} }
+  .blink{ animation:blink 1s steps(2) infinite; }
+
+  .stamp-seal{ border:2.5px solid #BE3A22; color:#BE3A22; border-radius:8px;
+    font-family:"Spline Sans Mono",monospace; letter-spacing:.18em; text-transform:uppercase;
+    transform:rotate(-9deg); opacity:.92; }
+
+  .hide-approval [data-col=approval]{display:none}
+  .hide-excise   [data-col=excise]{display:none}
+  .hide-nonvat   [data-col=nonvat]{display:none}
+  .hide-exempt   [data-col=exempt]{display:none}
+  .hide-zero     [data-col=zero]{display:none}
+  .hide-road     [data-col=road]{display:none}
+
+  .dropzone.drag{ background:#FCFBF6; border-color:#BE3A22; }
+  .link-under{ text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
+  .row-hover:hover{ background:#FAF8F1; }
+</style>
+</head>
+<body class="font-sans">
+
+<!-- ======================= AUTH ======================= -->
+<div id="auth" class="min-h-screen grid md:grid-cols-2">
+
+  <!-- form column -->
+  <div class="flex flex-col px-7 sm:px-14 py-10 bg-paper">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 grid place-items-center bg-ink text-paper rounded-lg font-display font-semibold text-lg leading-none">I</div>
+      <span class="font-display text-xl tracking-tight">Invoice<span class="text-stamp">·</span>Intelligence</span>
+    </div>
+
+    <div class="flex-1 grid place-items-center py-10">
+      <div class="w-full max-w-[380px]">
+
+        <!-- SIGN IN -->
+        <div data-auth="login">
+          <p class="kicker mb-3">Account</p>
+          <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Welcome back.</h1>
+          <p class="text-muted mb-9">Sign in to continue working with your invoices.</p>
+
+          <div class="space-y-5">
+            <div>
+              <label class="field-label">Email</label>
+              <input type="email" value="ivan@company.io" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Password</label>
+              <div class="relative">
+                <input type="password" value="placeholder" class="field-input pr-12">
+                <button class="absolute right-0 top-0 h-full px-3.5 text-faint hover:text-ink"
+                        onclick="const i=this.previousElementSibling; i.type=i.type==='password'?'text':'password'">◍</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-sm mt-4 mb-7">
+            <label class="flex items-center gap-2 text-muted cursor-pointer"><input type="checkbox" class="accent-stamp"> Remember me</label>
+            <a class="link-under text-muted hover:text-ink cursor-pointer" onclick="authView('forgot')">Forgot password?</a>
+          </div>
+          <button class="btn btn-ink w-full" onclick="enterApp()">Sign in</button>
+          <p class="text-sm text-muted mt-6">No account? <a class="link-under text-ink cursor-pointer" onclick="authView('register')">Sign up</a></p>
+        </div>
+
+        <!-- SIGN UP -->
+        <div data-auth="register" class="hidden">
+          <p class="kicker mb-3">New account</p>
+          <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Create your account.</h1>
+          <p class="text-muted mb-9">Invoice upload and AI chat — in minutes.</p>
+
+          <div class="space-y-5">
+            <div><label class="field-label">Name</label><input class="field-input" placeholder="Ivan Petrov"></div>
+            <div><label class="field-label">Email</label><input class="field-input" placeholder="you@company.io"></div>
+            <div>
+              <label class="field-label">Password</label>
+              <input type="password" class="field-input" placeholder="••••••••" oninput="pwStrength(this.value)">
+              <div class="flex gap-1.5 mt-3" id="pwbars">
+                <span class="h-1 flex-1 rounded bg-line"></span><span class="h-1 flex-1 rounded bg-line"></span>
+                <span class="h-1 flex-1 rounded bg-line"></span><span class="h-1 flex-1 rounded bg-line"></span>
+              </div>
+            </div>
+          </div>
+
+          <label class="flex items-start gap-2 text-sm text-muted my-6 cursor-pointer">
+            <input type="checkbox" class="accent-stamp mt-0.5"> I accept the terms of use and the data processing policy.</label>
+          <button class="btn btn-ink w-full" onclick="enterApp()">Create account</button>
+          <p class="text-sm text-muted mt-6">Already have an account? <a class="link-under text-ink cursor-pointer" onclick="authView('login')">Sign in</a></p>
+        </div>
+
+        <!-- FORGOT -->
+        <div data-auth="forgot" class="hidden">
+          <p class="kicker mb-3">Recovery</p>
+          <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Reset your password.</h1>
+          <p class="text-muted mb-9">We'll send a recovery link to your email.</p>
+          <div><label class="field-label">Email</label><input class="field-input" placeholder="you@company.io"></div>
+          <button class="btn btn-ink w-full mt-7" onclick="alert('Recovery link sent (demo)')">Send link</button>
+          <p class="text-sm text-muted mt-6"><a class="link-under text-ink cursor-pointer" onclick="authView('login')">← Back to sign in</a></p>
+        </div>
+
+      </div>
+    </div>
+    <p class="text-xs text-faint">© 2026 Invoice Intelligence · interface prototype</p>
+  </div>
+
+  <!-- editorial panel -->
+  <div class="hidden md:flex relative bg-inkpanel text-paper overflow-hidden">
+    <div class="absolute inset-0 opacity-[0.07]"
+         style="background-image:linear-gradient(#F2EEE3 1px,transparent 1px),linear-gradient(90deg,#F2EEE3 1px,transparent 1px);background-size:34px 34px"></div>
+    <div class="relative z-10 flex flex-col justify-between p-14 w-full">
+      <p class="kicker text-faint">e-Invoices · VAT · analytics</p>
+      <div>
+        <p class="font-display text-[2.9rem] leading-[1.08]">“How much VAT<br>did we pay<br>in&nbsp;January?”</p>
+        <p class="text-faint mt-5 max-w-sm leading-relaxed">Upload your invoice export — and query the data in plain language. No formulas, no Excel exports.</p>
+      </div>
+      <div class="flex items-end justify-between">
+        <div class="font-mono text-sm text-faint leading-relaxed">
+          <div>01 — upload file</div>
+          <div>02 — verify parsing</div>
+          <div>03 — ask the AI</div>
+        </div>
+        <div class="stamp-seal text-sm font-semibold px-4 py-2.5">e-invoice<br>verified</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================= APP ======================= -->
+<div id="app" class="hidden min-h-screen flex">
+
+  <!-- SIDEBAR -->
+  <aside class="hidden md:flex flex-col w-60 shrink-0 bg-paper border-r hair">
+    <div class="h-16 flex items-center gap-2.5 px-5 border-b hair">
+      <div class="w-7 h-7 grid place-items-center bg-ink text-paper rounded-md font-display font-semibold leading-none">I</div>
+      <span class="font-display text-lg tracking-tight">Invoice<span class="text-stamp">·</span>Intel</span>
+    </div>
+    <nav class="flex-1 py-4">
+      <a class="nav-item active" data-nav="dashboard" onclick="navigate('dashboard')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1.2"/><rect x="11.5" y="2.5" width="6" height="6" rx="1.2"/><rect x="2.5" y="11.5" width="6" height="6" rx="1.2"/><rect x="11.5" y="11.5" width="6" height="6" rx="1.2"/></svg>Overview</a>
+      <a class="nav-item" data-nav="invoices" onclick="navigate('invoices')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><path d="M5 2.5h7l3 3v12H5z" stroke-linejoin="round"/><path d="M12 2.5v3.5h3M7.5 9.5h5M7.5 12.5h5"/></svg>Invoices</a>
+      <a class="nav-item" data-nav="upload" onclick="navigate('upload')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M3.5 13.5v2a1 1 0 001 1h11a1 1 0 001-1v-2"/></svg>Upload</a>
+      <a class="nav-item" data-nav="chat" onclick="navigate('chat')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linejoin="round"><path d="M3 4.5h14v9H8l-4 3v-3H3z"/></svg>AI Chat</a>
+      <div class="mx-5 my-3 border-t hair"></div>
+      <a class="nav-item" data-nav="settings" onclick="navigate('settings')">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.5v2M10 16.5v2M3.5 3.5l1.4 1.4M15.1 15.1l1.4 1.4M1.5 10h2M16.5 10h2M3.5 16.5l1.4-1.4M15.1 4.9l1.4-1.4"/></svg>Settings</a>
+    </nav>
+    <div class="p-4 border-t hair">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-ledger/15 text-ledger grid place-items-center font-semibold">I</div>
+        <div class="text-sm leading-tight"><div class="font-medium">Ivan Petrov</div><div class="text-faint text-xs">FoodWholesale Ltd</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <!-- TOPBAR -->
+    <header class="h-16 shrink-0 flex items-center gap-4 px-5 sm:px-7 border-b hair bg-paper/80 backdrop-blur sticky top-0 z-30">
+      <button class="md:hidden text-xl" onclick="document.querySelector('aside').classList.toggle('hidden')">≡</button>
+      <div class="flex-1 max-w-md flex items-center gap-2 bg-surface border hair rounded-xl px-3.5 h-10">
+        <span class="text-faint">⌕</span>
+        <input id="topSearch" placeholder="Search invoices, TIN, number…" class="w-full bg-transparent outline-none text-sm"
+               onkeydown="if(event.key==='Enter'){navigate('invoices'); document.getElementById('invSearch').value=this.value; renderInvoices();}">
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <button class="w-10 h-10 grid place-items-center border hair rounded-xl bg-surface hover:border-ink transition" title="Notifications">◔</button>
+        <button class="flex items-center gap-2 border hair rounded-xl bg-surface px-2.5 h-10 hover:border-ink transition" onclick="logout()">
+          <span class="w-6 h-6 rounded-full bg-ledger/15 text-ledger grid place-items-center text-xs font-semibold">I</span>
+          <span class="text-sm hidden sm:inline">Sign out</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto">
+
+      <!-- ===== DASHBOARD ===== -->
+      <section data-view="dashboard" class="p-5 sm:p-8 max-w-[1180px]">
+        <div class="flex items-end justify-between flex-wrap gap-3 mb-7">
+          <div>
+            <p class="kicker mb-1.5">Period · 2026</p>
+            <h1 class="font-display text-4xl">Overview</h1>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="navigate('upload')">⬆ Upload</button>
+            <button class="btn btn-stamp btn-sm" onclick="navigate('chat')">Ask AI</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7" id="kpis"></div>
+
+        <div class="grid lg:grid-cols-5 gap-5">
+          <div class="lg:col-span-3 card p-6 fadeup">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="font-display text-xl">Turnover by month</h2>
+              <span class="kicker">2026</span>
+            </div>
+            <div id="chart" class="flex items-end gap-6 h-52"></div>
+          </div>
+          <div class="lg:col-span-2 card p-6 fadeup" style="animation-delay:.08s">
+            <h2 class="font-display text-xl mb-5">Recent uploads</h2>
+            <ul class="space-y-3.5 text-sm" id="recentUploads"></ul>
+            <button class="btn btn-ghost btn-sm w-full mt-5" onclick="navigate('upload')">All uploads →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== INVOICES ===== -->
+      <section data-view="invoices" class="hidden p-5 sm:p-8">
+        <div class="flex items-end justify-between flex-wrap gap-3 mb-6">
+          <div>
+            <p class="kicker mb-1.5">Database</p>
+            <h1 class="font-display text-4xl">Invoices</h1>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="navigate('upload')">⬆ Upload</button>
+            <button class="btn btn-ghost btn-sm">Export ⤓</button>
+          </div>
+        </div>
+
+        <!-- filter bar -->
+        <div class="card-flat p-3 flex flex-wrap items-center gap-2 mb-4">
+          <div class="flex items-center gap-2 bg-paper border hair rounded-xl px-3.5 h-10 flex-1 min-w-[220px]">
+            <span class="text-faint">⌕</span>
+            <input id="invSearch" placeholder="Search: TIN, invoice number…" class="w-full bg-transparent outline-none text-sm" oninput="renderInvoices()">
+          </div>
+          <select id="invPeriod" class="field-input !h-10 !w-auto" onchange="renderInvoices()">
+            <option value="">Period: all</option>
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+          </select>
+          <div class="relative">
+            <button class="chip px-3.5 h-10 text-sm" onclick="document.getElementById('colsPop').classList.toggle('hidden')">Columns ⚙</button>
+            <div id="colsPop" class="hidden absolute right-0 mt-1.5 w-56 card-flat shadow-lg z-20 p-3.5 text-sm space-y-2.5">
+              <p class="kicker mb-1">Additional columns</p>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('approval',this.checked)"> Approval date</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('excise',this.checked)"> Excise</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('nonvat',this.checked)"> Non-taxable</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('exempt',this.checked)"> Exempt</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('zero',this.checked)"> Zero-rated</label>
+              <label class="flex items-center gap-2.5 cursor-pointer"><input type="checkbox" class="accent-stamp" onchange="toggleCol('road',this.checked)"> Road tax</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- summary -->
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-2 px-1 mb-3 text-sm">
+          <span><span class="font-mono tnum font-semibold" id="sumCount">0</span> <span class="text-muted">invoices</span></span>
+          <span class="text-muted">VAT amount <span class="font-mono tnum font-semibold text-ink" id="sumVat">0.00</span></span>
+          <span class="text-muted">Taxable turnover <span class="font-mono tnum font-semibold text-ink" id="sumTurnover">0.00</span></span>
+          <span class="text-muted">Total <span class="font-mono tnum font-semibold text-ledger" id="sumTotal">0.00</span></span>
+        </div>
+
+        <!-- bulk bar -->
+        <div id="bulkBar" class="hidden items-center gap-3 bg-ink text-paper rounded-xl px-4 py-2.5 mb-2 text-sm">
+          <span id="bulkCount">0</span> selected
+          <button class="link-under" onclick="navigate('chat')">Ask AI about selected</button>
+          <button class="link-under">Export</button>
+          <button class="ml-auto text-paper/60 hover:text-paper" onclick="clearSel()">✕ Clear selection</button>
+        </div>
+
+        <!-- table -->
+        <div id="invTableWrap" class="card-flat overflow-hidden hide-approval hide-excise hide-nonvat hide-exempt hide-zero hide-road">
+          <div class="overflow-x-auto">
+          <table class="w-full text-sm whitespace-nowrap">
+            <thead>
+              <tr class="text-left border-b-2 border-ink/80">
+                <th class="px-3 py-3 w-8"><input type="checkbox" class="accent-stamp" onchange="selectAll(this.checked)"></th>
+                <th class="px-3 py-3 kicker font-sans">Number</th>
+                <th class="px-3 py-3 kicker font-sans">Date</th>
+                <th class="px-3 py-3 kicker font-sans" data-col="approval">Approved</th>
+                <th class="px-3 py-3 kicker font-sans">Series</th>
+                <th class="px-3 py-3 kicker font-sans">Supplier</th>
+                <th class="px-3 py-3 kicker font-sans">Recipient</th>
+                <th class="px-3 py-3 kicker font-sans text-right">Taxable VAT</th>
+                <th class="px-3 py-3 kicker font-sans text-right" data-col="nonvat">Non-tax.</th>
+                <th class="px-3 py-3 kicker font-sans text-right" data-col="exempt">Exempt</th>
+                <th class="px-3 py-3 kicker font-sans text-right" data-col="zero">Zero-rate</th>
+                <th class="px-3 py-3 kicker font-sans text-right" data-col="excise">Excise</th>
+                <th class="px-3 py-3 kicker font-sans text-right" data-col="road">Road tax</th>
+                <th class="px-3 py-3 kicker font-sans text-right">VAT amount</th>
+                <th class="px-3 py-3 kicker font-sans text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="invBody"></tbody>
+          </table>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-4 text-sm text-muted">
+          <span>Page 1 of 1 · all demo rows shown</span>
+          <div class="flex items-center gap-1">
+            <button class="chip px-2.5 py-1.5">‹</button>
+            <button class="chip px-3 py-1.5 bg-ink text-paper border-ink">1</button>
+            <button class="chip px-2.5 py-1.5">›</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== UPLOAD ===== -->
+      <section data-view="upload" class="hidden p-5 sm:p-8 max-w-[920px]">
+        <div class="mb-6">
+          <p class="kicker mb-1.5">Data import</p>
+          <h1 class="font-display text-4xl">Upload invoices</h1>
+        </div>
+
+        <!-- stepper -->
+        <ol class="flex items-center gap-3 mb-7 text-sm" id="stepper">
+          <li class="flex items-center gap-2" data-step-dot="1"><span class="w-6 h-6 grid place-items-center bg-stamp text-paper rounded-md font-mono text-xs">1</span> File</li>
+          <li class="w-8 border-t hair"></li>
+          <li class="flex items-center gap-2 text-muted" data-step-dot="2"><span class="w-6 h-6 grid place-items-center border hair rounded-md font-mono text-xs">2</span> Mapping</li>
+          <li class="w-8 border-t hair"></li>
+          <li class="flex items-center gap-2 text-muted" data-step-dot="3"><span class="w-6 h-6 grid place-items-center border hair rounded-md font-mono text-xs">3</span> Result</li>
+        </ol>
+
+        <!-- step 1 -->
+        <div data-step="1">
+          <div class="dropzone card bg-surface border-2 border-dashed hair p-12 text-center transition cursor-pointer"
+               onclick="goStep(2)"
+               ondragover="event.preventDefault(); this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="event.preventDefault(); this.classList.remove('drag'); goStep(2)">
+            <div class="text-4xl mb-3 text-faint">⬆</div>
+            <p class="font-display text-2xl mb-1">Drag your CSV here</p>
+            <p class="text-muted mb-5">or click to choose a file</p>
+            <span class="btn btn-ink">Choose file</span>
+            <p class="text-xs text-faint mt-5">Supported: .csv, .xlsx · up to 20&nbsp;MB</p>
+          </div>
+          <div class="mt-4 flex items-start gap-2.5 text-sm text-muted card-flat p-3.5">
+            <span class="text-amber">ℹ</span>
+            <span>The file must contain columns: supplier/recipient TIN, issue and approval dates, series and number, VAT amounts and total.</span>
+          </div>
+        </div>
+
+        <!-- step 2 -->
+        <div data-step="2" class="hidden">
+          <div class="card-flat p-5 mb-4">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-sm">FoodWholesale_sampleData_short.csv</span>
+                <span class="text-xs text-faint">· 4 KB</span>
+              </div>
+              <span class="text-ledger text-sm">19 rows found ✓</span>
+            </div>
+            <p class="text-sm text-muted">Auto-mapped 15 of 15 columns.</p>
+          </div>
+
+          <div class="card-flat divide-y hair mb-4 overflow-hidden">
+            <div class="grid grid-cols-[1.2fr_1.4fr_1fr] gap-3 px-4 py-2.5 kicker">
+              <span>File column</span><span>System field</span><span>Example</span>
+            </div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">Supplier TIN</span>
+              <select class="field-input !h-10"><option>Supplier TIN</option><option>— do not import</option></select>
+              <span class="font-mono text-xs">A_00000001</span>
+            </div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">e-Invoice Date</span>
+              <select class="field-input !h-10"><option>Issue date</option></select>
+              <span class="font-mono text-xs">01.01.2026 <span class="text-amber">⚠ M/D/Y</span></span>
+            </div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">VAT Amount</span>
+              <select class="field-input !h-10"><option>VAT amount</option></select>
+              <span class="font-mono text-xs">1,181.29 <span class="text-amber">⚠ comma</span></span>
+            </div>
+            <div class="grid grid-cols-[1.2fr_1.4fr_1fr] gap-3 px-4 py-3 items-center text-sm">
+              <span class="font-mono text-xs">Total Amount</span>
+              <select class="field-input !h-10"><option>Total</option></select>
+              <span class="font-mono text-xs">7,744.00</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-2.5 text-sm bg-amber/10 border border-amber/30 rounded-xl p-3.5 mb-4">
+            <span class="text-amber">⚠</span>
+            <span>Detected format: dates <b>M/D/YYYY</b>, comma as decimal separator, TINs with <span class="font-mono">A_</span>/<span class="font-mono">T_</span> prefixes. Will be normalized automatically.</span>
+          </div>
+
+          <p class="kicker mb-2">Preview — how it will be saved</p>
+          <div class="card-flat overflow-hidden mb-6">
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm whitespace-nowrap">
+              <thead><tr class="text-left border-b hair">
+                <th class="px-3 py-2 kicker font-sans">Number</th><th class="px-3 py-2 kicker font-sans">Date</th>
+                <th class="px-3 py-2 kicker font-sans">Supplier</th><th class="px-3 py-2 kicker font-sans text-right">VAT amount</th>
+                <th class="px-3 py-2 kicker font-sans text-right">Total</th></tr></thead>
+              <tbody id="previewBody" class="font-mono tnum"></tbody>
+            </table>
+            </div>
+          </div>
+
+          <div class="flex justify-between">
+            <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
+            <button class="btn btn-stamp" onclick="goStep(3)">Import 19 rows</button>
+          </div>
+        </div>
+
+        <!-- step 3 -->
+        <div data-step="3" class="hidden">
+          <div class="card p-10 text-center relative overflow-hidden">
+            <div class="stamp-seal stampin inline-block text-base font-semibold px-6 py-4 mb-6">imported</div>
+            <h2 class="font-display text-3xl mb-1">Imported 18 invoices</h2>
+            <p class="text-amber mb-7">⚠ 1 row skipped — duplicate number 10003564</p>
+            <div class="flex flex-wrap gap-3 justify-center">
+              <button class="btn btn-ink" onclick="navigate('invoices')">Open in table</button>
+              <button class="btn btn-ghost" onclick="goStep(1)">Upload more</button>
+              <button class="btn btn-ghost">Import report</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- history -->
+        <div class="mt-10">
+          <h2 class="font-display text-xl mb-3">Upload history</h2>
+          <div class="card-flat overflow-hidden">
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm whitespace-nowrap">
+              <thead><tr class="text-left border-b hair">
+                <th class="px-4 py-2.5 kicker font-sans">File</th><th class="px-4 py-2.5 kicker font-sans">Date</th>
+                <th class="px-4 py-2.5 kicker font-sans text-right">Rows</th><th class="px-4 py-2.5 kicker font-sans">Status</th>
+                <th class="px-4 py-2.5 kicker font-sans w-10"></th></tr></thead>
+              <tbody class="divide-y hair">
+                <tr class="row-hover">
+                  <td class="px-4 py-3 font-mono text-xs">FoodWholesale_sampleData_short.csv</td>
+                  <td class="px-4 py-3 text-muted">Jun 22 · 14:30</td>
+                  <td class="px-4 py-3 text-right font-mono tnum">19</td>
+                  <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-ledger"><span class="w-1.5 h-1.5 rounded-full bg-ledger"></span> Done</span></td>
+                  <td class="px-4 py-3 text-faint">⋯</td>
+                </tr>
+                <tr class="row-hover">
+                  <td class="px-4 py-3 font-mono text-xs">january_batch.csv</td>
+                  <td class="px-4 py-3 text-muted">Jun 20 · 09:12</td>
+                  <td class="px-4 py-3 text-right font-mono tnum">142</td>
+                  <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-amber blink"><span class="w-1.5 h-1.5 rounded-full bg-amber"></span> Parsing…</span></td>
+                  <td class="px-4 py-3 text-faint">⋯</td>
+                </tr>
+                <tr class="row-hover">
+                  <td class="px-4 py-3 font-mono text-xs">broken_export.csv</td>
+                  <td class="px-4 py-3 text-muted">Jun 19 · 16:00</td>
+                  <td class="px-4 py-3 text-right font-mono tnum">0</td>
+                  <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-stamp"><span class="w-1.5 h-1.5 rounded-full bg-stamp"></span> Failed</span></td>
+                  <td class="px-4 py-3 text-faint">⋯</td>
+                </tr>
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== CHAT ===== -->
+      <section data-view="chat" class="hidden h-[calc(100vh-4rem)] flex">
+        <!-- history -->
+        <div class="hidden lg:flex flex-col w-64 shrink-0 border-r hair bg-paper">
+          <div class="p-4">
+            <button class="btn btn-ink w-full" onclick="newChat()">+ New chat</button>
+          </div>
+          <p class="kicker px-4 mb-2">History</p>
+          <nav class="flex-1 overflow-y-auto text-sm px-2 space-y-1">
+            <a class="block px-3 py-2.5 rounded-lg row-hover cursor-pointer bg-surface border-l-2 border-stamp">VAT &amp; top suppliers</a>
+            <a class="block px-3 py-2.5 rounded-lg row-hover cursor-pointer">Month comparison</a>
+            <a class="block px-3 py-2.5 rounded-lg row-hover cursor-pointer">Invoices without VAT</a>
+          </nav>
+        </div>
+
+        <!-- thread -->
+        <div class="flex-1 flex flex-col min-w-0 bg-surface">
+          <div id="chatThread" class="hidden flex-1 overflow-y-auto p-5 sm:p-8"></div>
+
+          <!-- empty state -->
+          <div id="chatEmpty" class="flex-1 overflow-y-auto grid place-items-center p-8 text-center">
+            <div class="max-w-lg">
+              <div class="text-4xl mb-3">✻</div>
+              <h2 class="font-display text-3xl mb-2">Ask about your invoices</h2>
+              <p class="text-muted mb-7">Query the data in plain language — totals, aggregates, comparisons. The AI shows the answer and the data it's based on.</p>
+              <div class="grid sm:grid-cols-2 gap-2.5 text-left text-sm">
+                <button class="chip p-3.5" onclick="ask('How much VAT did we pay in January and who are the top-3 suppliers?')">How much VAT in January and top-3 suppliers?</button>
+                <button class="chip p-3.5" onclick="ask('How many invoices have no VAT?')">How many invoices have no VAT?</button>
+                <button class="chip p-3.5" onclick="ask('Top-5 suppliers by turnover')">Top-5 suppliers by turnover</button>
+                <button class="chip p-3.5" onclick="ask('Compare turnover by month')">Compare turnover by month</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- input -->
+          <div class="border-t hair p-4 bg-paper">
+            <div class="max-w-3xl mx-auto flex items-end gap-2 bg-surface border hair rounded-2xl focus-within:border-ink transition px-3 py-2">
+              <textarea id="chatInput" rows="1" placeholder="Ask anything about your data…"
+                class="flex-1 bg-transparent outline-none resize-none py-1.5 text-sm max-h-32"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); ask(this.value);}"></textarea>
+              <button class="btn-stamp w-9 h-9 grid place-items-center shrink-0 rounded-xl" onclick="ask(document.getElementById('chatInput').value)">➤</button>
+            </div>
+            <p class="text-center text-xs text-faint mt-2">Enter — send · Shift+Enter — new line</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section data-view="settings" class="hidden p-5 sm:p-8 max-w-[760px]">
+        <div class="mb-6">
+          <p class="kicker mb-1.5">Account</p>
+          <h1 class="font-display text-4xl">Settings</h1>
+        </div>
+        <div class="flex gap-1 border-b hair mb-6 text-sm">
+          <button class="px-4 py-2.5 border-b-2 border-ink -mb-px font-medium">Profile</button>
+          <button class="px-4 py-2.5 border-b-2 border-transparent text-muted hover:text-ink">Security</button>
+          <button class="px-4 py-2.5 border-b-2 border-transparent text-muted hover:text-ink">Preferences</button>
+        </div>
+        <div class="card p-7">
+          <div class="flex items-center gap-4 mb-7">
+            <div class="w-16 h-16 rounded-full bg-ledger/15 text-ledger grid place-items-center text-2xl font-semibold font-display">I</div>
+            <button class="btn btn-ghost btn-sm">Change photo</button>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-5">
+            <div><label class="field-label">Name</label><input value="Ivan Petrov" class="field-input"></div>
+            <div><label class="field-label">Email</label><input value="ivan@company.io" class="field-input"></div>
+            <div><label class="field-label">Number format</label>
+              <select class="field-input"><option>1,234.56 (comma / dot)</option><option>1 234,56 (space / comma)</option></select></div>
+            <div><label class="field-label">Default currency</label>
+              <select class="field-input"><option>EUR €</option><option>USD $</option><option>GEL ₾</option></select></div>
+          </div>
+          <div class="pt-7"><button class="btn btn-ink">Save changes</button></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ======================= DRAWER ======================= -->
+<div id="drawerBackdrop" class="hidden fixed inset-0 bg-ink/40 z-40" onclick="closeDrawer()"></div>
+<aside id="drawer" class="hidden fixed top-0 right-0 h-full w-full max-w-md bg-surface border-l hair z-50 overflow-y-auto"></aside>
+
+<script>
+/* ---------- DATA (real 19 rows from the file) ---------- */
+const INVOICES = [
+ {n:1, supplier:'A_00000001', recipient:'T_00000160', date:'1/1/2026',  approval:'1/8/2026',  series:'MT2601', number:'10003564', excise:0, vatTaxable:6562.71, nonVat:0, exempt:0, zero:0, vat:1181.29, road:0,      total:7744},
+ {n:2, supplier:'A_00001128', recipient:'T_00000025', date:'1/30/2026', approval:'1/31/2026', series:'MT2601', number:'12066807', excise:0, vatTaxable:508.48,  nonVat:0, exempt:0, zero:0, vat:91.53,   road:0,      total:600},
+ {n:3, supplier:'A_00002487', recipient:'T_00000160', date:'1/6/2026',  approval:'1/13/2026', series:'MT2601', number:'10045556', excise:0, vatTaxable:40.68,   nonVat:0, exempt:0, zero:0, vat:7.32,    road:0,      total:48},
+ {n:4, supplier:'A_00000329', recipient:'T_00000747', date:'1/14/2026', approval:'1/18/2026', series:'MT2601', number:'10846742', excise:0, vatTaxable:8467.5,  nonVat:0, exempt:0, zero:0, vat:1524.15, road:0,      total:9991.65},
+ {n:5, supplier:'A_00001104', recipient:'T_00000591', date:'1/30/2026', approval:'2/5/2026',  series:'MT2601', number:'12024144', excise:0, vatTaxable:137.29,  nonVat:0, exempt:0, zero:0, vat:24.71,   road:0,      total:162},
+ {n:6, supplier:'A_00003125', recipient:'T_00000591', date:'2/27/2026', approval:'2/27/2026', series:'MT2602', number:'12166391', excise:0, vatTaxable:3073.73, nonVat:0, exempt:0, zero:0, vat:553.27,  road:0,      total:3627},
+ {n:7, supplier:'T_00000790', recipient:'T_00000591', date:'1/16/2026', approval:'1/23/2026', series:'MT2601', number:'11039776', excise:0, vatTaxable:399.51,  nonVat:0, exempt:0, zero:0, vat:71.91,   road:0,      total:471.43},
+ {n:8, supplier:'A_00001415', recipient:'T_00000160', date:'1/13/2026', approval:'1/15/2026', series:'MT2601', number:'10689289', excise:0, vatTaxable:6440.5,  nonVat:0, exempt:0, zero:0, vat:1159.29, road:0,      total:7599.79},
+ {n:9, supplier:'A_00002797', recipient:'T_00000143', date:'1/5/2026',  approval:'1/12/2026', series:'MT2601', number:'10040109', excise:0, vatTaxable:200.64,  nonVat:0, exempt:0, zero:0, vat:36.12,   road:0,      total:236.76},
+ {n:10,supplier:'A_00001600', recipient:'T_00000795', date:'1/5/2026',  approval:'1/12/2026', series:'MT2601', number:'10089175', excise:0, vatTaxable:0,       nonVat:0, exempt:0, zero:0, vat:0,       road:0,      total:50},
+ {n:11,supplier:'A_00000701', recipient:'T_00000645', date:'3/31/2026', approval:'3/31/2026', series:'MT2603', number:'12170557', excise:0, vatTaxable:8473.67, nonVat:0, exempt:0, zero:0, vat:1525.26, road:0,      total:9998.93},
+ {n:12,supplier:'A_00001125', recipient:'T_00000160', date:'2/17/2026', approval:'2/24/2026', series:'MT2602', number:'11258115', excise:0, vatTaxable:0,       nonVat:0, exempt:0, zero:0, vat:0,       road:0,      total:310.02},
+ {n:13,supplier:'A_00001771', recipient:'T_00000143', date:'1/13/2026', approval:'1/13/2026', series:'MT2601', number:'10694886', excise:0, vatTaxable:3050.85, nonVat:0, exempt:0, zero:0, vat:549.15,  road:0,      total:3600},
+ {n:14,supplier:'A_00002240', recipient:'T_00000354', date:'1/6/2026',  approval:'1/8/2026',  series:'MT2601', number:'10164935', excise:0, vatTaxable:201.28,  nonVat:0, exempt:0, zero:0, vat:36.23,   road:0,      total:237.51},
+ {n:15,supplier:'A_00002772', recipient:'T_00000160', date:'1/13/2026', approval:'1/21/2026', series:'MT2601', number:'10695891', excise:0, vatTaxable:1641.6,  nonVat:0, exempt:0, zero:0, vat:295.49,  road:0,      total:1937.09},
+ {n:16,supplier:'A_00001986', recipient:'T_00000105', date:'1/14/2026', approval:'1/22/2026', series:'MT2601', number:'10803577', excise:0, vatTaxable:0,       nonVat:0, exempt:0, zero:0, vat:0,       road:0,      total:100},
+ {n:17,supplier:'A_00002643', recipient:'T_00000143', date:'1/23/2026', approval:'1/29/2026', series:'MT2601', number:'11464985', excise:0, vatTaxable:74,      nonVat:0, exempt:0, zero:0, vat:13.32,   road:0,      total:87.32},
+ {n:18,supplier:'A_00000628', recipient:'T_00000518', date:'1/23/2026', approval:'1/29/2026', series:'MT2601', number:'11465176', excise:0, vatTaxable:1355.08, nonVat:0, exempt:0, zero:0, vat:243.91,  road:0,      total:1598.99},
+ {n:19,supplier:'A_00002995', recipient:'T_00000790', date:'1/5/2026',  approval:'1/5/2026',  series:'MT2601', number:'10035188', excise:0, vatTaxable:2106.69, nonVat:0, exempt:0, zero:0, vat:379.21,  road:161.35, total:2647.25},
+];
+
+/* ---------- helpers ---------- */
+const fmt = n => new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fmtInt = n => new Intl.NumberFormat('en-US').format(n);
+const monthOf = d => parseInt(d.split('/')[0],10);
+function fmtDate(d){ const [m,day,y]=d.split('/'); const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]; return `${M} ${day}, '${String(y).slice(2)}`; }
+const dim = v => v===0 ? 'text-faint' : 'text-ink';
+
+/* ---------- auth ---------- */
+function authView(v){ document.querySelectorAll('[data-auth]').forEach(e=>e.classList.toggle('hidden', e.dataset.auth!==v)); }
+function enterApp(){ document.getElementById('auth').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); navigate('dashboard'); }
+function logout(){ document.getElementById('app').classList.add('hidden'); document.getElementById('auth').classList.remove('hidden'); authView('login'); }
+function pwStrength(v){
+  const bars=document.querySelectorAll('#pwbars span'); let s=0;
+  if(v.length>=6)s++; if(/[A-Z]/.test(v))s++; if(/[0-9]/.test(v))s++; if(/[^A-Za-z0-9]/.test(v))s++;
+  const col=['#DAD3C2','#BE3A22','#A9761A','#A9761A','#1F6B4A'][s];
+  bars.forEach((b,i)=> b.style.background = i<s? col : '#DAD3C2');
+}
+
+/* ---------- navigation ---------- */
+function navigate(view){
+  document.querySelectorAll('[data-view]').forEach(s=>s.classList.toggle('hidden', s.dataset.view!==view));
+  document.querySelectorAll('[data-nav]').forEach(n=>n.classList.toggle('active', n.dataset.nav===view));
+  if(view==='dashboard') renderDashboard();
+  if(view==='invoices') renderInvoices();
+  if(view==='upload') goStep(1);
+  window.scrollTo(0,0);
+  document.querySelector('main').scrollTo(0,0);
+}
+
+/* ---------- dashboard ---------- */
+function renderDashboard(){
+  const count=INVOICES.length;
+  const turnover=INVOICES.reduce((a,b)=>a+b.total,0);
+  const vat=INVOICES.reduce((a,b)=>a+b.vat,0);
+  const suppliers=new Set(INVOICES.map(i=>i.supplier)).size;
+  const kpi=[['Invoices',fmtInt(count),''],['Turnover, €',fmt(turnover),'ledger'],['VAT amount, €',fmt(vat),''],['Suppliers',fmtInt(suppliers),'']];
+  document.getElementById('kpis').innerHTML = kpi.map((k,i)=>`
+    <div class="card p-5 fadeup" style="animation-delay:${i*.06}s">
+      <p class="kicker mb-2">${k[0]}</p>
+      <p class="font-mono tnum text-2xl ${k[2]==='ledger'?'text-ledger':''}">${k[1]}</p>
+    </div>`).join('');
+
+  const months={1:0,2:0,3:0};
+  INVOICES.forEach(i=>months[monthOf(i.date)]+=i.total);
+  const max=Math.max(...Object.values(months));
+  const names={1:'Jan',2:'Feb',3:'Mar'};
+  document.getElementById('chart').innerHTML=Object.keys(months).map(m=>{
+    const h=Math.round(months[m]/max*100);
+    return `<div class="flex-1 flex flex-col items-center justify-end gap-2 h-full">
+      <span class="font-mono text-xs text-muted tnum">${fmtInt(Math.round(months[m]))}</span>
+      <div class="w-full bg-ink/85 hover:bg-stamp transition-all rounded-t-md" style="height:${h}%"></div>
+      <span class="kicker">${names[m]}</span></div>`;
+  }).join('');
+
+  document.getElementById('recentUploads').innerHTML=`
+    <li class="flex items-center justify-between"><span class="font-mono text-xs">FoodWholesale…csv</span><span class="text-ledger text-xs">● Done</span></li>
+    <li class="flex items-center justify-between"><span class="font-mono text-xs">january_batch.csv</span><span class="text-amber text-xs blink">◐ Parsing</span></li>
+    <li class="flex items-center justify-between"><span class="font-mono text-xs">broken_export.csv</span><span class="text-stamp text-xs">✕ Failed</span></li>`;
+}
+
+/* ---------- invoices ---------- */
+let selected=new Set();
+function filteredInvoices(){
+  const q=document.getElementById('invSearch').value.trim().toLowerCase();
+  const p=document.getElementById('invPeriod').value;
+  return INVOICES.filter(i=>{
+    const matchQ=!q || i.supplier.toLowerCase().includes(q)||i.recipient.toLowerCase().includes(q)||i.number.includes(q);
+    const matchP=!p || monthOf(i.date)==p;
+    return matchQ&&matchP;
+  });
+}
+function renderInvoices(){
+  const rows=filteredInvoices();
+  document.getElementById('invBody').innerHTML=rows.map(i=>`
+    <tr class="border-b hair row-hover cursor-pointer" onclick="if(event.target.type!=='checkbox')openDrawer(${i.n})">
+      <td class="px-3 py-2.5"><input type="checkbox" class="accent-stamp" ${selected.has(i.n)?'checked':''} onchange="toggleSel(${i.n},this.checked)"></td>
+      <td class="px-3 py-2.5 font-mono">${i.number}</td>
+      <td class="px-3 py-2.5 text-muted">${fmtDate(i.date)}</td>
+      <td class="px-3 py-2.5 text-muted" data-col="approval">${fmtDate(i.approval)}</td>
+      <td class="px-3 py-2.5 font-mono text-xs">${i.series}</td>
+      <td class="px-3 py-2.5 font-mono text-xs">${i.supplier}</td>
+      <td class="px-3 py-2.5 font-mono text-xs">${i.recipient}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.vatTaxable)}">${fmt(i.vatTaxable)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.nonVat)}" data-col="nonvat">${fmt(i.nonVat)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.exempt)}" data-col="exempt">${fmt(i.exempt)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.zero)}" data-col="zero">${fmt(i.zero)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.excise)}" data-col="excise">${fmt(i.excise)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.road)}" data-col="road">${fmt(i.road)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum ${dim(i.vat)}">${fmt(i.vat)}</td>
+      <td class="px-3 py-2.5 text-right font-mono tnum font-semibold">${fmt(i.total)}</td>
+    </tr>`).join('') || `<tr><td colspan="15" class="px-3 py-10 text-center text-muted">Nothing found for this filter.</td></tr>`;
+
+  document.getElementById('sumCount').textContent=fmtInt(rows.length);
+  document.getElementById('sumVat').textContent=fmt(rows.reduce((a,b)=>a+b.vat,0));
+  document.getElementById('sumTurnover').textContent=fmt(rows.reduce((a,b)=>a+b.vatTaxable,0));
+  document.getElementById('sumTotal').textContent=fmt(rows.reduce((a,b)=>a+b.total,0));
+}
+function toggleCol(col,show){ document.getElementById('invTableWrap').classList.toggle('hide-'+col, !show); }
+function toggleSel(n,on){ on?selected.add(n):selected.delete(n); updateBulk(); }
+function selectAll(on){ filteredInvoices().forEach(i=> on?selected.add(i.n):selected.delete(i.n)); renderInvoices(); updateBulk(); }
+function clearSel(){ selected.clear(); renderInvoices(); updateBulk(); }
+function updateBulk(){
+  const bar=document.getElementById('bulkBar');
+  bar.classList.toggle('hidden', selected.size===0); bar.classList.toggle('flex', selected.size>0);
+  document.getElementById('bulkCount').textContent=selected.size;
+}
+
+/* ---------- drawer ---------- */
+function openDrawer(n){
+  const i=INVOICES.find(x=>x.n===n);
+  const row=(l,v,strong)=>`<div class="flex items-center justify-between py-2 border-b hair"><span class="text-muted text-sm">${l}</span><span class="font-mono tnum ${strong?'text-lg font-semibold':''} ${v==='0.00'&&!strong?'text-faint':''}">${v}</span></div>`;
+  document.getElementById('drawer').innerHTML=`
+    <div class="sticky top-0 bg-surface border-b hair px-6 py-4 flex items-center justify-between">
+      <div><p class="kicker">Invoice</p><p class="font-display text-xl">${i.series} · ${i.number}</p></div>
+      <button class="text-2xl text-faint hover:text-ink" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="p-6 space-y-6">
+      <div><p class="kicker mb-1">Parties</p>${row('Supplier TIN',i.supplier)}${row('Recipient TIN',i.recipient)}</div>
+      <div><p class="kicker mb-1">Dates</p>${row('Issued',fmtDate(i.date))}${row('Approved',fmtDate(i.approval))}</div>
+      <div><p class="kicker mb-1">Amounts, €</p>
+        ${row('Taxable VAT',fmt(i.vatTaxable))}${row('Non-taxable',fmt(i.nonVat))}${row('Exempt',fmt(i.exempt))}
+        ${row('Zero-rated',fmt(i.zero))}${row('Excise',fmt(i.excise))}${row('Road tax',fmt(i.road))}${row('VAT amount',fmt(i.vat))}
+        ${row('Total',fmt(i.total),true)}
+      </div>
+      <div class="text-xs text-faint pt-2">From upload: <span class="font-mono">FoodWholesale_sampleData_short.csv</span></div>
+    </div>`;
+  document.getElementById('drawer').classList.remove('hidden'); document.getElementById('drawer').classList.add('slidein');
+  document.getElementById('drawerBackdrop').classList.remove('hidden');
+}
+function closeDrawer(){ document.getElementById('drawer').classList.add('hidden'); document.getElementById('drawerBackdrop').classList.add('hidden'); }
+
+/* ---------- upload wizard ---------- */
+function goStep(s){
+  document.querySelectorAll('[data-step]').forEach(e=>e.classList.toggle('hidden', e.dataset.step!=s));
+  document.querySelectorAll('[data-step-dot]').forEach(e=>{
+    const k=e.dataset.stepDot, dot=e.querySelector('span');
+    const on = k<=s;
+    e.classList.toggle('text-muted', !on);
+    dot.className = `w-6 h-6 grid place-items-center font-mono text-xs rounded-md ${on?'bg-ink text-paper':'border hair'}`;
+    if(k==s){ dot.className='w-6 h-6 grid place-items-center font-mono text-xs rounded-md bg-stamp text-paper'; }
+  });
+  if(s==2){
+    document.getElementById('previewBody').innerHTML=INVOICES.slice(0,5).map(i=>`
+      <tr class="border-b hair"><td class="px-3 py-1.5">${i.number}</td><td class="px-3 py-1.5">${fmtDate(i.date)}</td>
+      <td class="px-3 py-1.5">${i.supplier}</td><td class="px-3 py-1.5 text-right">${fmt(i.vat)}</td>
+      <td class="px-3 py-1.5 text-right">${fmt(i.total)}</td></tr>`).join('');
+  }
+}
+
+/* ---------- chat ---------- */
+function newChat(){ document.getElementById('chatThread').innerHTML=''; document.getElementById('chatThread').classList.add('hidden'); document.getElementById('chatEmpty').classList.remove('hidden'); }
+function bubbleUser(t){ return `<div class="max-w-3xl mx-auto mb-6 flex justify-end"><div class="bg-ink text-paper px-4 py-3 rounded-2xl rounded-tr-sm max-w-[80%]">${t}</div></div>`; }
+function bubbleAI(inner){ return `<div class="max-w-3xl mx-auto mb-6 fadeup"><div class="flex items-start gap-3"><div class="w-8 h-8 shrink-0 grid place-items-center bg-stamp text-paper rounded-lg font-display">I</div><div class="flex-1 pt-1">${inner}</div></div></div>`; }
+
+function answerFor(q){
+  q=q.toLowerCase();
+  const vat=INVOICES.reduce((a,b)=>a+b.vat,0), turn=INVOICES.reduce((a,b)=>a+b.vatTaxable,0);
+  if(q.includes('vat')&&(q.includes('supplier')||q.includes('top'))){
+    const by={}; INVOICES.forEach(i=>{by[i.supplier]=by[i.supplier]||{c:0,t:0}; by[i.supplier].c++; by[i.supplier].t+=i.total;});
+    const top=Object.entries(by).sort((a,b)=>b[1].t-a[1].t).slice(0,3);
+    return `<p class="mb-3">For the period (Jan–Mar 2026):</p>
+      <ul class="mb-4 space-y-1 text-sm"><li>• VAT amount: <b class="font-mono tnum">€${fmt(vat)}</b></li><li>• Taxable turnover: <b class="font-mono tnum">€${fmt(turn)}</b></li></ul>
+      <p class="kicker mb-2">Top-3 suppliers by turnover</p>
+      <div class="card-flat overflow-hidden text-sm mb-3"><table class="w-full">
+      <thead><tr class="border-b hair text-left"><th class="px-3 py-2 kicker font-sans">#</th><th class="px-3 py-2 kicker font-sans">Supplier</th><th class="px-3 py-2 kicker font-sans text-right">Invoices</th><th class="px-3 py-2 kicker font-sans text-right">Turnover €</th></tr></thead>
+      <tbody>${top.map((t,i)=>`<tr class="border-b hair"><td class="px-3 py-2 font-mono">${i+1}</td><td class="px-3 py-2 font-mono text-xs">${t[0]}</td><td class="px-3 py-2 text-right font-mono tnum">${t[1].c}</td><td class="px-3 py-2 text-right font-mono tnum">${fmt(t[1].t)}</td></tr>`).join('')}</tbody></table></div>
+      ${meta(INVOICES.length,'Jan 1 – Mar 31, 2026')}`;
+  }
+  if(q.includes('no vat')||q.includes('without vat')){
+    const z=INVOICES.filter(i=>i.vat===0);
+    return `<p class="mb-3">Found <b class="font-mono">${z.length}</b> invoices with no VAT (zero tax):</p>
+      <div class="card-flat overflow-hidden text-sm mb-3"><table class="w-full"><thead><tr class="border-b hair text-left"><th class="px-3 py-2 kicker font-sans">Number</th><th class="px-3 py-2 kicker font-sans">Supplier</th><th class="px-3 py-2 kicker font-sans text-right">Total €</th></tr></thead>
+      <tbody>${z.map(i=>`<tr class="border-b hair"><td class="px-3 py-2 font-mono">${i.number}</td><td class="px-3 py-2 font-mono text-xs">${i.supplier}</td><td class="px-3 py-2 text-right font-mono tnum">${fmt(i.total)}</td></tr>`).join('')}</tbody></table></div>
+      ${meta(z.length,'whole dataset')}`;
+  }
+  if(q.includes('month')){
+    const m={1:0,2:0,3:0}; INVOICES.forEach(i=>m[monthOf(i.date)]+=i.total);
+    const names={1:'January',2:'February',3:'March'};
+    return `<p class="mb-3">Turnover by month:</p>
+      <ul class="space-y-1 text-sm mb-3">${Object.keys(m).map(k=>`<li>• ${names[k]}: <b class="font-mono tnum">€${fmt(m[k])}</b></li>`).join('')}</ul>${meta(INVOICES.length,'Jan–Mar 2026')}`;
+  }
+  if(q.includes('top')||q.includes('supplier')){
+    const by={}; INVOICES.forEach(i=>{by[i.supplier]=(by[i.supplier]||0)+i.total;});
+    const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    return `<p class="kicker mb-2">Top-5 suppliers by turnover</p>
+      <div class="card-flat overflow-hidden text-sm mb-3"><table class="w-full"><tbody>${top.map((t,i)=>`<tr class="border-b hair"><td class="px-3 py-2 font-mono">${i+1}</td><td class="px-3 py-2 font-mono text-xs">${t[0]}</td><td class="px-3 py-2 text-right font-mono tnum">€${fmt(t[1])}</td></tr>`).join('')}</tbody></table></div>${meta(INVOICES.length,'whole dataset')}`;
+  }
+  return `<p class="mb-2">Across your set of <b>${INVOICES.length}</b> invoices: VAT amount — <b class="font-mono tnum">€${fmt(vat)}</b>, turnover — <b class="font-mono tnum">€${fmt(turn)}</b>.</p><p class="text-muted text-sm">Refine your question — e.g. by period, supplier, or invoice series.</p>${meta(INVOICES.length,'whole dataset')}`;
+}
+function meta(n,period){
+  return `<p class="text-xs text-muted mt-2">▸ Calculated over ${n} invoices · ${period}</p>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <button class="chip px-2.5 py-1 text-xs" onclick="navigate('invoices')">Open in table</button>
+      <button class="chip px-2.5 py-1 text-xs">📊 Chart</button>
+      <button class="chip px-2.5 py-1 text-xs">⧉ Copy</button>
+      <button class="chip px-2.5 py-1 text-xs">↻ Regenerate</button>
+    </div>`;
+}
+function ask(text){
+  text=(text||'').trim(); if(!text) return;
+  document.getElementById('chatEmpty').classList.add('hidden');
+  const thread=document.getElementById('chatThread'); thread.classList.remove('hidden');
+  thread.insertAdjacentHTML('beforeend', bubbleUser(text));
+  document.getElementById('chatInput').value='';
+  const thinkId='t'+Date.now();
+  thread.insertAdjacentHTML('beforeend', bubbleAI(`<p class="text-muted blink" id="${thinkId}">Analyzing data…</p>`));
+  thread.scrollTop=thread.scrollHeight;
+  setTimeout(()=>{
+    document.getElementById(thinkId).closest('.fadeup').remove();
+    thread.insertAdjacentHTML('beforeend', bubbleAI(answerFor(text)));
+    thread.scrollTop=thread.scrollHeight;
+  },850);
+}
+
+/* ---------- init ---------- */
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDrawer(); document.getElementById('colsPop').classList.add('hidden'); }});
+document.getElementById('chatInput')?.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,128)+'px'; });
+renderDashboard();
+</script>
+</body>
+</html>
