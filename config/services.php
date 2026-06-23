@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    // External LLM (chat / NL->SQL / re-ranking) via OpenRouter.
+    'openrouter' => [
+        'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+        'api_key' => env('OPENROUTER_API_KEY'),
+        'model' => env('OPENROUTER_MODEL', 'openai/gpt-4o-mini'),
+        'timeout' => (int) env('OPENROUTER_TIMEOUT', 60),
+    ],
+
+    // Local embedding model served by Ollama (catalog similarity search).
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://ollama:11434'),
+        'embed_model' => env('OLLAMA_EMBED_MODEL', 'bge-m3'),
+        'dimensions' => (int) env('EMBED_DIMENSIONS', 1024),
+    ],
+
 ];
