@@ -30,3 +30,6 @@ Thumbs.db
 *:Zone.Identifier
 # Local sqlite created by scaffolding (project uses Postgres)
 /database/*.sqlite
+
+# Throwaway root-level test scripts
+/_*.php
