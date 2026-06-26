@@ -19,13 +19,13 @@
           <div class="space-y-5">
             <div>
               <label class="field-label">Login</label>
-              <input name="login" type="text" value="{{ old('login', 'admin') }}" autofocus
+              <input name="login" type="text" value="{{ old('login') }}" autofocus
                      class="field-input @error('login') ring-1 ring-stamp @enderror">
             </div>
             <div>
               <label class="field-label">Password</label>
               <div class="relative">
-                <input name="password" type="password" value="admin" class="field-input pr-12">
+                <input name="password" type="password" class="field-input pr-12">
                 <button type="button" class="absolute right-0 top-0 h-full px-3.5 text-faint hover:text-ink"
                         onclick="const i=this.previousElementSibling; i.type=i.type==='password'?'text':'password'">◍</button>
               </div>
@@ -44,8 +44,6 @@
 
           <button type="submit" class="btn btn-ink w-full">Sign in</button>
         </form>
-
-        <p class="text-sm text-muted mt-6">Demo credentials: <span class="font-mono text-ink">admin / admin</span></p>
       </div>
     </div>
     <p class="text-xs text-faint">© 2026 Invoice Intelligence · interface prototype</p>
