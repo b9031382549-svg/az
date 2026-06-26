@@ -7,7 +7,10 @@
 #   ssh -L 8081:127.0.0.1:8081 root@157.90.152.161
 # then open http://localhost:8081  (System: PostgreSQL, Server: pgsql,
 # User: app, Database: app, Password: from /opt/az/.env).
-name: az_prod
+#
+# Runs as its own compose project (az_tools) attached to the prod network, so
+# stopping it never touches the app stack.
+name: az_tools
 
 services:
   adminer:
