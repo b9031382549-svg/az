@@ -1,0 +1,26 @@
+# Optional ops tooling (DB viewer) — NOT part of the app deploy.
+# Start on demand:   docker compose -f docker-compose.tools.yml up -d
+# Stop:              docker compose -f docker-compose.tools.yml down
+#
+# Adminer binds to 127.0.0.1 only (never exposed to the internet). Reach it
+# over an SSH tunnel from your machine:
+#   ssh -L 8081:127.0.0.1:8081 root@157.90.152.161
+# then open http://localhost:8081  (System: PostgreSQL, Server: pgsql,
+# User: app, Database: app, Password: from /opt/az/.env).
+name: az_prod
+
+services:
+  adminer:
+    image: adminer:latest
+    environment:
+      ADMINER_DEFAULT_SERVER: pgsql
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks:
+      - default
+    restart: unless-stopped
+
+networks:
+  default:
+    external: true
+    name: az_prod_default
