@@ -46,7 +46,7 @@
     <div class="p-4 border-t hair">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-full bg-ledger/15 text-ledger grid place-items-center font-semibold">{{ $initial }}</div>
-        <div class="text-sm leading-tight"><div class="font-medium">{{ auth()->user()->name }}</div><div class="text-faint text-xs">FoodWholesale Ltd</div></div>
+        <div class="text-sm leading-tight"><div class="font-medium">{{ auth()->user()->name }}</div><div class="text-faint text-xs">{{ config('app.organization') }}</div></div>
       </div>
     </div>
   </aside>

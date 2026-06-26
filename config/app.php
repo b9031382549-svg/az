@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Organization label shown in the app shell (sidebar).
+    'organization' => env('APP_ORGANIZATION', 'Demo Organization'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

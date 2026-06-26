@@ -2,7 +2,7 @@
 <section class="p-5 sm:p-8 max-w-[1180px]">
   <div class="flex items-end justify-between flex-wrap gap-3 mb-7">
     <div>
-      <p class="kicker mb-1.5">Period · 2026</p>
+      <p class="kicker mb-1.5">Period · {{ $period }}</p>
       <h1 class="font-display text-4xl">Overview</h1>
     </div>
     <div class="flex gap-2">

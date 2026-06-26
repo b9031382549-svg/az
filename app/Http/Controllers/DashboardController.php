@@ -15,7 +15,11 @@ class DashboardController extends Controller
             ->selectRaw('coalesce(sum(total_amount),0) as turnover')
             ->selectRaw('coalesce(sum(vat_amount),0) as vat')
             ->selectRaw('count(distinct supplier_tin) as suppliers')
+            ->selectRaw('min(invoice_date) as first_date')
+            ->selectRaw('max(invoice_date) as last_date')
             ->first();
+
+        $period = $this->periodLabel($agg->first_date, $agg->last_date);
 
         $monthsRaw = EInvoice::query()
             ->selectRaw("to_char(invoice_date,'YYYY-MM') as ym, sum(total_amount) as t")
@@ -32,6 +36,22 @@ class DashboardController extends Controller
             ->orderByDesc('invoice_date')->orderByDesc('id')
             ->limit(6)->get();
 
-        return view('pages.overview', compact('agg', 'months', 'recent'));
+        return view('pages.overview', compact('agg', 'months', 'recent', 'period'));
+    }
+
+    private function periodLabel(?string $first, ?string $last): string
+    {
+        $years = array_filter([
+            $first ? Carbon::parse($first)->year : null,
+            $last ? Carbon::parse($last)->year : null,
+        ]);
+
+        if (empty($years)) {
+            return '—';
+        }
+
+        return min($years) === max($years)
+            ? (string) min($years)
+            : min($years).'–'.max($years);
     }
 }
