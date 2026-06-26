@@ -58,13 +58,13 @@ class CatalogEmbeddingRunner
         $rows = $query
             ->orderBy('id')
             ->limit(max(1, $size))
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'synonyms']);
 
         if ($rows->isEmpty()) {
             return 0;
         }
 
-        $vectors = $this->embedder->embed($rows->map(fn ($r) => $this->embedText($r->name))->all());
+        $vectors = $this->embedder->embed($rows->map(fn ($r) => $this->embedText($r->name, $r->synonyms ?? null))->all());
 
         DB::transaction(function () use ($rows, $vectors) {
             foreach ($rows->values() as $i => $row) {
@@ -85,7 +85,7 @@ class CatalogEmbeddingRunner
      * mid-path boilerplate. This improves recall for items whose meaning depends
      * on the category, not just the leaf word.
      */
-    private function embedText(string $name): string
+    private function embedText(string $name, ?string $synonyms = null): string
     {
         $segments = array_values(array_filter(array_map(
             'trim',
@@ -93,16 +93,21 @@ class CatalogEmbeddingRunner
         )));
 
         if (count($segments) <= 1) {
-            return $this->clip($segments[0] ?? trim($name), 16);
+            $base = $this->clip($segments[0] ?? trim($name), 16);
+        } else {
+            // Keep a short category head (first words) + the specific leaf. The full
+            // head can be very long; clipping it keeps the signal while cutting the
+            // token count (and embedding time) several-fold.
+            $head = $this->clip($segments[0], 8);
+            $leaf = $this->clip(end($segments), 16);
+            $base = $head === $leaf ? $leaf : $head.' — '.$leaf;
         }
 
-        // Keep a short category head (first words) + the specific leaf. The full
-        // head can be very long; clipping it keeps the signal while cutting the
-        // token count (and embedding time) several-fold.
-        $head = $this->clip($segments[0], 8);
-        $leaf = $this->clip(end($segments), 16);
+        // Append everyday synonyms (if enriched) so the vector also covers the
+        // colloquial terms invoices actually use.
+        $syn = trim((string) $synonyms);
 
-        return $head === $leaf ? $leaf : $head.' — '.$leaf;
+        return $syn !== '' ? $base.' — '.$syn : $base;
     }
 
     private function clip(string $text, int $words): string

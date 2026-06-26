@@ -89,12 +89,15 @@ class CatalogRetriever
     {
         $tokens = $this->tokens($text);
 
+        // Search name + everyday synonyms together.
+        $haystack = "(name || ' ' || coalesce(synonyms, ''))";
+
         if (empty($tokens)) {
             return DB::select(
-                "SELECT id, code, name, kind, word_similarity(?, name) AS sim
+                "SELECT id, code, name, kind, word_similarity(?, {$haystack}) AS sim
                  FROM catalog
                  WHERE TRUE {$kindSql}
-                 ORDER BY word_similarity(?, name) DESC
+                 ORDER BY word_similarity(?, {$haystack}) DESC
                  LIMIT {$per}",
                 array_merge([$text], $kindBind, [$text]),
             );
@@ -106,7 +109,10 @@ class CatalogRetriever
         // best matches, so the rare-but-decisive code is not crowded out.
         $freq = [];
         foreach ($tokens as $token) {
-            $freq[$token] = (int) DB::table('catalog')->where('name', 'ILIKE', '%'.$token.'%')->count();
+            $like = '%'.$token.'%';
+            $freq[$token] = (int) DB::table('catalog')
+                ->where(fn ($q) => $q->where('name', 'ILIKE', $like)->orWhere('synonyms', 'ILIKE', $like))
+                ->count();
         }
         $freq = array_filter($freq, fn ($c) => $c > 0);
         asort($freq);
@@ -117,13 +123,14 @@ class CatalogRetriever
         $seen = [];
 
         foreach ($ordered as $token) {
+            $like = '%'.$token.'%';
             $rows = DB::select(
-                "SELECT id, code, name, kind, word_similarity(?, name) AS sim
+                "SELECT id, code, name, kind, word_similarity(?, {$haystack}) AS sim
                  FROM catalog
-                 WHERE name ILIKE ? {$kindSql}
-                 ORDER BY word_similarity(?, name) DESC
+                 WHERE (name ILIKE ? OR synonyms ILIKE ?) {$kindSql}
+                 ORDER BY word_similarity(?, {$haystack}) DESC
                  LIMIT {$perToken}",
-                array_merge([$text, '%'.$token.'%'], $kindBind, [$text]),
+                array_merge([$text, $like, $like], $kindBind, [$text]),
             );
             foreach ($rows as $row) {
                 if (! isset($seen[$row->id])) {

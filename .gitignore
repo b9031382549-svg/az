@@ -33,3 +33,7 @@ Thumbs.db
 
 # Throwaway root-level test scripts
 /_*.php
+
+# Synonym enrichment work files
+/storage/app/catalog_codes.jsonl
+/storage/app/catalog_synonyms.jsonl
