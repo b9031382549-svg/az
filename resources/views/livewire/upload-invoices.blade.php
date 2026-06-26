@@ -25,8 +25,15 @@
 
   {{-- STEP 1 — choose file --}}
   @if($step === 1)
-    <label class="dropzone card bg-surface border-2 border-dashed hair p-12 text-center block cursor-pointer hover:border-ink transition">
-      <input type="file" wire:model="file" class="hidden" accept=".xlsx,.xls,.csv">
+    <label class="dropzone card bg-surface border-2 border-dashed hair p-12 text-center block cursor-pointer hover:border-ink transition"
+           x-data
+           @dragover.prevent="$el.classList.add('drag')"
+           @dragenter.prevent="$el.classList.add('drag')"
+           @dragleave.prevent="$el.classList.remove('drag')"
+           @drop.prevent="$el.classList.remove('drag');
+                          $refs.fileInput.files = $event.dataTransfer.files;
+                          $refs.fileInput.dispatchEvent(new Event('change', { bubbles: true }))">
+      <input x-ref="fileInput" type="file" wire:model="file" class="hidden" accept=".xlsx,.xls,.csv">
       <div wire:loading.remove wire:target="file">
         <div class="text-4xl mb-3 text-faint">⬆</div>
         <p class="font-display text-2xl mb-1">Drag your file here</p>
