@@ -42,6 +42,31 @@
     </div>
   </div>
 
+  {{-- File upload — batch classification in the background --}}
+  <div class="card-flat p-5 mt-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <p class="font-medium">Or upload a file</p>
+        <p class="text-muted text-sm">.xlsx / .xls / .csv — one item name per row. Classified in the background (first {{ 200 }} rows).</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="file" wire:model="file" accept=".xlsx,.xls,.csv" class="text-sm max-w-[230px]">
+        <button wire:click="classifyFile" wire:loading.attr="disabled" wire:target="classifyFile,file" class="btn btn-ink btn-sm">
+          <span wire:loading.remove wire:target="classifyFile,file">Queue file →</span>
+          <span wire:loading wire:target="classifyFile,file">Queuing…</span>
+        </button>
+      </div>
+    </div>
+    @error('file') <p class="text-sm text-stamp mt-2">{{ $message }}</p> @enderror
+    @if($queued)
+      <div class="mt-3 card p-3.5 text-sm border-ledger/40 flex items-start gap-2.5">
+        <span class="text-ledger">✓</span>
+        <span>Queued <b>{{ number_format($queued['count'],0,'.',' ') }}</b>@if($queued['total'] > $queued['count']) of {{ number_format($queued['total'],0,'.',' ') }}@endif items for background classification.
+          Results appear in the <a href="{{ route('review') }}" class="link-under text-ink">Review queue</a> as the worker processes them.</span>
+      </div>
+    @endif
+  </div>
+
   @if(!empty($results))
     <div class="flex items-center justify-between mt-7 mb-3">
       <h2 class="font-display text-xl">{{ count($results) }} items matched</h2>
