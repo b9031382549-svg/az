@@ -1,0 +1,135 @@
+# Production stack — self-contained (NOT merged with docker-compose.yml).
+# Run on the server with:  docker compose -f docker-compose.prod.yml up -d --build
+# The dev docker-compose.yml is untouched and unrelated to this file.
+name: az_prod
+
+services:
+  # Web tier: php-fpm + nginx in one container (supervisord).
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+      target: prod
+    image: az_prod_app
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+    ports:
+      - "80:80"
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/up || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  # Background jobs (catalog embedding, classification). Same image as app.
+  worker:
+    image: az_prod_app
+    user: www-data
+    command: >
+      php artisan queue:work
+      --queue=default --tries=3 --timeout=620
+      --memory=256 --max-jobs=200 --max-time=3600 --sleep=3 --rest=1
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+    depends_on:
+      app:
+        condition: service_started
+      pgsql:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Laravel scheduler (runs schedules from routes/console.php). Single instance.
+  scheduler:
+    image: az_prod_app
+    user: www-data
+    command: php artisan schedule:work
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  pgsql:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-app}
+      POSTGRES_USER: ${DB_USERNAME:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    # Memory tuning for a 7.6 GB box shared with Ollama + app. Raise
+    # maintenance_work_mem to 2GB transiently only when building the HNSW index.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=1GB
+      - -c
+      - max_parallel_maintenance_workers=2
+      - -c
+      - max_connections=50
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - wal_compression=on
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Loopback-only: safe regardless of ufw, and lets a DB GUI connect over an
+    # SSH tunnel (ssh -L 5432:127.0.0.1:5432 ...). NOT exposed to the internet.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-app} -d ${DB_DATABASE:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    # No published port: reachable only as http://ollama:11434 on the compose net.
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "10m"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    # Cap so an embedding spike can't OOM-kill Postgres/app on the shared box.
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  ollama:

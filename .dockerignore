@@ -1,0 +1,25 @@
+# Keep the build context lean and secrets out of the image.
+.git
+.github
+.gitignore
+.gitattributes
+.editorconfig
+
+# Secrets — never bake env into the image (keep the example template).
+.env
+.env.*
+!.env.example
+
+# Rebuilt inside the image (vendor stage / assets stage).
+node_modules
+vendor
+public/build
+public/hot
+
+# Dev cruft.
+storage/logs/*.log
+storage/framework/cache/data/*
+docker-compose*.yml
+*.md
+tests
+.phpunit.result.cache
