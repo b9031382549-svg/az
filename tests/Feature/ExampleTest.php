@@ -2,18 +2,19 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    /** The health endpoint boots the framework and returns 200. */
+    public function test_health_endpoint_is_available(): void
     {
-        $response = $this->get('/');
+        $this->get('/up')->assertStatus(200);
+    }
 
-        $response->assertStatus(200);
+    /** The app is auth-gated: guests hitting "/" are redirected to login. */
+    public function test_guests_are_redirected_to_login(): void
+    {
+        $this->get('/')->assertRedirect('/login');
     }
 }
