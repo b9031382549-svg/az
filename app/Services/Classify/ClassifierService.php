@@ -279,6 +279,8 @@ class ClassifierService
             * "çay dəsmalı" (tea towel) -> towel / kitchen linen (NOT tea)
             * "qrilyaj" (grillage sweet) -> confectionery (NOT a grill/stove)
             * "cath ..." -> catheter, a medical instrument (NOT aluminium/metal)
+            * paper napkin / pocket tissue ("kağız salfet", "cib salfeti") -> paper
+              article (chapter 48), NOT a textile towel or handkerchief
         - Prefer the most specific code that fits the item's actual purpose.
         - If none of the candidates is a reasonable match, set "code" to null.
         - Calibrate "confidence" (0..1) honestly: use > 0.85 only when a candidate

@@ -24,7 +24,9 @@ return [
         'kateter' => 'kateter tibbi alət',
         'desensitizer' => 'stomatoloji material',          // dental bonding agent
         'pancake' => 'xəmir məmulatı şirniyyat',
-        'cib mendel' => 'kağız dəsmal salfet',             // pocket paper tissues
+        'cib mendel' => 'kağız cib salfeti, kağızdan',     // pocket PAPER tissues (ch48)
+        'cib mendil' => 'kağız cib salfeti, kağızdan',
+        'soffione' => 'kağız salfet, kağızdan',            // paper-napkin brand (ch48)
     ],
 
     // Confidence >= auto_confirm  -> auto_confirmed
