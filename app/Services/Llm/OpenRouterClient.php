@@ -4,6 +4,7 @@ namespace App\Services\Llm;
 
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class OpenRouterClient
 {
@@ -107,24 +108,33 @@ class OpenRouterClient
     {
         $options['response_format'] ??= ['type' => 'json_object'];
 
-        // Retry the whole call: covers transient API errors AND the occasional
-        // unparseable (non-JSON / truncated) response a fresh call usually fixes.
-        $attempts = 3;
+        // Retry the whole call. Catch Throwable, not just RuntimeException — a
+        // transient timeout/network blip throws ConnectionException (NOT a
+        // RuntimeException) and must be retried too. Covers: connection errors,
+        // HTTP 4xx/5xx, and unparseable/empty responses.
+        $attempts = 4;
         $lastError = null;
 
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             try {
-                $result = $this->complete($messages, $options);
+                $opts = $options;
+                // On a retry, nudge temperature so a deterministic bad/unparseable
+                // output (temperature 0) is not reproduced identically.
+                if ($attempt > 1 && ! isset($options['temperature'])) {
+                    $opts['temperature'] = min(0.4, 0.15 * ($attempt - 1));
+                }
+
+                $result = $this->complete($messages, $opts);
 
                 return [
                     'data' => JsonExtractor::decode($result['content']),
                     'usage' => $result['usage'],
                     'model' => $result['model'],
                 ];
-            } catch (RuntimeException $e) {
+            } catch (Throwable $e) {
                 $lastError = $e;
                 if ($attempt < $attempts) {
-                    usleep(400000 * $attempt);
+                    usleep((int) (500000 * (2 ** ($attempt - 1)))); // 0.5s, 1s, 2s backoff
                 }
             }
         }
