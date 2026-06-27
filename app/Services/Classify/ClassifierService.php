@@ -158,9 +158,10 @@ class ClassifierService
     private function expandForRetrieval(string $text): array
     {
         $zero = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
+        $hints = $this->trapHints($text); // deterministic disambiguation, always applied
 
         if (! config('classify.expand_query', true)) {
-            return [$text, $zero];
+            return [trim($hints.' '.$text), $zero];
         }
 
         try {
@@ -172,12 +173,30 @@ class ClassifierService
             $this->logUsage($response['usage'], $response['model'], $text, 'expand');
 
             $description = trim((string) ($response['data']['description'] ?? ''));
-            $retrievalText = $description !== '' ? $description.' '.$text : $text;
+            $retrievalText = trim($description.' '.$hints.' '.$text);
 
             return [$retrievalText, $response['usage']];
         } catch (Throwable) {
-            return [$text, $zero]; // graceful: fall back to the raw item
+            return [trim($hints.' '.$text), $zero]; // graceful: raw item + trap hints
         }
+    }
+
+    /**
+     * Append canonical hints for known Azerbaijani invoice traps (homonyms /
+     * false friends / abbreviations) present in the raw text — so e.g. a "çay
+     * dəsmalı" (tea towel) is not pulled toward tea.
+     */
+    private function trapHints(string $text): string
+    {
+        $low = mb_strtolower($text);
+        $hints = [];
+        foreach ((array) config('classify.traps', []) as $needle => $hint) {
+            if (mb_stripos($low, mb_strtolower((string) $needle)) !== false) {
+                $hints[] = $hint;
+            }
+        }
+
+        return implode(' ', array_values(array_unique($hints)));
     }
 
     /**
@@ -213,11 +232,23 @@ class ClassifierService
         service description for catalogue lookup. The item is usually Azerbaijani
         and may contain brand names, article numbers, sizes and packaging.
 
-        Output what the item fundamentally IS, in 2-6 words IN AZERBAIJANI,
-        dropping brand names, article numbers and sizes. Examples:
+        Output what the item fundamentally IS — its MAIN product noun + purpose —
+        in 2-6 words IN AZERBAIJANI. Drop brand names, article numbers and sizes.
+
+        Important:
+        - Return the HEAD product, not an ingredient, flavour, sauce or material.
+          "fruit cake" -> cake; "fish in tomato sauce" -> canned fish (not sauce).
+        - Resolve compound words by their WHOLE meaning, not a sub-word.
+          "çay dəsmalı" is a tea TOWEL -> "mətbəx dəsmalı" (NOT tea/çay).
+          "qrilyaj" is a grillage SWEET -> "şirniyyat" (NOT a grill/stove).
+        - Expand obvious abbreviations: "cath" -> "kateter".
+
+        Examples:
         - "5337 ZEWA DELUXE BRT 8 3PLY CAMOMILE" -> "tualet kağızı"
         - "Şpris 5ml 23G BLİSSET" -> "tibbi şpris"
-        - "PANNAKOTA" -> "süd deserti pannakotta"
+        - "OWOM ÇAY DƏSMALI VAF" -> "mətbəx dəsmalı"
+        - "OVEN MEYVELI TORTU" -> "tort şirniyyat"
+        - "SARDINA tomatda 240qr" -> "balıq konservi"
         - "Su (Pizza Hut)" -> "içməli su"
 
         Respond with strict JSON only: {"description": "..."}
@@ -241,6 +272,13 @@ class ClassifierService
           material it is made of. E.g. a syringe with a rubber plunger is a medical
           syringe, not a rubber article; a plastic water bottle is a beverage
           container, not a plastics product.
+        - Classify by the HEAD product — not by an ingredient, flavour, sauce,
+          packaging, brand or a sub-word of a compound name. Examples:
+            * fish in tomato sauce -> canned fish (NOT sauce)
+            * fruit cake / honey cake -> bakery/confectionery (NOT fruit, jam or a service)
+            * "çay dəsmalı" (tea towel) -> towel / kitchen linen (NOT tea)
+            * "qrilyaj" (grillage sweet) -> confectionery (NOT a grill/stove)
+            * "cath ..." -> catheter, a medical instrument (NOT aluminium/metal)
         - Prefer the most specific code that fits the item's actual purpose.
         - If none of the candidates is a reasonable match, set "code" to null.
         - Calibrate "confidence" (0..1) honestly: use > 0.85 only when a candidate

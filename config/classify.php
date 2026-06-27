@@ -8,6 +8,25 @@ return [
     // model) before retrieval, so branded/coded names still find candidates.
     'expand_query' => (bool) env('CLASSIFY_EXPAND_QUERY', true),
 
+    // Domain disambiguation map for Azerbaijani invoice traps: homonyms / false
+    // friends / abbreviations whose sub-word matches the wrong category. When a
+    // key (case-insensitive substring) is present, the hint is appended to the
+    // retrieval text so the right sense is searched. Keep focused on confusions,
+    // not general synonyms (those live in catalog.synonyms).
+    'traps' => [
+        'çay dəsmal' => 'mətbəx əl dəsmalı toxuculuq',   // tea TOWEL, not tea
+        'cay desmal' => 'mətbəx əl dəsmalı toxuculuq',
+        'çay dəsmalı' => 'mətbəx əl dəsmalı toxuculuq',
+        'qrilyaj' => 'şirniyyat qrilyaj konfet',          // grillage sweet, not "grill"
+        'midii' => 'midyə dəniz məhsulu',                 // mussels
+        'midyə' => 'midyə dəniz məhsulu',
+        'cath ' => 'kateter tibbi',                        // catheter abbreviation
+        'kateter' => 'kateter tibbi alət',
+        'desensitizer' => 'stomatoloji material',          // dental bonding agent
+        'pancake' => 'xəmir məmulatı şirniyyat',
+        'cib mendel' => 'kağız dəsmal salfet',             // pocket paper tissues
+    ],
+
     // Confidence >= auto_confirm  -> auto_confirmed
     // Confidence >= review_floor  -> needs_review
     // otherwise                   -> needs_review (low confidence, flagged)
