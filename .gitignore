@@ -37,3 +37,7 @@ Thumbs.db
 # Synonym enrichment work files
 /storage/app/catalog_codes.jsonl
 /storage/app/catalog_synonyms.jsonl
+
+# Internal docs / reports (not shipped)
+/docs/
+/ByFedor/

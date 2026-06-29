@@ -40,8 +40,14 @@ return [
         'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
         'api_key' => env('OPENROUTER_API_KEY'),
         'model' => env('OPENROUTER_MODEL', 'openai/gpt-4o-mini'),
-        // Stronger model for goods/services code re-ranking (better accuracy and
-        // confidence calibration than the default). Override per environment.
+        // Two-tier re-ranking (ТЗ: cheap/local-equivalent model first, strong
+        // model as fallback). tier-1 does the bulk; an uncertain pick (low
+        // confidence OR weak semantic backing) is escalated to classify_model.
+        // tier-1 is a small, self-hostable model (Qwen 2.5 7B) run via OpenRouter;
+        // swap to a local Ollama endpoint later without touching the flow.
+        'classify_model_tier1' => env('OPENROUTER_CLASSIFY_TIER1_MODEL', 'qwen/qwen-2.5-7b-instruct'),
+        // Stronger fallback model for the re-ranking (better accuracy and
+        // confidence calibration). Override per environment.
         'classify_model' => env('OPENROUTER_CLASSIFY_MODEL', 'openai/gpt-4o'),
         'timeout' => (int) env('OPENROUTER_TIMEOUT', 60),
     ],

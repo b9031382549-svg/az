@@ -4,6 +4,12 @@ return [
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 
+    // Two-tier re-ranking: a cheap/local-equivalent model (classify_model_tier1)
+    // ranks first; if its pick is not confident AND semantically backed, the item
+    // is escalated to the stronger fallback (classify_model). Set false to always
+    // use the fallback model directly.
+    'two_tier' => (bool) env('CLASSIFY_TWO_TIER', true),
+
     // Normalize a noisy item into a canonical product description (via the cheap
     // model) before retrieval, so branded/coded names still find candidates.
     'expand_query' => (bool) env('CLASSIFY_EXPAND_QUERY', true),

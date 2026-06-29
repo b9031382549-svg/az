@@ -36,6 +36,8 @@ class ClassifierService
             'reason' => null,
             'candidates' => [],
             'usage' => null,
+            'tier' => null,
+            'escalated' => false,
             'error' => null,
         ];
 
@@ -63,7 +65,9 @@ class ClassifierService
             ], array_slice($candidates, 0, 10));
 
             $picked = $this->rerank($text, $candidates);
-            $this->logUsage($picked['usage'], $picked['model'], $text, 'rerank');
+            // (rerank logs llm_usage per tier itself.)
+            $result['tier'] = $picked['tier'];
+            $result['escalated'] = $picked['escalated'];
 
             $result['usage'] = $this->sumUsage($expandUsage, $picked['usage']);
 
@@ -120,21 +124,71 @@ class ClassifierService
     }
 
     /**
+     * Two-tier re-ranking (ТЗ): a cheap/local-equivalent model ranks first; if
+     * its pick is not confident AND semantically backed, the item is escalated
+     * to the stronger fallback model. Each tier is logged separately in
+     * llm_usage. Returns the chosen tier's pick + which tier produced it.
+     *
      * @param  array<int, object>  $candidates
-     * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string}
+     * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string, tier:int, escalated:bool}
      */
     private function rerank(string $text, array $candidates): array
     {
-        $lines = [];
-        foreach (array_values($candidates) as $i => $c) {
-            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".mb_substr($c->name, 0, 180);
-        }
-        $list = implode("\n", $lines);
+        $list = $this->candidateList($candidates);
+        $tier2Model = (string) config('services.openrouter.classify_model');
+        $tier1Model = (string) config('services.openrouter.classify_model_tier1');
+        $twoTier = (bool) config('classify.two_tier', true) && $tier1Model !== '';
 
+        // Single-tier mode: go straight to the strong model.
+        if (! $twoTier) {
+            $only = $this->rerankWith($tier2Model, $text, $list);
+            $this->logUsage($only['usage'], $only['model'], $text, 'rerank');
+
+            return $only + ['tier' => 2, 'escalated' => false];
+        }
+
+        // Tier 1 — cheap / local-equivalent model handles the bulk.
+        $first = $this->rerankWith($tier1Model, $text, $list);
+        $this->logUsage($first['usage'], $first['model'], $text, 'rerank_tier1');
+
+        // Accept tier-1 only when its own pick clears BOTH gates (confidence +
+        // semantic backing) — the same bar used for auto-confirmation. Anything
+        // weaker is exactly the "model isn't sure" case the fallback exists for.
+        $sim = $this->semanticOf($first['code'], $candidates);
+        $confident = $first['confidence'] >= (float) config('classify.auto_confirm');
+        $backed = $sim !== null && $sim >= (float) config('classify.min_semantic');
+
+        if ($first['code'] !== null && $confident && $backed) {
+            return $first + ['tier' => 1, 'escalated' => false];
+        }
+
+        // Tier 2 — escalate to the stronger fallback model.
+        $second = $this->rerankWith($tier2Model, $text, $list);
+        $this->logUsage($second['usage'], $second['model'], $text, 'rerank_tier2');
+
+        return [
+            'kind' => $second['kind'],
+            'code' => $second['code'],
+            'confidence' => $second['confidence'],
+            'reason' => $second['reason'],
+            'usage' => $this->sumUsage($first['usage'], $second['usage']),
+            'model' => $second['model'],
+            'tier' => 2,
+            'escalated' => true,
+        ];
+    }
+
+    /**
+     * One re-rank LLM call against a given model.
+     *
+     * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string}
+     */
+    private function rerankWith(string $model, string $text, string $list): array
+    {
         $response = $this->llm->jsonWithUsage([
             ['role' => 'system', 'content' => $this->prompt()],
             ['role' => 'user', 'content' => "ITEM: {$text}\n\nCANDIDATES:\n{$list}"],
-        ], ['model' => config('services.openrouter.classify_model')]);
+        ], ['model' => $model]);
 
         $d = $response['data'];
 
@@ -146,6 +200,32 @@ class ClassifierService
             'usage' => $response['usage'],
             'model' => $response['model'],
         ];
+    }
+
+    /** @param array<int, object> $candidates */
+    private function candidateList(array $candidates): string
+    {
+        $lines = [];
+        foreach (array_values($candidates) as $i => $c) {
+            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".mb_substr($c->name, 0, 180);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Semantic (cosine) similarity of the candidate the model picked, if any.
+     *
+     * @param  array<int, object>  $candidates
+     */
+    private function semanticOf(?string $code, array $candidates): ?float
+    {
+        if ($code === null) {
+            return null;
+        }
+        $match = Arr::first($candidates, fn ($c) => $c->code === $code);
+
+        return $match->semantic_sim ?? null;
     }
 
     /**
