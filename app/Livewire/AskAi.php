@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\ChatMessage;
 use App\Services\NlSql\NlSqlService;
+use App\Support\Audit;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -70,6 +71,13 @@ class AskAi extends Component
 
         $this->messages[] = $this->toMessage($message);
         $this->question = '';
+
+        Audit::log('chat.ask', [
+            'question' => $question,
+            'has_sql' => $result['sql'] !== null,
+            'rows' => count($result['rows']),
+            'error' => $result['error'],
+        ], $message);
     }
 
     public function clearHistory(): void

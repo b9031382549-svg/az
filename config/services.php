@@ -50,6 +50,9 @@ return [
         // confidence calibration). Override per environment.
         'classify_model' => env('OPENROUTER_CLASSIFY_MODEL', 'openai/gpt-4o'),
         'timeout' => (int) env('OPENROUTER_TIMEOUT', 60),
+        // Store full prompt + response in the LLM decision log (llm_usage).
+        // Useful for auditing/evaluating decisions; prompts can be large.
+        'log_payloads' => (bool) env('OPENROUTER_LOG_PAYLOADS', true),
     ],
 
     // Local embedding model served by Ollama (catalog similarity search).

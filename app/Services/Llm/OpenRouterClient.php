@@ -124,12 +124,15 @@ class OpenRouterClient
                     $opts['temperature'] = min(0.4, 0.15 * ($attempt - 1));
                 }
 
+                $startedAt = microtime(true);
                 $result = $this->complete($messages, $opts);
 
                 return [
                     'data' => JsonExtractor::decode($result['content']),
                     'usage' => $result['usage'],
                     'model' => $result['model'],
+                    'raw' => $result['content'],
+                    'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
                 ];
             } catch (Throwable $e) {
                 $lastError = $e;

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\EInvoice;
 use App\Services\Import\InvoiceImporter;
+use App\Support\Audit;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -45,7 +46,17 @@ class UploadInvoices extends Component
             return;
         }
 
+        $filename = $this->file->getClientOriginalName();
         $this->report = $importer->import($this->file->getRealPath(), $this->fresh);
+
+        Audit::log('invoice.import', [
+            'file' => $filename,
+            'replace' => (bool) $this->fresh,
+            'imported' => $this->report['imported'] ?? null,
+            'total' => $this->report['total'] ?? null,
+            'error' => $this->report['error'] ?? null,
+        ]);
+
         $this->reset('file', 'preview');
     }
 

@@ -3,8 +3,8 @@
 namespace App\Services\Classify;
 
 use App\Models\Classification;
-use App\Models\LlmUsage;
 use App\Services\Llm\OpenRouterClient;
+use App\Support\LlmLog;
 use Illuminate\Support\Arr;
 use Throwable;
 
@@ -141,15 +141,13 @@ class ClassifierService
 
         // Single-tier mode: go straight to the strong model.
         if (! $twoTier) {
-            $only = $this->rerankWith($tier2Model, $text, $list);
-            $this->logUsage($only['usage'], $only['model'], $text, 'rerank');
+            $only = $this->rerankWith($tier2Model, $text, $list, 'rerank');
 
             return $only + ['tier' => 2, 'escalated' => false];
         }
 
         // Tier 1 — cheap / local-equivalent model handles the bulk.
-        $first = $this->rerankWith($tier1Model, $text, $list);
-        $this->logUsage($first['usage'], $first['model'], $text, 'rerank_tier1');
+        $first = $this->rerankWith($tier1Model, $text, $list, 'rerank_tier1', 'tier1');
 
         // Accept tier-1 only when its own pick clears BOTH gates (confidence +
         // semantic backing) — the same bar used for auto-confirmation. Anything
@@ -163,8 +161,7 @@ class ClassifierService
         }
 
         // Tier 2 — escalate to the stronger fallback model.
-        $second = $this->rerankWith($tier2Model, $text, $list);
-        $this->logUsage($second['usage'], $second['model'], $text, 'rerank_tier2');
+        $second = $this->rerankWith($tier2Model, $text, $list, 'rerank_tier2', 'tier2');
 
         return [
             'kind' => $second['kind'],
@@ -179,16 +176,23 @@ class ClassifierService
     }
 
     /**
-     * One re-rank LLM call against a given model.
+     * One re-rank LLM call against a given model, logged as a decision (LlmLog).
      *
      * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string}
      */
-    private function rerankWith(string $model, string $text, string $list): array
+    private function rerankWith(string $model, string $text, string $list, string $purpose, ?string $tier = null): array
     {
-        $response = $this->llm->jsonWithUsage([
+        $messages = [
             ['role' => 'system', 'content' => $this->prompt()],
             ['role' => 'user', 'content' => "ITEM: {$text}\n\nCANDIDATES:\n{$list}"],
-        ], ['model' => $model]);
+        ];
+
+        $response = $this->llm->jsonWithUsage($messages, ['model' => $model]);
+
+        LlmLog::record(
+            $purpose, $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
+            'ok', $response['raw'] ?? null, $messages, $tier, null, ['item' => mb_substr($text, 0, 120)],
+        );
 
         $d = $response['data'];
 
@@ -245,12 +249,17 @@ class ClassifierService
         }
 
         try {
-            $response = $this->llm->jsonWithUsage([
+            $messages = [
                 ['role' => 'system', 'content' => $this->expandPrompt()],
                 ['role' => 'user', 'content' => $text],
-            ]);
+            ];
 
-            $this->logUsage($response['usage'], $response['model'], $text, 'expand');
+            $response = $this->llm->jsonWithUsage($messages);
+
+            LlmLog::record(
+                'expand', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
+                'ok', $response['raw'] ?? null, $messages, null, null, ['item' => mb_substr($text, 0, 120)],
+            );
 
             $description = trim((string) ($response['data']['description'] ?? ''));
             $retrievalText = trim($description.' '.$hints.' '.$text);
@@ -291,18 +300,6 @@ class ClassifierService
             'completion_tokens' => ($a['completion_tokens'] ?? 0) + ($b['completion_tokens'] ?? 0),
             'total_tokens' => ($a['total_tokens'] ?? 0) + ($b['total_tokens'] ?? 0),
         ];
-    }
-
-    private function logUsage(array $usage, string $model, string $text, string $purpose): void
-    {
-        LlmUsage::create([
-            'purpose' => $purpose,
-            'model' => $model,
-            'prompt_tokens' => $usage['prompt_tokens'] ?? 0,
-            'completion_tokens' => $usage['completion_tokens'] ?? 0,
-            'total_tokens' => $usage['total_tokens'] ?? 0,
-            'meta' => ['item' => mb_substr($text, 0, 120)],
-        ]);
     }
 
     private function expandPrompt(): string

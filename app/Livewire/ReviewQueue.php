@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Classification;
 use App\Models\ImportBatch;
+use App\Support\Audit;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -49,11 +50,13 @@ class ReviewQueue extends Component
     public function confirm(int $id): void
     {
         Classification::whereKey($id)->update(['status' => 'confirmed']);
+        Audit::log('classification.confirm', ['id' => $id]);
     }
 
     public function reject(int $id): void
     {
         Classification::whereKey($id)->update(['status' => 'rejected']);
+        Audit::log('classification.reject', ['id' => $id]);
     }
 
     /** Confirm every still-pending item in the selected upload. */
@@ -75,8 +78,10 @@ class ReviewQueue extends Component
             return;
         }
 
+        $deleted = Classification::where('batch', $this->batch)->count();
         Classification::where('batch', $this->batch)->delete();
         ImportBatch::where('key', $this->batch)->delete();
+        Audit::log('batch.delete', ['batch' => $this->batch, 'deleted' => $deleted]);
 
         $this->batch = 'all';
         $this->resetPage();
@@ -88,10 +93,11 @@ class ReviewQueue extends Component
             return; // bulk actions are scoped to a single upload, never "all"
         }
 
-        Classification::where('batch', $this->batch)
+        $updated = Classification::where('batch', $this->batch)
             ->whereIn('status', self::PENDING)
             ->update(['status' => $status]);
 
+        Audit::log('batch.bulk_'.$status, ['batch' => $this->batch, 'updated' => $updated]);
         $this->resetPage();
     }
 
