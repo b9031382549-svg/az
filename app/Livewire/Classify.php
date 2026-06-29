@@ -28,6 +28,9 @@ class Classify extends Component
     /** @var array<string, mixed>|null */
     public ?array $queued = null;
 
+    /** Batch key of the most recent manual (form) classification, for deep-linking. */
+    public ?string $lastBatch = null;
+
     /** @var array<int, array<string, mixed>> */
     public array $results = [];
 
@@ -65,6 +68,7 @@ class Classify extends Component
             'user_id' => auth()->id(),
             'item_count' => $lines->count(),
         ]);
+        $this->lastBatch = $batch;
 
         $this->results = [];
         $tokens = 0;

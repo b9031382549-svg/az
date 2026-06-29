@@ -23,7 +23,106 @@
     </label>
   </div>
 
-  <div class="flex flex-wrap gap-2 mb-5">
+  {{-- Distribution report --}}
+  @php
+    $chName = [
+      '03'=>'Fish','04'=>'Dairy','07'=>'Vegetables','08'=>'Fruit','09'=>'Coffee/tea','11'=>'Milling',
+      '15'=>'Fats/oils','16'=>'Meat/fish prep','17'=>'Sugar/sweets','18'=>'Cocoa','19'=>'Bakery',
+      '20'=>'Veg/fruit prep','21'=>'Food prep','22'=>'Beverages','25'=>'Salt/stone','28'=>'Inorg. chem',
+      '30'=>'Pharma','32'=>'Dyes/paint','33'=>'Cosmetics','34'=>'Soap/cleaning','38'=>'Chemicals',
+      '39'=>'Plastics','40'=>'Rubber','42'=>'Leather goods','48'=>'Paper','49'=>'Printed','61'=>'Knit apparel',
+      '62'=>'Apparel','63'=>'Textiles','64'=>'Footwear','69'=>'Ceramics','70'=>'Glass','73'=>'Steel articles',
+      '76'=>'Aluminium','82'=>'Tools','84'=>'Machinery','85'=>'Electrical','90'=>'Medical/optical',
+      '94'=>'Furniture/lamps','95'=>'Toys','96'=>'Misc. mfg','99'=>'Services',
+    ];
+    $cf = $report['conf']; $cfTotal = max(1, $cf['high']+$cf['mid']+$cf['low']);
+    $gs = $report['good'] + $report['service'];
+    $maxCh = max(1, optional($report['chapters']->first())->c ?? 1);
+  @endphp
+  <div x-data="{open:true}" class="card p-5 mb-5">
+    <button @click="open=!open" class="w-full flex items-center justify-between">
+      <span class="kicker">Report{{ $batch !== 'all' ? ' · this upload' : '' }}</span>
+      <span class="text-faint text-sm" x-text="open ? '▾ hide' : '▸ show'"></span>
+    </button>
+
+    <div x-show="open" class="mt-4 grid lg:grid-cols-3 gap-7">
+      {{-- Status donut --}}
+      <div class="flex items-center gap-4">
+        <div class="relative shrink-0" style="width:120px;height:120px">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="{{ $report['donut']['r'] }}" fill="none" stroke="#ece6d9" stroke-width="12"/>
+            @foreach($report['donut']['segments'] as $s)
+              <circle cx="60" cy="60" r="{{ $report['donut']['r'] }}" fill="none"
+                      stroke="{{ $s['color'] }}" stroke-width="12" stroke-linecap="butt"
+                      stroke-dasharray="{{ $s['len'] }} {{ $s['gap'] }}"
+                      stroke-dashoffset="{{ $s['offset'] }}"
+                      transform="rotate(-90 60 60)"/>
+            @endforeach
+          </svg>
+          <div class="absolute inset-0 grid place-items-center text-center">
+            <div>
+              <div class="font-display text-2xl leading-none tnum">{{ number_format($report['total']) }}</div>
+              <div class="text-faint text-[11px]">items</div>
+            </div>
+          </div>
+        </div>
+        <div class="space-y-1.5 text-sm min-w-0 flex-1">
+          @forelse($report['donut']['segments'] as $s)
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:{{ $s['color'] }}"></span>
+              <span class="truncate">{{ $s['label'] }}</span>
+              <span class="text-faint tnum ml-auto whitespace-nowrap">{{ $s['count'] }} · {{ $s['pct'] }}%</span>
+            </div>
+          @empty
+            <p class="text-muted">No items yet.</p>
+          @endforelse
+        </div>
+      </div>
+
+      {{-- Good/service + confidence --}}
+      <div class="space-y-4">
+        <div>
+          <p class="kicker mb-2">Good vs service</p>
+          <div class="flex h-3 rounded-full overflow-hidden bg-line/40">
+            <div class="bg-ledger h-full" style="width:{{ $gs ? $report['good']/$gs*100 : 0 }}%"></div>
+            <div class="bg-amber h-full" style="width:{{ $gs ? $report['service']/$gs*100 : 0 }}%"></div>
+          </div>
+          <div class="flex justify-between text-sm mt-1.5">
+            <span class="text-ledger">● Goods <span class="tnum">{{ $report['good'] }}</span></span>
+            <span class="text-amber"><span class="tnum">{{ $report['service'] }}</span> Services ●</span>
+          </div>
+        </div>
+        <div>
+          <p class="kicker mb-2">Confidence</p>
+          <div class="space-y-1.5">
+            @foreach([['High ≥85%',$cf['high'],'bg-ledger'],['Medium 60–85%',$cf['mid'],'bg-amber'],['Low <60%',$cf['low'],'bg-stamp']] as [$lbl,$val,$bar])
+              <div class="flex items-center gap-2 text-sm">
+                <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
+                <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$cfTotal*100 }}%"></span></span>
+                <span class="tnum text-faint w-8 text-right">{{ $val }}</span>
+              </div>
+            @endforeach
+          </div>
+        </div>
+      </div>
+
+      {{-- Top HS chapters --}}
+      <div>
+        <p class="kicker mb-2">Top categories (HS chapter)</p>
+        @forelse($report['chapters'] as $ch)
+          <div class="flex items-center gap-2 text-sm mb-1.5">
+            <span class="w-28 shrink-0 truncate">{{ $chName[$ch->chapter] ?? ('Ch '.$ch->chapter) }}</span>
+            <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="bg-ink/70 block h-full" style="width:{{ $ch->c/$maxCh*100 }}%"></span></span>
+            <span class="tnum text-faint w-8 text-right">{{ $ch->c }}</span>
+          </div>
+        @empty
+          <p class="text-muted text-sm">No classified codes yet.</p>
+        @endforelse
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-3">
     @foreach($tabs as $key => $label)
       <button wire:click="setFilter('{{ $key }}')"
               class="px-3 py-1.5 rounded-lg text-sm border hair transition {{ $filter === $key ? 'bg-ink text-paper border-ink' : 'bg-surface hover:border-ink' }}">
@@ -32,6 +131,21 @@
       </button>
     @endforeach
   </div>
+
+  {{-- Bulk actions for a single upload --}}
+  @if($batch !== 'all')
+    <div class="flex flex-wrap items-center gap-2 mb-5">
+      <span class="text-sm text-muted">This upload:</span>
+      <button wire:click="confirmAll" wire:confirm="Confirm all {{ $pendingCount }} pending items in this upload?"
+              @disabled($pendingCount === 0)
+              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✓ Confirm all ({{ $pendingCount }})</button>
+      <button wire:click="rejectAll" wire:confirm="Reject all {{ $pendingCount }} pending items in this upload?"
+              @disabled($pendingCount === 0)
+              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✕ Reject all</button>
+      <button wire:click="deleteBatch" wire:confirm="Delete this entire upload and all its items? This cannot be undone."
+              class="btn btn-ghost btn-sm text-stamp ml-auto">🗑 Delete upload</button>
+    </div>
+  @endif
 
   <div class="space-y-3">
     @forelse($items as $item)
