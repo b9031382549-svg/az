@@ -178,6 +178,7 @@ class ReviewQueue extends Component
             }
             $len = $total > 0 ? $c / $total * $circ : 0;
             $segments[] = [
+                'key' => $key,
                 'color' => $meta['color'],
                 'label' => $meta['label'],
                 'count' => $c,

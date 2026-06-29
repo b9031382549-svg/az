@@ -1,6 +1,8 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
-    $tabs = ['needs_review' => 'Needs review', 'auto_confirmed' => 'Auto-confirmed', 'confirmed' => 'Confirmed', 'rejected' => 'Rejected', 'all' => 'All'];
+    $tabs = ['needs_review' => 'Needs review', 'auto_confirmed' => 'Auto-confirmed', 'confirmed' => 'Confirmed', 'rejected' => 'Rejected', 'no_match' => 'No match'];
+    if (($counts['error'] ?? 0) > 0) { $tabs['error'] = 'Error'; }
+    $tabs['all'] = 'All';
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
   @endphp
 
@@ -68,11 +70,12 @@
         </div>
         <div class="space-y-1.5 text-sm min-w-0 flex-1">
           @forelse($report['donut']['segments'] as $s)
-            <div class="flex items-center gap-2">
+            <button type="button" wire:click="setFilter('{{ $s['key'] }}')"
+                    class="w-full flex items-center gap-2 text-left rounded px-1 -mx-1 hover:bg-paper/60 transition {{ $filter === $s['key'] ? 'font-medium' : '' }}">
               <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:{{ $s['color'] }}"></span>
               <span class="truncate">{{ $s['label'] }}</span>
               <span class="text-faint tnum ml-auto whitespace-nowrap">{{ $s['count'] }} · {{ $s['pct'] }}%</span>
-            </div>
+            </button>
           @empty
             <p class="text-muted">No items yet.</p>
           @endforelse
