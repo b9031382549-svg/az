@@ -4,6 +4,17 @@ return [
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 
+    // Universal retrieval: run two retrieval passes — one on the LLM-normalized
+    // canonical query (clean head-noun) and one on the noise-stripped raw text —
+    // and fuse them, so brand/barcode/flavour noise can't drown the real product.
+    // Set false for the legacy single-combined-query behaviour.
+    'multi_query' => (bool) env('CLASSIFY_MULTI_QUERY', true),
+
+    // Legacy per-case disambiguation dictionary (traps). Off by default — the
+    // universal multi_query retrieval generalises instead of hardcoding cases.
+    // Kept only as an optional emergency safety net.
+    'use_traps' => (bool) env('CLASSIFY_USE_TRAPS', false),
+
     // Two-tier re-ranking: a cheap/local-equivalent model (classify_model_tier1)
     // ranks first; if its pick is not confident AND semantically backed, the item
     // is escalated to the stronger fallback (classify_model). Set false to always

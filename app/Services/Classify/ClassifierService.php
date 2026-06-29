@@ -49,9 +49,9 @@ class ClassifierService
         }
 
         try {
-            [$retrievalText, $expandUsage] = $this->expandForRetrieval($text);
+            [$queries, $expandUsage] = $this->expandForRetrieval($text);
 
-            $candidates = $this->retriever->candidates($retrievalText, (int) config('classify.candidates'));
+            $candidates = $this->retriever->candidates($queries, (int) config('classify.candidates'));
             if (empty($candidates)) {
                 $result['usage'] = $expandUsage;
                 $result['reason'] = 'No catalog candidates found.';
@@ -233,19 +233,21 @@ class ClassifierService
     }
 
     /**
-     * Normalize a noisy item into a canonical product description (via the cheap
-     * default model) and append it to the original, so brand/coded names still
-     * retrieve the right candidates. Returns [retrievalText, usage].
+     * Build the retrieval query/queries for an item. Universal: a canonical
+     * LLM-normalized query plus the noise-stripped raw text are returned as
+     * separate queries (multi_query) so brand/barcode/flavour noise can't drown
+     * the real product. Returns [queries[], usage].
      *
-     * @return array{0: string, 1: array<string, int>}
+     * @return array{0: array<int, string>, 1: array<string, int>}
      */
     private function expandForRetrieval(string $text): array
     {
         $zero = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
-        $hints = $this->trapHints($text); // deterministic disambiguation, always applied
+        $hints = config('classify.use_traps', false) ? $this->trapHints($text) : '';
+        $clean = $this->cleanNoise($text);
 
         if (! config('classify.expand_query', true)) {
-            return [trim($hints.' '.$text), $zero];
+            return [$this->buildQueries('', $hints, $clean, $text), $zero];
         }
 
         try {
@@ -262,12 +264,57 @@ class ClassifierService
             );
 
             $description = trim((string) ($response['data']['description'] ?? ''));
-            $retrievalText = trim($description.' '.$hints.' '.$text);
 
-            return [$retrievalText, $response['usage']];
+            return [$this->buildQueries($description, $hints, $clean, $text), $response['usage']];
         } catch (Throwable) {
-            return [trim($hints.' '.$text), $zero]; // graceful: raw item + trap hints
+            return [$this->buildQueries('', $hints, $clean, $text), $zero]; // graceful
         }
+    }
+
+    /**
+     * Assemble retrieval queries. multi_query: [canonical description (+hints),
+     * noise-stripped raw]; legacy: one combined string.
+     *
+     * @return array<int, string>
+     */
+    private function buildQueries(string $description, string $hints, string $clean, string $raw): array
+    {
+        if (config('classify.multi_query', true)) {
+            $primary = trim($description.' '.$hints);
+
+            return array_values(array_filter([
+                $primary !== '' ? $primary : null,
+                $clean !== '' ? $clean : $raw,
+            ]));
+        }
+
+        return [trim($description.' '.$hints.' '.$raw)];
+    }
+
+    /**
+     * Strip non-product noise (barcodes, measures, packaging like 140GRX2LI,
+     * units, stray punctuation) so the head product noun dominates retrieval.
+     * Universal — no per-item rules.
+     */
+    private function cleanNoise(string $text): string
+    {
+        $text = preg_replace('/[0-9]+(?:[.,][0-9]+)?\s*[xх]\s*[0-9]+/iu', ' ', $text) ?? $text; // 2x12, 140X2
+
+        $kept = [];
+        foreach (preg_split('/\s+/u', $text) ?: [] as $token) {
+            $token = trim($token, " \t\n\r-_.,;:()[]{}/\\|");
+            if ($token === '' || mb_strlen($token) < 2) {
+                continue;
+            }
+            if (preg_match('/\d/u', $token)) {
+                continue; // barcodes, 280GR, 5ml, 23G, article numbers
+            }
+            $kept[] = $token;
+        }
+
+        $clean = trim(implode(' ', $kept));
+
+        return $clean !== '' ? $clean : $text;
     }
 
     /**
