@@ -62,7 +62,8 @@
       <div class="mt-3 card p-3.5 text-sm border-ledger/40 flex items-start gap-2.5">
         <span class="text-ledger">✓</span>
         <span>Queued <b>{{ number_format($queued['count'],0,'.',' ') }}</b>@if($queued['total'] > $queued['count']) of {{ number_format($queued['total'],0,'.',' ') }}@endif items for background classification.
-          Results appear in the <a href="{{ route('review') }}" class="link-under text-ink">Review queue</a> as the worker processes them.</span>
+          <a href="{{ route('review', ['batch' => $queued['batch'], 'filter' => 'all']) }}" class="link-under text-ink font-medium">Open this upload in the queue →</a>
+          <span class="text-muted">Items appear as the worker processes them.</span></span>
       </div>
     @endif
   </div>
@@ -104,6 +105,7 @@
         </table>
       </div>
     </div>
-    <p class="text-faint text-sm mt-3">Saved to the review queue. <a href="{{ route('review') }}" class="link-under text-ink">Open review →</a></p>
+    <p class="text-faint text-sm mt-3">Saved to the review queue.
+      <a href="{{ route('review', ['batch' => $lastBatch, 'filter' => 'all']) }}" class="link-under text-ink">Open this upload in the queue →</a></p>
   @endif
 </section>
