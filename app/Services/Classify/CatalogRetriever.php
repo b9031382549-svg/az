@@ -13,21 +13,44 @@ class CatalogRetriever
      * Hybrid candidate retrieval: semantic (pgvector cosine) + lexical (token
      * overlap ranked by trigram similarity), fused with Reciprocal Rank Fusion.
      *
+     * Accepts one query or several (e.g. the LLM-normalized canonical name plus
+     * the noise-stripped raw text). Each query contributes a semantic and a
+     * lexical ranked list; all are fused with RRF, so a clean head-noun query
+     * surfaces the right code even when the raw text's brand/barcode/flavour
+     * noise pulls a different sense.
+     *
+     * @param  string|array<int, string>  $queries
      * @return array<int, object{id:int, code:string, name:string, kind:string, score:float}>
      */
-    public function candidates(string $text, int $limit = 24, ?string $kind = null): array
+    public function candidates(string|array $queries, int $limit = 24, ?string $kind = null): array
     {
+        $queries = array_values(array_filter(
+            array_map('trim', is_array($queries) ? $queries : [$queries]),
+            fn ($q) => $q !== '',
+        ));
+        if (empty($queries)) {
+            return [];
+        }
+
         $per = max($limit, 30);
         $kindSql = $kind ? 'AND kind = ?' : '';
         $kindBind = $kind ? [$kind] : [];
 
-        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($text)));
+        // The first query is primary (canonical) — its vector backs the
+        // auto-confirm semantic-similarity gate.
+        $lists = [];
+        $primaryVector = null;
+        foreach ($queries as $i => $q) {
+            $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($q)));
+            if ($i === 0) {
+                $primaryVector = $vector;
+            }
+            $lists[] = $this->semantic($vector, $per, $kindSql, $kindBind);
+            $lists[] = $this->lexical($q, $per, $kindSql, $kindBind);
+        }
 
-        $semantic = $this->semantic($vector, $per, $kindSql, $kindBind);
-        $lexical = $this->lexical($text, $per, $kindSql, $kindBind);
-
-        $fused = $this->fuse($semantic, $lexical, $limit);
-        $this->attachSemanticSim($fused, $vector);
+        $fused = $this->fuse($lists, $limit);
+        $this->attachSemanticSim($fused, $primaryVector);
 
         return $fused;
     }
@@ -173,17 +196,18 @@ class CatalogRetriever
     }
 
     /**
-     * @param  array<int, object>  $semantic
-     * @param  array<int, object>  $lexical
+     * Reciprocal Rank Fusion over any number of ranked lists.
+     *
+     * @param  array<int, array<int, object>>  $lists
      * @return array<int, object>
      */
-    private function fuse(array $semantic, array $lexical, int $limit): array
+    private function fuse(array $lists, int $limit): array
     {
         $k = 60; // RRF damping
         $scores = [];
         $rows = [];
 
-        foreach ([$semantic, $lexical] as $list) {
+        foreach ($lists as $list) {
             foreach (array_values($list) as $rank => $row) {
                 $scores[$row->id] = ($scores[$row->id] ?? 0) + 1 / ($k + $rank + 1);
                 $rows[$row->id] = $row;
