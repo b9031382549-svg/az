@@ -36,6 +36,8 @@ class ClassifierService
             'reason' => null,
             'candidates' => [],
             'usage' => null,
+            'tier' => null,
+            'escalated' => false,
             'error' => null,
         ];
 
@@ -63,7 +65,9 @@ class ClassifierService
             ], array_slice($candidates, 0, 10));
 
             $picked = $this->rerank($text, $candidates);
-            $this->logUsage($picked['usage'], $picked['model'], $text, 'rerank');
+            // (rerank logs llm_usage per tier itself.)
+            $result['tier'] = $picked['tier'];
+            $result['escalated'] = $picked['escalated'];
 
             $result['usage'] = $this->sumUsage($expandUsage, $picked['usage']);
 
@@ -120,21 +124,71 @@ class ClassifierService
     }
 
     /**
+     * Two-tier re-ranking (ТЗ): a cheap/local-equivalent model ranks first; if
+     * its pick is not confident AND semantically backed, the item is escalated
+     * to the stronger fallback model. Each tier is logged separately in
+     * llm_usage. Returns the chosen tier's pick + which tier produced it.
+     *
      * @param  array<int, object>  $candidates
-     * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string}
+     * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string, tier:int, escalated:bool}
      */
     private function rerank(string $text, array $candidates): array
     {
-        $lines = [];
-        foreach (array_values($candidates) as $i => $c) {
-            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".mb_substr($c->name, 0, 180);
-        }
-        $list = implode("\n", $lines);
+        $list = $this->candidateList($candidates);
+        $tier2Model = (string) config('services.openrouter.classify_model');
+        $tier1Model = (string) config('services.openrouter.classify_model_tier1');
+        $twoTier = (bool) config('classify.two_tier', true) && $tier1Model !== '';
 
+        // Single-tier mode: go straight to the strong model.
+        if (! $twoTier) {
+            $only = $this->rerankWith($tier2Model, $text, $list);
+            $this->logUsage($only['usage'], $only['model'], $text, 'rerank');
+
+            return $only + ['tier' => 2, 'escalated' => false];
+        }
+
+        // Tier 1 — cheap / local-equivalent model handles the bulk.
+        $first = $this->rerankWith($tier1Model, $text, $list);
+        $this->logUsage($first['usage'], $first['model'], $text, 'rerank_tier1');
+
+        // Accept tier-1 only when its own pick clears BOTH gates (confidence +
+        // semantic backing) — the same bar used for auto-confirmation. Anything
+        // weaker is exactly the "model isn't sure" case the fallback exists for.
+        $sim = $this->semanticOf($first['code'], $candidates);
+        $confident = $first['confidence'] >= (float) config('classify.auto_confirm');
+        $backed = $sim !== null && $sim >= (float) config('classify.min_semantic');
+
+        if ($first['code'] !== null && $confident && $backed) {
+            return $first + ['tier' => 1, 'escalated' => false];
+        }
+
+        // Tier 2 — escalate to the stronger fallback model.
+        $second = $this->rerankWith($tier2Model, $text, $list);
+        $this->logUsage($second['usage'], $second['model'], $text, 'rerank_tier2');
+
+        return [
+            'kind' => $second['kind'],
+            'code' => $second['code'],
+            'confidence' => $second['confidence'],
+            'reason' => $second['reason'],
+            'usage' => $this->sumUsage($first['usage'], $second['usage']),
+            'model' => $second['model'],
+            'tier' => 2,
+            'escalated' => true,
+        ];
+    }
+
+    /**
+     * One re-rank LLM call against a given model.
+     *
+     * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string}
+     */
+    private function rerankWith(string $model, string $text, string $list): array
+    {
         $response = $this->llm->jsonWithUsage([
             ['role' => 'system', 'content' => $this->prompt()],
             ['role' => 'user', 'content' => "ITEM: {$text}\n\nCANDIDATES:\n{$list}"],
-        ], ['model' => config('services.openrouter.classify_model')]);
+        ], ['model' => $model]);
 
         $d = $response['data'];
 
@@ -148,6 +202,32 @@ class ClassifierService
         ];
     }
 
+    /** @param array<int, object> $candidates */
+    private function candidateList(array $candidates): string
+    {
+        $lines = [];
+        foreach (array_values($candidates) as $i => $c) {
+            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".mb_substr($c->name, 0, 180);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Semantic (cosine) similarity of the candidate the model picked, if any.
+     *
+     * @param  array<int, object>  $candidates
+     */
+    private function semanticOf(?string $code, array $candidates): ?float
+    {
+        if ($code === null) {
+            return null;
+        }
+        $match = Arr::first($candidates, fn ($c) => $c->code === $code);
+
+        return $match->semantic_sim ?? null;
+    }
+
     /**
      * Normalize a noisy item into a canonical product description (via the cheap
      * default model) and append it to the original, so brand/coded names still
@@ -158,9 +238,10 @@ class ClassifierService
     private function expandForRetrieval(string $text): array
     {
         $zero = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
+        $hints = $this->trapHints($text); // deterministic disambiguation, always applied
 
         if (! config('classify.expand_query', true)) {
-            return [$text, $zero];
+            return [trim($hints.' '.$text), $zero];
         }
 
         try {
@@ -172,12 +253,30 @@ class ClassifierService
             $this->logUsage($response['usage'], $response['model'], $text, 'expand');
 
             $description = trim((string) ($response['data']['description'] ?? ''));
-            $retrievalText = $description !== '' ? $description.' '.$text : $text;
+            $retrievalText = trim($description.' '.$hints.' '.$text);
 
             return [$retrievalText, $response['usage']];
         } catch (Throwable) {
-            return [$text, $zero]; // graceful: fall back to the raw item
+            return [trim($hints.' '.$text), $zero]; // graceful: raw item + trap hints
         }
+    }
+
+    /**
+     * Append canonical hints for known Azerbaijani invoice traps (homonyms /
+     * false friends / abbreviations) present in the raw text — so e.g. a "çay
+     * dəsmalı" (tea towel) is not pulled toward tea.
+     */
+    private function trapHints(string $text): string
+    {
+        $low = mb_strtolower($text);
+        $hints = [];
+        foreach ((array) config('classify.traps', []) as $needle => $hint) {
+            if (mb_stripos($low, mb_strtolower((string) $needle)) !== false) {
+                $hints[] = $hint;
+            }
+        }
+
+        return implode(' ', array_values(array_unique($hints)));
     }
 
     /**
@@ -213,11 +312,23 @@ class ClassifierService
         service description for catalogue lookup. The item is usually Azerbaijani
         and may contain brand names, article numbers, sizes and packaging.
 
-        Output what the item fundamentally IS, in 2-6 words IN AZERBAIJANI,
-        dropping brand names, article numbers and sizes. Examples:
+        Output what the item fundamentally IS — its MAIN product noun + purpose —
+        in 2-6 words IN AZERBAIJANI. Drop brand names, article numbers and sizes.
+
+        Important:
+        - Return the HEAD product, not an ingredient, flavour, sauce or material.
+          "fruit cake" -> cake; "fish in tomato sauce" -> canned fish (not sauce).
+        - Resolve compound words by their WHOLE meaning, not a sub-word.
+          "çay dəsmalı" is a tea TOWEL -> "mətbəx dəsmalı" (NOT tea/çay).
+          "qrilyaj" is a grillage SWEET -> "şirniyyat" (NOT a grill/stove).
+        - Expand obvious abbreviations: "cath" -> "kateter".
+
+        Examples:
         - "5337 ZEWA DELUXE BRT 8 3PLY CAMOMILE" -> "tualet kağızı"
         - "Şpris 5ml 23G BLİSSET" -> "tibbi şpris"
-        - "PANNAKOTA" -> "süd deserti pannakotta"
+        - "OWOM ÇAY DƏSMALI VAF" -> "mətbəx dəsmalı"
+        - "OVEN MEYVELI TORTU" -> "tort şirniyyat"
+        - "SARDINA tomatda 240qr" -> "balıq konservi"
         - "Su (Pizza Hut)" -> "içməli su"
 
         Respond with strict JSON only: {"description": "..."}
@@ -241,6 +352,15 @@ class ClassifierService
           material it is made of. E.g. a syringe with a rubber plunger is a medical
           syringe, not a rubber article; a plastic water bottle is a beverage
           container, not a plastics product.
+        - Classify by the HEAD product — not by an ingredient, flavour, sauce,
+          packaging, brand or a sub-word of a compound name. Examples:
+            * fish in tomato sauce -> canned fish (NOT sauce)
+            * fruit cake / honey cake -> bakery/confectionery (NOT fruit, jam or a service)
+            * "çay dəsmalı" (tea towel) -> towel / kitchen linen (NOT tea)
+            * "qrilyaj" (grillage sweet) -> confectionery (NOT a grill/stove)
+            * "cath ..." -> catheter, a medical instrument (NOT aluminium/metal)
+            * paper napkin / pocket tissue ("kağız salfet", "cib salfeti") -> paper
+              article (chapter 48), NOT a textile towel or handkerchief
         - Prefer the most specific code that fits the item's actual purpose.
         - If none of the candidates is a reasonable match, set "code" to null.
         - Calibrate "confidence" (0..1) honestly: use > 0.85 only when a candidate

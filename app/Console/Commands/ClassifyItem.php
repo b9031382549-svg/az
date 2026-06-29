@@ -29,6 +29,7 @@ class ClassifyItem extends Command
         $this->line('  Name:       '.($r['name'] ?? '—'));
         $this->line('  Confidence: '.($r['confidence'] ?? '—').'   Semantic: '.($r['semantic_sim'] ?? '—'));
         $this->line('  Status:     <comment>'.$r['status'].'</comment>');
+        $this->line('  Tier:       '.($r['tier'] ?? '—').($r['escalated'] ? ' (escalated to fallback)' : ''));
         $this->line('  Reason:     '.($r['reason'] ?? '—'));
         if ($r['usage']) {
             $this->line('  Tokens:     '.$r['usage']['total_tokens'].' (prompt '.$r['usage']['prompt_tokens'].' / completion '.$r['usage']['completion_tokens'].')');

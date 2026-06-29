@@ -4,9 +4,36 @@ return [
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 
+    // Two-tier re-ranking: a cheap/local-equivalent model (classify_model_tier1)
+    // ranks first; if its pick is not confident AND semantically backed, the item
+    // is escalated to the stronger fallback (classify_model). Set false to always
+    // use the fallback model directly.
+    'two_tier' => (bool) env('CLASSIFY_TWO_TIER', true),
+
     // Normalize a noisy item into a canonical product description (via the cheap
     // model) before retrieval, so branded/coded names still find candidates.
     'expand_query' => (bool) env('CLASSIFY_EXPAND_QUERY', true),
+
+    // Domain disambiguation map for Azerbaijani invoice traps: homonyms / false
+    // friends / abbreviations whose sub-word matches the wrong category. When a
+    // key (case-insensitive substring) is present, the hint is appended to the
+    // retrieval text so the right sense is searched. Keep focused on confusions,
+    // not general synonyms (those live in catalog.synonyms).
+    'traps' => [
+        'çay dəsmal' => 'mətbəx əl dəsmalı toxuculuq',   // tea TOWEL, not tea
+        'cay desmal' => 'mətbəx əl dəsmalı toxuculuq',
+        'çay dəsmalı' => 'mətbəx əl dəsmalı toxuculuq',
+        'qrilyaj' => 'şirniyyat qrilyaj konfet',          // grillage sweet, not "grill"
+        'midii' => 'midyə dəniz məhsulu',                 // mussels
+        'midyə' => 'midyə dəniz məhsulu',
+        'cath ' => 'kateter tibbi',                        // catheter abbreviation
+        'kateter' => 'kateter tibbi alət',
+        'desensitizer' => 'stomatoloji material',          // dental bonding agent
+        'pancake' => 'xəmir məmulatı şirniyyat',
+        'cib mendel' => 'kağız cib salfeti, kağızdan',     // pocket PAPER tissues (ch48)
+        'cib mendil' => 'kağız cib salfeti, kağızdan',
+        'soffione' => 'kağız salfet, kağızdan',            // paper-napkin brand (ch48)
+    ],
 
     // Confidence >= auto_confirm  -> auto_confirmed
     // Confidence >= review_floor  -> needs_review
