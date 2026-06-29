@@ -18,6 +18,14 @@ class AskAi extends Command
 
         $result = $service->ask($question);
 
+        // Conversational reply (no query was run).
+        if (! $result['error'] && empty($result['sql']) && ! empty($result['answer'])) {
+            $this->newLine();
+            $this->line($result['answer']);
+
+            return self::SUCCESS;
+        }
+
         if ($result['sql']) {
             $this->newLine();
             $this->line('<comment>SQL:</comment>');
