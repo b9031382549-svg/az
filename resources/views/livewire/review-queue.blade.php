@@ -4,9 +4,23 @@
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
   @endphp
 
-  <div class="mb-6">
-    <p class="kicker mb-1.5">Quality control</p>
-    <h1 class="font-display text-4xl">Review queue</h1>
+  @php $batchLabels = $batches->keyBy('key'); @endphp
+
+  <div class="mb-6 flex items-end justify-between flex-wrap gap-3">
+    <div>
+      <p class="kicker mb-1.5">Quality control</p>
+      <h1 class="font-display text-4xl">Review queue</h1>
+    </div>
+    <label class="flex items-center gap-2 text-sm">
+      <span class="text-muted">Upload:</span>
+      <select wire:model.live="batch"
+              class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none max-w-[280px]">
+        <option value="all">All uploads</option>
+        @foreach($batches as $b)
+          <option value="{{ $b->key }}">{{ \Illuminate\Support\Str::limit($b->label, 32) }} · {{ $b->total }} items</option>
+        @endforeach
+      </select>
+    </label>
   </div>
 
   <div class="flex flex-wrap gap-2 mb-5">
@@ -23,10 +37,13 @@
     @forelse($items as $item)
       <div wire:key="cls-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4">
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
             <span class="font-mono text-sm">{{ $item->matched_code ?? 'no match' }}</span>
             <span class="text-faint text-xs tnum">{{ $item->confidence !== null ? number_format($item->confidence*100,0).'%' : '' }}</span>
+            @if($batch === 'all' && $item->batch)
+              <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? 'Earlier import', 26) }}</span>
+            @endif
           </div>
           <p class="font-medium">{{ $item->source_text }}</p>
           @if($item->code)

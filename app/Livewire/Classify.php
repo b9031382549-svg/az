@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Jobs\ClassifyItemJob;
 use App\Models\Classification;
+use App\Models\ImportBatch;
 use App\Models\LlmUsage;
 use App\Services\Classify\ClassifierService;
 use App\Services\Import\ItemFileParser;
@@ -57,6 +58,14 @@ class Classify extends Component
         }
 
         $batch = (string) Str::uuid();
+        ImportBatch::create([
+            'key' => $batch,
+            'label' => 'Manual entry',
+            'source' => 'manual',
+            'user_id' => auth()->id(),
+            'item_count' => $lines->count(),
+        ]);
+
         $this->results = [];
         $tokens = 0;
 
@@ -93,6 +102,14 @@ class Classify extends Component
         }
 
         $batch = (string) Str::uuid();
+        ImportBatch::create([
+            'key' => $batch,
+            'label' => $this->file->getClientOriginalName() ?: 'File import',
+            'source' => 'file',
+            'user_id' => auth()->id(),
+            'item_count' => count($items),
+        ]);
+
         foreach ($items as $text) {
             ClassifyItemJob::dispatch($text, $batch);
         }
