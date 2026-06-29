@@ -6,7 +6,6 @@ use App\Jobs\ClassifyItemJob;
 use App\Models\Classification;
 use App\Models\ImportBatch;
 use App\Models\LlmUsage;
-use App\Services\Classify\ClassifierService;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
 use Illuminate\Support\Str;
@@ -19,6 +18,9 @@ class Classify extends Component
 {
     use WithFileUploads;
 
+    /** Max items accepted from one manual (textarea) submission. */
+    private const MANUAL_LIMIT = 20;
+
     /** Max items queued from a single file upload. */
     private const FILE_LIMIT = 200;
 
@@ -26,16 +28,12 @@ class Classify extends Component
 
     public $file;
 
-    /** @var array<string, mixed>|null */
+    /**
+     * The upload currently being classified in the background, or null.
+     *
+     * @var array{batch:string, count:int, total:int, source:string, label:string}|null
+     */
     public ?array $queued = null;
-
-    /** Batch key of the most recent manual (form) classification, for deep-linking. */
-    public ?string $lastBatch = null;
-
-    /** @var array<int, array<string, mixed>> */
-    public array $results = [];
-
-    public ?int $tokens = null;
 
     /** @var array<int, string> */
     public array $examples = [
@@ -49,12 +47,18 @@ class Classify extends Component
         $this->input = trim($this->input."\n".$text);
     }
 
-    public function run(ClassifierService $classifier): void
+    /**
+     * Queue the textarea items for background classification (one job each) and
+     * hand off to the live progress panel — so the request returns immediately
+     * instead of blocking on the LLM for every line.
+     */
+    public function run(): void
     {
         $lines = collect(preg_split('/\r?\n/', $this->input) ?: [])
             ->map(fn ($l) => trim($l))
             ->filter()
-            ->take(20)
+            ->unique()
+            ->take(self::MANUAL_LIMIT)
             ->values();
 
         if ($lines->isEmpty()) {
@@ -69,26 +73,25 @@ class Classify extends Component
             'user_id' => auth()->id(),
             'item_count' => $lines->count(),
         ]);
-        $this->lastBatch = $batch;
-
-        $this->results = [];
-        $tokens = 0;
 
         foreach ($lines as $line) {
-            $result = $classifier->classify($line);
-            $classifier->record($result, $batch);
-            $tokens += $result['usage']['total_tokens'] ?? 0;
-            $this->results[] = $result;
+            ClassifyItemJob::dispatch($line, $batch);
         }
 
-        $this->tokens = $tokens;
+        Audit::log('classify.manual', ['count' => $lines->count(), 'batch' => $batch]);
 
-        Audit::log('classify.manual', ['count' => $lines->count(), 'batch' => $batch, 'tokens' => $tokens]);
+        $this->queued = [
+            'batch' => $batch,
+            'count' => $lines->count(),
+            'total' => $lines->count(),
+            'source' => 'manual',
+            'label' => 'Manual entry',
+        ];
+        $this->input = '';
     }
 
     public function classifyFile(ItemFileParser $parser): void
     {
-        $this->queued = null;
         $this->validate(['file' => 'required|file|max:25600']);
 
         $ext = strtolower((string) $this->file->getClientOriginalExtension());
@@ -109,9 +112,10 @@ class Classify extends Component
         }
 
         $batch = (string) Str::uuid();
+        $label = $this->file->getClientOriginalName() ?: 'File import';
         ImportBatch::create([
             'key' => $batch,
-            'label' => $this->file->getClientOriginalName() ?: 'File import',
+            'label' => $label,
             'source' => 'file',
             'user_id' => auth()->id(),
             'item_count' => count($items),
@@ -122,19 +126,50 @@ class Classify extends Component
         }
 
         Audit::log('classify.file_upload', [
-            'file' => $this->file->getClientOriginalName(),
+            'file' => $label,
             'queued' => count($items),
             'total' => $total,
             'batch' => $batch,
         ]);
 
-        $this->queued = ['count' => count($items), 'total' => $total, 'batch' => $batch];
+        $this->queued = [
+            'batch' => $batch,
+            'count' => count($items),
+            'total' => $total,
+            'source' => 'file',
+            'label' => $label,
+        ];
         $this->reset('file');
+    }
+
+    /** Dismiss the progress panel and start a fresh classification. */
+    public function startOver(): void
+    {
+        $this->reset('queued', 'input', 'file');
     }
 
     public function render()
     {
+        $progress = null;
+
+        if ($this->queued) {
+            $batch = $this->queued['batch'];
+            $done = Classification::where('batch', $batch)->count();
+
+            $progress = [
+                'done' => $done,
+                'count' => (int) $this->queued['count'],
+                'complete' => $done >= (int) $this->queued['count'],
+                'rows' => Classification::where('batch', $batch)
+                    ->with('code')
+                    ->latest()
+                    ->limit(50)
+                    ->get(),
+            ];
+        }
+
         return view('livewire.classify', [
+            'progress' => $progress,
             'stats' => [
                 'total' => Classification::count(),
                 'auto' => Classification::where('status', 'auto_confirmed')->count(),
