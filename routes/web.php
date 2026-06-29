@@ -7,6 +7,7 @@ use App\Livewire\AskAi;
 use App\Livewire\Catalog;
 use App\Livewire\Classify;
 use App\Livewire\Invoices;
+use App\Livewire\Logs;
 use App\Livewire\ReviewQueue;
 use App\Livewire\UploadInvoices;
 use Illuminate\Support\Facades\Route;
@@ -33,4 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/catalog', Catalog::class)->name('catalog');
 
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');
+
+    // Audit / activity log — reachable by URL only (not in the nav).
+    Route::get('/log', Logs::class)->name('log');
 });

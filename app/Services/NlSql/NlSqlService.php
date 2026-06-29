@@ -3,6 +3,8 @@
 namespace App\Services\NlSql;
 
 use App\Services\Llm\OpenRouterClient;
+use App\Support\Audit;
+use App\Support\LlmLog;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -54,6 +56,14 @@ class NlSqlService
             $result['error'] = $e->getMessage();
         }
 
+        Audit::log('nlsql.query', [
+            'question' => $question,
+            'sql' => $result['sql'],
+            'conversational' => $result['answer'] !== null,
+            'rows' => count($result['rows']),
+            'error' => $result['error'],
+        ]);
+
         return $result;
     }
 
@@ -67,7 +77,19 @@ class NlSqlService
             ['role' => 'user', 'content' => $question],
         ];
 
-        $json = $this->llm->json($messages);
+        try {
+            $response = $this->llm->jsonWithUsage($messages);
+        } catch (Throwable $e) {
+            LlmLog::record('nlsql', (string) config('services.openrouter.model'), [], 0, 'error', null, $messages, null, $e->getMessage());
+            throw $e;
+        }
+
+        LlmLog::record(
+            'nlsql', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
+            'ok', $response['raw'] ?? null, $messages,
+        );
+
+        $json = $response['data'];
 
         $sql = $json['sql'] ?? null;
         $sql = is_string($sql) && trim($sql) !== '' ? trim($sql) : null;

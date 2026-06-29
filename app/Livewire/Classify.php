@@ -8,6 +8,7 @@ use App\Models\ImportBatch;
 use App\Models\LlmUsage;
 use App\Services\Classify\ClassifierService;
 use App\Services\Import\ItemFileParser;
+use App\Support\Audit;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -81,6 +82,8 @@ class Classify extends Component
         }
 
         $this->tokens = $tokens;
+
+        Audit::log('classify.manual', ['count' => $lines->count(), 'batch' => $batch, 'tokens' => $tokens]);
     }
 
     public function classifyFile(ItemFileParser $parser): void
@@ -117,6 +120,13 @@ class Classify extends Component
         foreach ($items as $text) {
             ClassifyItemJob::dispatch($text, $batch);
         }
+
+        Audit::log('classify.file_upload', [
+            'file' => $this->file->getClientOriginalName(),
+            'queued' => count($items),
+            'total' => $total,
+            'batch' => $batch,
+        ]);
 
         $this->queued = ['count' => count($items), 'total' => $total, 'batch' => $batch];
         $this->reset('file');
