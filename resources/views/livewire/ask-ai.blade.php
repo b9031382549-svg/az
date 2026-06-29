@@ -16,7 +16,12 @@
         </div>
       </div>
     @else
-      <div class="max-w-[820px] mx-auto space-y-6">
+      <div class="max-w-[820px] mx-auto">
+        <div class="flex justify-end mb-3">
+          <button wire:click="clearHistory" wire:confirm="Clear your entire chat history?"
+                  class="btn btn-ghost btn-sm text-muted">Clear history</button>
+        </div>
+        <div class="space-y-6">
         @foreach($messages as $m)
           <div class="flex justify-end">
             <div class="bg-ink text-paper rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[80%]">{{ $m['q'] }}</div>
@@ -25,6 +30,9 @@
           <div class="card p-5">
             @if($m['error'])
               <p class="text-stamp text-sm"><span class="font-medium">Could not answer:</span> {{ $m['error'] }}</p>
+            @elseif(!empty($m['answer']) && empty($m['sql']))
+              {{-- Conversational reply (no query was run) --}}
+              <p>{{ $m['answer'] }}</p>
             @else
               @if($m['explanation'])
                 <p class="mb-4">{{ $m['explanation'] }}</p>
@@ -69,6 +77,7 @@
             @endif
           </div>
         @endforeach
+        </div>
       </div>
     @endif
   </div>
