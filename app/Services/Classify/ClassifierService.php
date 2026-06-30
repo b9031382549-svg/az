@@ -59,10 +59,13 @@ class ClassifierService
                 return $result;
             }
 
+            // Store the FULL candidate set the model chose from (not just the top
+            // 10) so the review screen can offer every option as a correction and
+            // the model's own pick is always present in the list.
             $result['candidates'] = array_map(fn ($c) => [
                 'code' => $c->code, 'kind' => $c->kind, 'name' => $c->name,
                 'score' => $c->score, 'semantic_sim' => $c->semantic_sim ?? null,
-            ], array_slice($candidates, 0, 10));
+            ], $candidates);
 
             $picked = $this->rerank($text, $candidates);
             // (rerank logs llm_usage per tier itself.)
