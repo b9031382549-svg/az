@@ -77,12 +77,7 @@
       {{ $slot }}
     </main>
 
-    @if(!empty($requestId))
-      <footer class="shrink-0 px-5 sm:px-7 py-2 border-t hair text-faint text-[11px] flex items-center justify-end gap-2 select-none">
-        <span>Request</span>
-        <code class="font-mono">{{ $requestId }}</code>
-      </footer>
-    @endif
+    <livewire:report-problem />
   </div>
 </div>
 @livewireScripts

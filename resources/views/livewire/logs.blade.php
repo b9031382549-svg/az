@@ -2,12 +2,14 @@
   <div class="mb-5">
     <p class="kicker mb-1.5">Audit</p>
     <h1 class="font-display text-4xl">Activity log</h1>
-    <p class="text-muted text-sm mt-1">Everything that happened — actions and LLM decisions — correlated by request id.</p>
+    <p class="text-muted text-sm mt-1">Everything that happened — actions, LLM decisions and problem reports — correlated by request id.</p>
   </div>
+
+  @php $cols = ['llm' => 8, 'reports' => 5][$tab] ?? 6; @endphp
 
   {{-- Tabs --}}
   <div class="flex flex-wrap gap-2 mb-4">
-    @foreach(['activity' => 'Actions', 'llm' => 'LLM decisions'] as $key => $label)
+    @foreach(['activity' => 'Actions', 'llm' => 'LLM decisions', 'reports' => 'Bug reports'] as $key => $label)
       <button wire:click="setTab('{{ $key }}')"
               class="px-3 py-1.5 rounded-lg text-sm border hair transition {{ $tab === $key ? 'bg-ink text-paper border-ink' : 'bg-surface hover:border-ink' }}">
         {{ $label }}
@@ -17,12 +19,14 @@
 
   {{-- Filters --}}
   <div class="flex flex-wrap items-center gap-2 mb-4">
-    <select wire:model.live="action" class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none">
-      <option value="">{{ $tab === 'llm' ? 'All purposes' : 'All actions' }}</option>
-      @foreach($actions as $a)
-        <option value="{{ $a }}">{{ $a }}</option>
-      @endforeach
-    </select>
+    @if($tab !== 'reports')
+      <select wire:model.live="action" class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none">
+        <option value="">{{ $tab === 'llm' ? 'All purposes' : 'All actions' }}</option>
+        @foreach($actions as $a)
+          <option value="{{ $a }}">{{ $a }}</option>
+        @endforeach
+      </select>
+    @endif
     <input wire:model.live.debounce.400ms="requestId" placeholder="request id"
            class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none font-mono w-[290px] max-w-full">
     <input wire:model.live.debounce.400ms="q" placeholder="search…"
@@ -44,6 +48,9 @@
               <th class="font-medium px-4 py-2.5">Status</th>
               <th class="font-medium px-4 py-2.5 text-right">Tokens</th>
               <th class="font-medium px-4 py-2.5 text-right">Latency</th>
+            @elseif($tab === 'reports')
+              <th class="font-medium px-4 py-2.5">User</th>
+              <th class="font-medium px-4 py-2.5">Message</th>
             @else
               <th class="font-medium px-4 py-2.5">User</th>
               <th class="font-medium px-4 py-2.5">Action</th>
@@ -59,15 +66,14 @@
               <td class="px-4 py-2.5 tnum whitespace-nowrap text-muted">{{ \Illuminate\Support\Carbon::parse($row->created_at)->format('Y-m-d H:i:s') }}</td>
 
               @if($tab === 'llm')
-                <td class="px-4 py-2.5 whitespace-nowrap">
-                  {{ $row->purpose }}@if($row->tier)<span class="text-faint"> · {{ $row->tier }}</span>@endif
-                </td>
+                <td class="px-4 py-2.5 whitespace-nowrap">{{ $row->purpose }}@if($row->tier)<span class="text-faint"> · {{ $row->tier }}</span>@endif</td>
                 <td class="px-4 py-2.5 font-mono text-xs">{{ $row->model }}</td>
-                <td class="px-4 py-2.5">
-                  <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $row->status === 'error' ? 'bg-stamp/12 text-stamp' : 'bg-ledger/12 text-ledger' }}">{{ $row->status ?? '—' }}</span>
-                </td>
+                <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $row->status === 'error' ? 'bg-stamp/12 text-stamp' : 'bg-ledger/12 text-ledger' }}">{{ $row->status ?? '—' }}</span></td>
                 <td class="px-4 py-2.5 tnum text-right">{{ number_format((int) $row->total_tokens) }}</td>
                 <td class="px-4 py-2.5 tnum text-right text-muted">{{ $row->latency_ms !== null ? $row->latency_ms.' ms' : '—' }}</td>
+              @elseif($tab === 'reports')
+                <td class="px-4 py-2.5 whitespace-nowrap">{{ $row->user?->name ?? ($row->user_id ? '#'.$row->user_id : 'guest') }}</td>
+                <td class="px-4 py-2.5 max-w-[460px]"><span class="line-clamp-1">{{ $row->message }}</span></td>
               @else
                 <td class="px-4 py-2.5 whitespace-nowrap">{{ $row->user?->name ?? ($row->user_id ? '#'.$row->user_id : 'system') }}</td>
                 <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md text-xs font-medium bg-line/40 text-ink whitespace-nowrap">{{ $row->action }}</span></td>
@@ -76,7 +82,7 @@
 
               <td class="px-4 py-2.5">
                 @if($row->request_id)
-                  <button @click.stop="$wire.set('requestId', '{{ $row->request_id }}')"
+                  <button @click.stop="$wire.set('requestId', @js($row->request_id))"
                           class="font-mono text-xs text-muted hover:text-ink" title="Filter by this request">{{ Str::limit($row->request_id, 8, '') }}…</button>
                 @else
                   <span class="text-faint">—</span>
@@ -85,7 +91,7 @@
               <td class="px-4 py-2.5 text-faint text-xs" x-text="open ? '▾' : '▸'"></td>
             </tr>
             <tr x-show="open" wire:key="det-{{ $tab }}-{{ $row->id }}" class="border-b hair last:border-0 bg-paper/30">
-              <td colspan="{{ $tab === 'llm' ? 7 : 6 }}" class="px-4 py-3">
+              <td colspan="{{ $cols }}" class="px-4 py-3">
                 @if($tab === 'llm')
                   @if($row->error)<p class="text-stamp text-sm mb-2"><b>Error:</b> {{ $row->error }}</p>@endif
                   <p class="kicker mb-1">Prompt</p>
@@ -94,6 +100,13 @@
                   <p class="kicker mb-1">Response</p>
                   <pre class="text-xs font-mono bg-surface border hair rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{{ $row->response ?? '(payload logging off)' }}</pre>
                   <p class="text-faint text-xs mt-2 font-mono">request: {{ $row->request_id ?? '—' }}</p>
+                @elseif($tab === 'reports')
+                  <p class="kicker mb-1">Message</p>
+                  <p class="text-sm whitespace-pre-wrap mb-3">{{ $row->message }}</p>
+                  <p class="text-faint text-xs">
+                    Page: <span class="break-all">{{ $row->url ?? '—' }}</span><br>
+                    request: <span class="font-mono">{{ $row->request_id ?? '—' }}</span> · status: {{ $row->status }}
+                  </p>
                 @else
                   <pre class="text-xs font-mono bg-surface border hair rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">{{ $row->properties ? json_encode($row->properties, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) : '(no properties)' }}</pre>
                   <p class="text-faint text-xs mt-2">IP: {{ $row->ip ?? '—' }} · request: <span class="font-mono">{{ $row->request_id ?? '—' }}</span></p>
@@ -101,7 +114,7 @@
               </td>
             </tr>
           @empty
-            <tr><td colspan="{{ $tab === 'llm' ? 7 : 6 }}" class="px-4 py-10 text-center text-muted">Nothing logged yet for this filter.</td></tr>
+            <tr><td colspan="{{ $cols }}" class="px-4 py-10 text-center text-muted">Nothing logged yet for this filter.</td></tr>
           @endforelse
         </tbody>
       </table>
