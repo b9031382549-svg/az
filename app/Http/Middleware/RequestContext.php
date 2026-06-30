@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\View;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -19,11 +18,14 @@ class RequestContext
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $id = $request->headers->get('X-Request-Id') ?: (string) Str::uuid();
+        // Accept a client-supplied id only if it is a real UUID — the id lands in
+        // native Postgres uuid columns (activity_log, llm_usage, bug_reports), so
+        // a junk header must never reach them. Otherwise mint our own.
+        $incoming = (string) $request->headers->get('X-Request-Id', '');
+        $id = Str::isUuid($incoming) ? $incoming : (string) Str::uuid();
 
         app()->instance('request_id', $id);
         Log::shareContext(['request_id' => $id, 'user_id' => auth()->id()]);
-        View::share('requestId', $id);
 
         $response = $next($request);
         $response->headers->set('X-Request-Id', $id);

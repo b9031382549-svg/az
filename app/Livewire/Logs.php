@@ -3,8 +3,10 @@
 namespace App\Livewire;
 
 use App\Models\ActivityLog;
+use App\Models\BugReport;
 use App\Models\LlmUsage;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,7 +22,7 @@ class Logs extends Component
     use WithPagination;
 
     #[Url]
-    public string $tab = 'activity'; // activity | llm
+    public string $tab = 'activity'; // activity | llm | reports
 
     #[Url]
     public string $requestId = '';
@@ -33,7 +35,7 @@ class Logs extends Component
 
     public function setTab(string $tab): void
     {
-        $this->tab = $tab === 'llm' ? 'llm' : 'activity';
+        $this->tab = in_array($tab, ['llm', 'reports'], true) ? $tab : 'activity';
         $this->action = '';
         $this->resetPage();
     }
@@ -57,10 +59,13 @@ class Logs extends Component
     {
         $q = trim($this->q);
         $like = '%'.$q.'%';
+        // request_id columns are native Postgres uuid — only filter on a complete,
+        // valid uuid, otherwise a partial/typed value would raise SQLSTATE 22P02.
+        $reqId = Str::isUuid(trim($this->requestId)) ? trim($this->requestId) : null;
 
         if ($this->tab === 'llm') {
             $rows = LlmUsage::query()
-                ->when($this->requestId !== '', fn ($x) => $x->where('request_id', $this->requestId))
+                ->when($reqId, fn ($x) => $x->where('request_id', $reqId))
                 ->when($this->action !== '', fn ($x) => $x->where('purpose', $this->action))
                 ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w
                     ->where('model', 'ilike', $like)
@@ -71,10 +76,21 @@ class Logs extends Component
                 ->paginate(25);
 
             $actions = LlmUsage::query()->distinct()->orderBy('purpose')->pluck('purpose');
+        } elseif ($this->tab === 'reports') {
+            $rows = BugReport::query()
+                ->with('user')
+                ->when($reqId, fn ($x) => $x->where('request_id', $reqId))
+                ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w
+                    ->where('message', 'ilike', $like)
+                    ->orWhere('url', 'ilike', $like)))
+                ->latest('id')
+                ->paginate(25);
+
+            $actions = collect();
         } else {
             $rows = ActivityLog::query()
                 ->with('user')
-                ->when($this->requestId !== '', fn ($x) => $x->where('request_id', $this->requestId))
+                ->when($reqId, fn ($x) => $x->where('request_id', $reqId))
                 ->when($this->action !== '', fn ($x) => $x->where('action', $this->action))
                 ->when($q !== '', fn ($x) => $x->where(fn ($w) => $w
                     ->where('action', 'ilike', $like)
