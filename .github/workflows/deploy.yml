@@ -65,5 +65,7 @@ jobs:
             docker compose -f docker-compose.prod.yml run --rm app php artisan migrate --force
             docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
-            docker compose -f docker-compose.prod.yml exec -T app php artisan queue:restart
+            # Horizon 5 self-serves its dashboard assets; the worker container is
+            # recreated by `up -d` (SIGTERM + 30s grace) so Horizon restarts with
+            # the new code — no horizon:terminate / horizon:publish needed.
             docker image prune -f

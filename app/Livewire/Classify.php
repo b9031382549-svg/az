@@ -8,6 +8,7 @@ use App\Models\ImportBatch;
 use App\Models\LlmUsage;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -22,7 +23,10 @@ class Classify extends Component
     private const MANUAL_LIMIT = 20;
 
     /** Max items queued from a single file upload. */
-    private const FILE_LIMIT = 200;
+    private const FILE_LIMIT = 10000;
+
+    /** Jobs pushed to the queue per bulk insert. */
+    private const DISPATCH_CHUNK = 500;
 
     public string $input = '';
 
@@ -101,9 +105,17 @@ class Classify extends Component
             return;
         }
 
+        // Parsing + enqueuing up to 10k rows can take a moment (kept under the
+        // nginx fastcgi_read_timeout of 120s).
+        ini_set('memory_limit', '768M');
+        set_time_limit(110);
+
         $path = $this->file->getRealPath();
-        $total = $parser->count($path);
-        $items = $parser->parse($path, self::FILE_LIMIT);
+        // Parse once (don't load the workbook twice) and de-duplicate: the job is
+        // idempotent per (batch, source_text), so duplicate rows would never be
+        // re-created and the progress bar would never reach 100%.
+        $items = array_values(array_unique($parser->parse($path, self::FILE_LIMIT)));
+        $total = count($items);
 
         if (empty($items)) {
             $this->addError('file', 'No item names found in the file.');
@@ -121,8 +133,14 @@ class Classify extends Component
             'item_count' => count($items),
         ]);
 
-        foreach ($items as $text) {
-            ClassifyItemJob::dispatch($text, $batch);
+        // Push jobs in bulk chunks instead of one dispatch() per row, so enqueuing
+        // thousands of items is a handful of round-trips, not thousands.
+        foreach (array_chunk($items, self::DISPATCH_CHUNK) as $chunk) {
+            Queue::bulk(
+                array_map(fn ($text) => new ClassifyItemJob($text, $batch), $chunk),
+                '',
+                'default',
+            );
         }
 
         Audit::log('classify.file_upload', [
