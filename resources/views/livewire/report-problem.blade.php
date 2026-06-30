@@ -8,7 +8,7 @@
   <button type="button"
           x-on:click="open = true; $wire.call('resetForm')"
           class="text-faint text-xs hover:text-stamp transition flex items-center gap-1.5">
-    <span aria-hidden="true">⚠</span> Сообщить об ошибке
+    <span aria-hidden="true">⚠</span> Report a problem
   </button>
 
   {{-- Modal --}}
@@ -21,17 +21,17 @@
       @if($sent)
         <div class="text-center py-3">
           <div class="mx-auto w-11 h-11 grid place-items-center rounded-2xl bg-ledger/12 text-ledger text-xl mb-3">✓</div>
-          <h3 class="font-display text-xl mb-1">Спасибо!</h3>
-          <p class="text-muted text-sm mb-5">Сообщение отправлено. Мы сможем найти детали по этому запросу.</p>
-          <button type="button" x-on:click="open = false" class="btn btn-ink btn-sm">Закрыть</button>
+          <h3 class="font-display text-xl mb-1">Thank you!</h3>
+          <p class="text-muted text-sm mb-5">Your report was sent. We can trace the details by this request id.</p>
+          <button type="button" x-on:click="open = false" class="btn btn-ink btn-sm">Close</button>
         </div>
       @else
         <div class="flex items-start justify-between gap-3 mb-3">
-          <h3 class="font-display text-xl">Сообщить об ошибке</h3>
+          <h3 class="font-display text-xl">Report a problem</h3>
           <button type="button" x-on:click="open = false" class="text-faint hover:text-ink text-lg leading-none">✕</button>
         </div>
 
-        <p class="text-muted text-sm mb-3">Опишите, что пошло не так. Идентификатор запроса прикрепится автоматически — по нему мы найдём детали в логах.</p>
+        <p class="text-muted text-sm mb-3">Describe what went wrong. The request id is attached automatically — we'll use it to find the details in the logs.</p>
 
         <div class="card-flat px-3 py-2 mb-3 text-xs flex items-center gap-2">
           <span class="text-faint">Request</span>
@@ -39,15 +39,15 @@
         </div>
 
         <textarea wire:model="message" rows="4" x-ref="msg"
-                  placeholder="Например: при нажатии «Match items» ничего не происходит…"
+                  placeholder="e.g. clicking “Match items” does nothing…"
                   class="field-input text-sm" style="height:auto"></textarea>
         @error('message') <p class="text-stamp text-xs mt-1.5">{{ $message }}</p> @enderror
 
         <div class="flex justify-end gap-2 mt-4">
-          <button type="button" x-on:click="open = false" class="btn btn-ghost btn-sm">Отмена</button>
+          <button type="button" x-on:click="open = false" class="btn btn-ghost btn-sm">Cancel</button>
           <button type="button" wire:click="submit" wire:loading.attr="disabled" wire:target="submit" class="btn btn-ink btn-sm">
-            <span wire:loading.remove wire:target="submit">Отправить</span>
-            <span wire:loading wire:target="submit">Отправка…</span>
+            <span wire:loading.remove wire:target="submit">Send</span>
+            <span wire:loading wire:target="submit">Sending…</span>
           </button>
         </div>
       @endif
