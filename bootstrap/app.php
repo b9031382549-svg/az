@@ -12,8 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Correlate every request (audit trail, LLM log, app log) by request_id.
-        $middleware->web(append: [\App\Http\Middleware\RequestContext::class]);
+        // Correlate every request (audit trail, LLM log, app log) by request_id,
+        // and apply the per-user UI language.
+        $middleware->web(append: [
+            \App\Http\Middleware\RequestContext::class,
+            \App\Http\Middleware\SetLocale::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

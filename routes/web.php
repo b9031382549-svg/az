@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ReviewExportController;
 use App\Livewire\AskAi;
@@ -36,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/catalog', Catalog::class)->name('catalog');
 
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');
+    Route::post('/locale', [LocaleController::class, 'update'])->name('locale.set');
 
     // Audit / activity log — reachable by URL only (not in the nav).
     Route::get('/log', Logs::class)->name('log');

@@ -32,7 +32,7 @@ class AuthController extends Controller
             Audit::log('auth.login_failed', ['login' => $credentials['login']]);
 
             return back()
-                ->withErrors(['login' => 'These credentials do not match our records.'])
+                ->withErrors(['login' => __('These credentials do not match our records.')])
                 ->onlyInput('login');
         }
 

@@ -5,12 +5,12 @@
       <div class="h-full grid place-items-center text-center">
         <div class="max-w-lg">
           <div class="mx-auto w-12 h-12 grid place-items-center rounded-2xl bg-ink text-paper font-display text-xl mb-4">✦</div>
-          <h1 class="font-display text-3xl mb-2">Ask about your invoices</h1>
-          <p class="text-muted mb-7">Plain-language questions are translated into read-only SQL and run against your data.</p>
+          <h1 class="font-display text-3xl mb-2">{{ __('Ask about your invoices') }}</h1>
+          <p class="text-muted mb-7">{{ __('Plain-language questions are translated into read-only SQL and run against your data.') }}</p>
           <div class="flex flex-wrap justify-center gap-2">
             @foreach($suggestions as $s)
-              <button wire:click="suggest('{{ $s }}')"
-                      class="btn btn-ghost btn-sm">{{ $s }}</button>
+              <button wire:click="suggest(@js(__($s)))"
+                      class="btn btn-ghost btn-sm">{{ __($s) }}</button>
             @endforeach
           </div>
         </div>
@@ -18,8 +18,8 @@
     @else
       <div class="max-w-[820px] mx-auto">
         <div class="flex justify-end mb-3">
-          <button wire:click="clearHistory" wire:confirm="Clear your entire chat history?"
-                  class="btn btn-ghost btn-sm text-muted">Clear history</button>
+          <button wire:click="clearHistory" wire:confirm="{{ __('Clear your entire chat history?') }}"
+                  class="btn btn-ghost btn-sm text-muted">{{ __('Clear history') }}</button>
         </div>
         <div class="space-y-6">
         @foreach($messages as $m)
@@ -29,7 +29,7 @@
 
           <div class="card p-5">
             @if($m['error'])
-              <p class="text-stamp text-sm"><span class="font-medium">Could not answer:</span> {{ $m['error'] }}</p>
+              <p class="text-stamp text-sm"><span class="font-medium">{{ __('Could not answer:') }}</span> {{ $m['error'] }}</p>
             @elseif(!empty($m['answer']) && empty($m['sql']))
               {{-- Conversational reply (no query was run) --}}
               <p>{{ $m['answer'] }}</p>
@@ -62,10 +62,10 @@
                   </div>
                 </div>
                 @if($m['truncated'])
-                  <p class="text-faint text-xs mt-2">Showing the first 50 rows.</p>
+                  <p class="text-faint text-xs mt-2">{{ __('Showing the first 50 rows.') }}</p>
                 @endif
               @else
-                <p class="text-muted text-sm">No rows returned.</p>
+                <p class="text-muted text-sm">{{ __('No rows returned.') }}</p>
               @endif
 
               @if($m['sql'])
@@ -86,11 +86,11 @@
     <form wire:submit="ask" class="max-w-[820px] mx-auto flex items-center gap-2">
       <div class="flex-1 flex items-center gap-2 bg-surface border hair rounded-xl px-3.5 h-11 focus-within:border-ink transition">
         <input wire:model="question" autofocus autocomplete="off"
-               placeholder="Ask a question about your invoices…"
+               placeholder="{{ __('Ask a question about your invoices…') }}"
                class="w-full bg-transparent outline-none text-sm" wire:loading.attr="disabled">
       </div>
       <button type="submit" class="btn btn-ink h-11 px-5" wire:loading.attr="disabled" wire:target="ask">
-        <span wire:loading.remove wire:target="ask">Ask</span>
+        <span wire:loading.remove wire:target="ask">{{ __('Ask') }}</span>
         <span wire:loading wire:target="ask">…</span>
       </button>
     </form>

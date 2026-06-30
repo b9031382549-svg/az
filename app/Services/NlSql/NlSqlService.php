@@ -99,7 +99,7 @@ class NlSqlService
 
         // Either a query to run, or a direct conversational answer — but not nothing.
         if ($sql === null && $answer === null) {
-            throw new SqlGuardException('The model did not return any SQL or answer.');
+            throw new SqlGuardException(__('The model did not return any SQL or answer.'));
         }
 
         return ['sql' => $sql, 'answer' => $answer, 'explanation' => $json['explanation'] ?? null];

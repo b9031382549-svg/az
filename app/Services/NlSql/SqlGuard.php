@@ -32,7 +32,7 @@ class SqlGuard
         $clean = trim($sql);
 
         if ($clean === '') {
-            throw new SqlGuardException('Empty query.');
+            throw new SqlGuardException(__('Empty query.'));
         }
 
         // Drop a single trailing semicolon; anything more means multiple statements.
@@ -42,16 +42,16 @@ class SqlGuard
         $scan = $this->stripComments($clean);
 
         if (str_contains($scan, ';')) {
-            throw new SqlGuardException('Only a single statement is allowed.');
+            throw new SqlGuardException(__('Only a single statement is allowed.'));
         }
 
         if (! preg_match('/^\s*(select|with)\b/i', $scan)) {
-            throw new SqlGuardException('Only SELECT/WITH queries are allowed.');
+            throw new SqlGuardException(__('Only SELECT/WITH queries are allowed.'));
         }
 
         foreach (self::FORBIDDEN as $kw) {
             if (preg_match('/\b'.preg_quote($kw, '/').'\b/i', $scan)) {
-                throw new SqlGuardException("Disallowed keyword: {$kw}.");
+                throw new SqlGuardException(__('Disallowed keyword: :kw.', ['kw' => $kw]));
             }
         }
 
@@ -71,7 +71,7 @@ class SqlGuard
                 $name = end($parts);
             }
             if (! in_array($name, $this->allowedTables, true)) {
-                throw new SqlGuardException("Table not allowed: {$name}.");
+                throw new SqlGuardException(__('Table not allowed: :name.', ['name' => $name]));
             }
         }
     }

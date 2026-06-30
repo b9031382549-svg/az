@@ -1,18 +1,18 @@
 <section class="p-5 sm:p-8 max-w-[920px]">
   <div class="flex items-end justify-between flex-wrap gap-3 mb-6">
     <div>
-      <p class="kicker mb-1.5">Data import</p>
-      <h1 class="font-display text-4xl">Upload invoices</h1>
+      <p class="kicker mb-1.5">{{ __('Data import') }}</p>
+      <h1 class="font-display text-4xl">{{ __('Upload invoices') }}</h1>
     </div>
     <div class="card-flat px-4 py-2.5 text-sm">
-      <span class="text-muted">In the database now:</span>
+      <span class="text-muted">{{ __('In the database now:') }}</span>
       <span class="font-display text-lg tnum ml-1">{{ number_format($existing, 0, '.', ' ') }}</span>
-      <span class="text-muted">invoices</span>
+      <span class="text-muted">{{ __('invoices') }}</span>
     </div>
   </div>
 
   @php
-    $steps = [1 => 'File', 2 => 'Preview', 3 => 'Result'];
+    $steps = [1 => __('File'), 2 => __('Preview'), 3 => __('Result')];
   @endphp
   <ol class="flex items-center gap-3 mb-7 text-sm">
     @foreach($steps as $n => $label)
@@ -36,19 +36,19 @@
       <input x-ref="fileInput" type="file" wire:model="file" class="hidden" accept=".xlsx,.xls,.csv">
       <div wire:loading.remove wire:target="file">
         <div class="text-4xl mb-3 text-faint">⬆</div>
-        <p class="font-display text-2xl mb-1">Drag your file here</p>
-        <p class="text-muted mb-5">or click to choose a file</p>
-        <span class="btn btn-ink">Choose file</span>
-        <p class="text-xs text-faint mt-5">Supported: .xlsx, .xls, .csv · up to 25&nbsp;MB</p>
+        <p class="font-display text-2xl mb-1">{{ __('Drag your file here') }}</p>
+        <p class="text-muted mb-5">{{ __('or click to choose a file') }}</p>
+        <span class="btn btn-ink">{{ __('Choose file') }}</span>
+        <p class="text-xs text-faint mt-5">{{ __('Supported: .xlsx, .xls, .csv · up to 25') }}&nbsp;{{ __('MB') }}</p>
       </div>
       <div wire:loading wire:target="file" class="py-6">
-        <p class="font-display text-xl">Reading file…</p>
+        <p class="font-display text-xl">{{ __('Reading file…') }}</p>
       </div>
     </label>
     @error('file') <p class="text-sm text-stamp mt-3">{{ $message }}</p> @enderror
     <div class="mt-4 flex items-start gap-2.5 text-sm text-muted card-flat p-3.5">
       <span class="text-amber">ℹ</span>
-      <span>The file must have the 15 standard columns: No., supplier/recipient TIN, issue &amp; approval dates, series, number, the VAT amount columns and total.</span>
+      <span>{{ __('The file must have the 15 standard columns: No., supplier/recipient TIN, issue & approval dates, series, number, the VAT amount columns and total.') }}</span>
     </div>
     @if($existing > 0)
       <div class="mt-3 flex items-start gap-2.5 text-sm card-flat p-3.5 border-amber/40">
@@ -64,7 +64,7 @@
       <div class="flex items-center justify-between flex-wrap gap-2">
         <span class="font-mono text-sm">{{ $file?->getClientOriginalName() }}</span>
         @if($preview['ok'])
-          <span class="text-ledger text-sm">{{ number_format($preview['count'],0,'.',' ') }} rows found ✓</span>
+          <span class="text-ledger text-sm">{{ number_format($preview['count'],0,'.',' ') }} {{ __('rows found ✓') }}</span>
         @else
           <span class="text-stamp text-sm">{{ $preview['error'] }}</span>
         @endif
@@ -77,12 +77,12 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-muted border-b hair bg-paper/50">
-                <th class="font-medium px-4 py-2.5">Date</th>
-                <th class="font-medium px-4 py-2.5">Series·No.</th>
-                <th class="font-medium px-4 py-2.5">Supplier</th>
-                <th class="font-medium px-4 py-2.5">Recipient</th>
-                <th class="font-medium px-4 py-2.5 text-right">VAT</th>
-                <th class="font-medium px-4 py-2.5 text-right">Total</th>
+                <th class="font-medium px-4 py-2.5">{{ __('Date') }}</th>
+                <th class="font-medium px-4 py-2.5">{{ __('Series·No.') }}</th>
+                <th class="font-medium px-4 py-2.5">{{ __('Supplier') }}</th>
+                <th class="font-medium px-4 py-2.5">{{ __('Recipient') }}</th>
+                <th class="font-medium px-4 py-2.5 text-right">{{ __('VAT') }}</th>
+                <th class="font-medium px-4 py-2.5 text-right">{{ __('Total') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -100,7 +100,7 @@
           </table>
         </div>
       </div>
-      <p class="text-faint text-xs mt-2">Preview of the first {{ count($preview['sample']) }} rows.</p>
+      <p class="text-faint text-xs mt-2">{{ __('Preview of the first :n rows.', ['n' => count($preview['sample'])]) }}</p>
 
       @if($existing > 0)
         <div class="mt-4 card-flat p-3.5 text-sm flex items-start gap-2.5 {{ $fresh ? 'border-ledger/40' : 'border-amber/40' }}">
@@ -116,18 +116,18 @@
 
       <div class="flex items-center justify-between mt-5">
         <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-          <input type="checkbox" wire:model.live="fresh" class="accent-stamp"> Replace existing data (truncate first)
+          <input type="checkbox" wire:model.live="fresh" class="accent-stamp"> {{ __('Replace existing data (truncate first)') }}
         </label>
         <div class="flex gap-2">
-          <button wire:click="startOver" class="btn btn-ghost btn-sm">Choose another</button>
+          <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('Choose another') }}</button>
           <button wire:click="import" wire:loading.attr="disabled" wire:target="import" class="btn btn-ink btn-sm">
-            <span wire:loading.remove wire:target="import">Import {{ number_format($preview['count'],0,'.',' ') }} rows →</span>
-            <span wire:loading wire:target="import">Importing…</span>
+            <span wire:loading.remove wire:target="import">{{ __('Import') }} {{ number_format($preview['count'],0,'.',' ') }} {{ __('rows →') }}</span>
+            <span wire:loading wire:target="import">{{ __('Importing…') }}</span>
           </button>
         </div>
       </div>
     @else
-      <button wire:click="startOver" class="btn btn-ghost btn-sm">← Choose another file</button>
+      <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('← Choose another file') }}</button>
     @endif
   @endif
 
@@ -136,16 +136,16 @@
     <div class="card p-8 text-center">
       @if($report['error'])
         <div class="text-3xl mb-3 text-stamp">✕</div>
-        <h2 class="font-display text-2xl mb-2">Import failed</h2>
+        <h2 class="font-display text-2xl mb-2">{{ __('Import failed') }}</h2>
         <p class="text-stamp">{{ $report['error'] }}</p>
       @else
         <div class="mx-auto w-12 h-12 grid place-items-center rounded-2xl bg-ledger/12 text-ledger text-2xl mb-3">✓</div>
-        <h2 class="font-display text-2xl mb-1">Imported {{ number_format($report['imported'],0,'.',' ') }} invoices</h2>
-        <p class="text-muted">{{ number_format($report['total'],0,'.',' ') }} invoices in the database now.</p>
+        <h2 class="font-display text-2xl mb-1">{{ __('Imported') }} {{ number_format($report['imported'],0,'.',' ') }} {{ __('invoices') }}</h2>
+        <p class="text-muted">{{ number_format($report['total'],0,'.',' ') }} {{ __('invoices in the database now.') }}</p>
       @endif
       <div class="flex justify-center gap-2 mt-6">
-        <a href="{{ route('invoices') }}" class="btn btn-ink btn-sm">Open in table</a>
-        <button wire:click="startOver" class="btn btn-ghost btn-sm">Upload more</button>
+        <a href="{{ route('invoices') }}" class="btn btn-ink btn-sm">{{ __('Open in table') }}</a>
+        <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('Upload more') }}</button>
       </div>
     </div>
   @endif

@@ -10,20 +10,20 @@
 
     <div class="flex-1 grid place-items-center py-10">
       <div class="w-full max-w-[380px]">
-        <p class="kicker mb-3">Account</p>
-        <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">Welcome back.</h1>
-        <p class="text-muted mb-9">Sign in to continue working with your invoices.</p>
+        <p class="kicker mb-3">{{ __('Account') }}</p>
+        <h1 class="font-display text-[2.5rem] leading-[1.05] mb-2">{{ __('Welcome back.') }}</h1>
+        <p class="text-muted mb-9">{{ __('Sign in to continue working with your invoices.') }}</p>
 
         <form method="POST" action="{{ route('login.attempt') }}">
           @csrf
           <div class="space-y-5">
             <div>
-              <label class="field-label">Login</label>
+              <label class="field-label">{{ __('Login') }}</label>
               <input name="login" type="text" value="{{ old('login') }}" autofocus
                      class="field-input @error('login') ring-1 ring-stamp @enderror">
             </div>
             <div>
-              <label class="field-label">Password</label>
+              <label class="field-label">{{ __('Password') }}</label>
               <div class="relative">
                 <input name="password" type="password" class="field-input pr-12">
                 <button type="button" class="absolute right-0 top-0 h-full px-3.5 text-faint hover:text-ink"
@@ -38,15 +38,15 @@
 
           <div class="flex items-center justify-between text-sm mt-4 mb-7">
             <label class="flex items-center gap-2 text-muted cursor-pointer">
-              <input name="remember" type="checkbox" class="accent-stamp"> Remember me
+              <input name="remember" type="checkbox" class="accent-stamp"> {{ __('Remember me') }}
             </label>
           </div>
 
-          <button type="submit" class="btn btn-ink w-full">Sign in</button>
+          <button type="submit" class="btn btn-ink w-full">{{ __('Sign in') }}</button>
         </form>
       </div>
     </div>
-    <p class="text-xs text-faint">© 2026 Invoice Intelligence · interface prototype</p>
+    <p class="text-xs text-faint">{{ __('© 2026 Invoice Intelligence · interface prototype') }}</p>
   </div>
 
   <!-- editorial panel -->
@@ -54,16 +54,16 @@
     <div class="absolute inset-0 opacity-[0.07]"
          style="background-image:linear-gradient(#F2EEE3 1px,transparent 1px),linear-gradient(90deg,#F2EEE3 1px,transparent 1px);background-size:34px 34px"></div>
     <div class="relative z-10 flex flex-col justify-between p-14 w-full">
-      <p class="kicker text-faint">e-Invoices · VAT · analytics</p>
+      <p class="kicker text-faint">{{ __('e-Invoices · VAT · analytics') }}</p>
       <div>
         <p class="font-display text-[2.9rem] leading-[1.08]">“How much VAT<br>did we pay<br>in&nbsp;January?”</p>
-        <p class="text-faint mt-5 max-w-sm leading-relaxed">Upload your invoice export — and query the data in plain language. No formulas, no Excel exports.</p>
+        <p class="text-faint mt-5 max-w-sm leading-relaxed">{{ __('Upload your invoice export — and query the data in plain language. No formulas, no Excel exports.') }}</p>
       </div>
       <div class="flex items-end justify-between">
         <div class="font-mono text-sm text-faint leading-relaxed">
-          <div>01 — upload file</div>
-          <div>02 — verify parsing</div>
-          <div>03 — ask the AI</div>
+          <div>{{ __('01 — upload file') }}</div>
+          <div>{{ __('02 — verify parsing') }}</div>
+          <div>{{ __('03 — ask the AI') }}</div>
         </div>
         <div class="stamp-seal text-sm font-semibold px-4 py-2.5">e-invoice<br>verified</div>
       </div>
