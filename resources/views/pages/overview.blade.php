@@ -1,22 +1,22 @@
-<x-app-layout :title="'Overview · '.config('app.name')">
+<x-app-layout :title="__('Overview').' · '.config('app.name')">
 <section class="p-5 sm:p-8 max-w-[1180px]">
   <div class="flex items-end justify-between flex-wrap gap-3 mb-7">
     <div>
-      <p class="kicker mb-1.5">Period · {{ $period }}</p>
-      <h1 class="font-display text-4xl">Overview</h1>
+      <p class="kicker mb-1.5">{{ __('Period') }} · {{ $period }}</p>
+      <h1 class="font-display text-4xl">{{ __('Overview') }}</h1>
     </div>
     <div class="flex gap-2">
-      <a href="{{ route('upload') }}" class="btn btn-ghost btn-sm">⬆ Upload</a>
-      <a href="{{ route('ask') }}" class="btn btn-stamp btn-sm">Ask AI</a>
+      <a href="{{ route('upload') }}" class="btn btn-ghost btn-sm">⬆ {{ __('Upload') }}</a>
+      <a href="{{ route('ask') }}" class="btn btn-stamp btn-sm">{{ __('Ask AI') }}</a>
     </div>
   </div>
 
   @php
     $kpis = [
-      ['Turnover', '₼ '.number_format($agg->turnover, 0, '.', ' ')],
-      ['VAT collected', '₼ '.number_format($agg->vat, 0, '.', ' ')],
-      ['Invoices', number_format($agg->invoices, 0, '.', ' ')],
-      ['Suppliers', number_format($agg->suppliers, 0, '.', ' ')],
+      [__('Turnover'), '₼ '.number_format($agg->turnover, 0, '.', ' ')],
+      [__('VAT collected'), '₼ '.number_format($agg->vat, 0, '.', ' ')],
+      [__('Invoices'), number_format($agg->invoices, 0, '.', ' ')],
+      [__('Suppliers'), number_format($agg->suppliers, 0, '.', ' ')],
     ];
   @endphp
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
@@ -31,7 +31,7 @@
   <div class="grid lg:grid-cols-5 gap-5">
     <div class="lg:col-span-3 card p-6">
       <div class="flex items-center justify-between mb-6">
-        <h2 class="font-display text-xl">Turnover by month</h2>
+        <h2 class="font-display text-xl">{{ __('Turnover by month') }}</h2>
         <span class="kicker">2026</span>
       </div>
       <div class="flex items-end gap-6 h-52">
@@ -42,13 +42,13 @@
             <span class="kicker">{{ $m['label'] }}</span>
           </div>
         @empty
-          <p class="text-muted">No data yet.</p>
+          <p class="text-muted">{{ __('No data yet.') }}</p>
         @endforelse
       </div>
     </div>
 
     <div class="lg:col-span-2 card p-6">
-      <h2 class="font-display text-xl mb-5">Recent invoices</h2>
+      <h2 class="font-display text-xl mb-5">{{ __('Recent invoices') }}</h2>
       <ul class="space-y-3.5 text-sm">
         @foreach($recent as $inv)
           <li class="flex items-center justify-between">
@@ -63,7 +63,7 @@
           </li>
         @endforeach
       </ul>
-      <a href="{{ route('invoices') }}" class="btn btn-ghost btn-sm w-full mt-5">All invoices →</a>
+      <a href="{{ route('invoices') }}" class="btn btn-ghost btn-sm w-full mt-5">{{ __('All invoices') }} →</a>
     </div>
   </div>
 </section>

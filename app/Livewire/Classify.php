@@ -100,7 +100,7 @@ class Classify extends Component
 
         $ext = strtolower((string) $this->file->getClientOriginalExtension());
         if (! in_array($ext, ['xlsx', 'xls', 'csv'], true)) {
-            $this->addError('file', 'Please upload a .xlsx, .xls or .csv file.');
+            $this->addError('file', __('Please upload a .xlsx, .xls or .csv file.'));
 
             return;
         }
@@ -118,7 +118,7 @@ class Classify extends Component
         $total = count($items);
 
         if (empty($items)) {
-            $this->addError('file', 'No item names found in the file.');
+            $this->addError('file', __('No item names found in the file.'));
 
             return;
         }
@@ -188,6 +188,7 @@ class Classify extends Component
 
         return view('livewire.classify', [
             'progress' => $progress,
+            'fileLimit' => self::FILE_LIMIT,
             'stats' => [
                 'total' => Classification::count(),
                 'auto' => Classification::where('status', 'auto_confirmed')->count(),

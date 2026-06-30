@@ -34,7 +34,7 @@ class InvoiceImporter
         try {
             [$header, $rows] = $this->read($path);
         } catch (Throwable $e) {
-            return ['ok' => false, 'error' => 'Cannot read file: '.$e->getMessage(), 'count' => 0, 'header' => [], 'sample' => []];
+            return ['ok' => false, 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()]), 'count' => 0, 'header' => [], 'sample' => []];
         }
 
         $ok = is_array($header) && count($header) >= count(self::COLUMNS);
@@ -53,7 +53,7 @@ class InvoiceImporter
 
         return [
             'ok' => $ok,
-            'error' => $ok ? null : 'Unexpected columns: expected at least '.count(self::COLUMNS).', got '.(is_array($header) ? count($header) : 0).'.',
+            'error' => $ok ? null : __('Unexpected columns: expected at least :min, got :got.', ['min' => count(self::COLUMNS), 'got' => is_array($header) ? count($header) : 0]),
             'count' => $count,
             'header' => is_array($header) ? $header : [],
             'sample' => $sample,
@@ -70,11 +70,11 @@ class InvoiceImporter
         try {
             [$header, $rows] = $this->read($path);
         } catch (Throwable $e) {
-            return ['imported' => 0, 'total' => $this->total(), 'error' => 'Cannot read file: '.$e->getMessage()];
+            return ['imported' => 0, 'total' => $this->total(), 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()])];
         }
 
         if (! is_array($header) || count($header) < count(self::COLUMNS)) {
-            return ['imported' => 0, 'total' => $this->total(), 'error' => 'Unexpected columns in file.'];
+            return ['imported' => 0, 'total' => $this->total(), 'error' => __('Unexpected columns in file.')];
         }
 
         if ($fresh) {

@@ -1,8 +1,8 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
-    $tabs = ['needs_review' => 'Needs review', 'auto_confirmed' => 'Auto-confirmed', 'confirmed' => 'Confirmed', 'rejected' => 'Rejected', 'no_match' => 'No match'];
-    if (($counts['error'] ?? 0) > 0) { $tabs['error'] = 'Error'; }
-    $tabs['all'] = 'All';
+    $tabs = ['needs_review' => __('Needs review'), 'auto_confirmed' => __('Auto-confirmed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match')];
+    if (($counts['error'] ?? 0) > 0) { $tabs['error'] = __('Error'); }
+    $tabs['all'] = __('All');
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
   @endphp
 
@@ -10,22 +10,22 @@
 
   <div class="mb-6 flex items-end justify-between flex-wrap gap-3">
     <div>
-      <p class="kicker mb-1.5">Quality control</p>
-      <h1 class="font-display text-4xl">Review queue</h1>
+      <p class="kicker mb-1.5">{{ __('Quality control') }}</p>
+      <h1 class="font-display text-4xl">{{ __('Review queue') }}</h1>
     </div>
     <div class="flex items-center gap-3 flex-wrap">
       <label class="flex items-center gap-2 text-sm">
-        <span class="text-muted">Upload:</span>
+        <span class="text-muted">{{ __('Upload:') }}</span>
         <select wire:model.live="batch"
                 class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none max-w-[280px]">
-          <option value="all">All uploads</option>
+          <option value="all">{{ __('All uploads') }}</option>
           @foreach($batches as $b)
             <option value="{{ $b->key }}">{{ \Illuminate\Support\Str::limit($b->label, 32) }} · {{ $b->total }} items</option>
           @endforeach
         </select>
       </label>
       <a href="{{ route('review.export', ['batch' => $batch, 'filter' => $filter]) }}"
-         class="btn btn-ghost btn-sm" title="Export the current view (upload + status filter) to Excel">⬇ Export Excel</a>
+         class="btn btn-ghost btn-sm" title="{{ __('Export the current view (upload + status filter) to Excel') }}">⬇ {{ __('Export Excel') }}</a>
     </div>
   </div>
 
@@ -47,7 +47,7 @@
   @endphp
   <div x-data="{open:true}" class="card p-5 mb-5">
     <button @click="open=!open" class="w-full flex items-center justify-between">
-      <span class="kicker">Report{{ $batch !== 'all' ? ' · this upload' : '' }}</span>
+      <span class="kicker">{{ __('Report') }}{{ $batch !== 'all' ? ' · '.__('this upload') : '' }}</span>
       <span class="text-faint text-sm" x-text="open ? '▾ hide' : '▸ show'"></span>
     </button>
 
@@ -68,7 +68,7 @@
           <div class="absolute inset-0 grid place-items-center text-center">
             <div>
               <div class="font-display text-2xl leading-none tnum">{{ number_format($report['total']) }}</div>
-              <div class="text-faint text-[11px]">items</div>
+              <div class="text-faint text-[11px]">{{ __('items') }}</div>
             </div>
           </div>
         </div>
@@ -81,7 +81,7 @@
               <span class="text-faint tnum ml-auto whitespace-nowrap">{{ $s['count'] }} · {{ $s['pct'] }}%</span>
             </button>
           @empty
-            <p class="text-muted">No items yet.</p>
+            <p class="text-muted">{{ __('No items yet.') }}</p>
           @endforelse
         </div>
       </div>
@@ -89,20 +89,20 @@
       {{-- Good/service + confidence --}}
       <div class="space-y-4">
         <div>
-          <p class="kicker mb-2">Good vs service</p>
+          <p class="kicker mb-2">{{ __('Good vs service') }}</p>
           <div class="flex h-3 rounded-full overflow-hidden bg-line/40">
             <div class="bg-ledger h-full" style="width:{{ $gs ? $report['good']/$gs*100 : 0 }}%"></div>
             <div class="bg-amber h-full" style="width:{{ $gs ? $report['service']/$gs*100 : 0 }}%"></div>
           </div>
           <div class="flex justify-between text-sm mt-1.5">
-            <span class="text-ledger">● Goods <span class="tnum">{{ $report['good'] }}</span></span>
-            <span class="text-amber"><span class="tnum">{{ $report['service'] }}</span> Services ●</span>
+            <span class="text-ledger">● {{ __('Goods') }} <span class="tnum">{{ $report['good'] }}</span></span>
+            <span class="text-amber"><span class="tnum">{{ $report['service'] }}</span> {{ __('Services') }} ●</span>
           </div>
         </div>
         <div>
-          <p class="kicker mb-2">Confidence</p>
+          <p class="kicker mb-2">{{ __('Confidence') }}</p>
           <div class="space-y-1.5">
-            @foreach([['High ≥85%',$cf['high'],'bg-ledger'],['Medium 60–85%',$cf['mid'],'bg-amber'],['Low <60%',$cf['low'],'bg-stamp']] as [$lbl,$val,$bar])
+            @foreach([[__('High ≥85%'),$cf['high'],'bg-ledger'],[__('Medium 60–85%'),$cf['mid'],'bg-amber'],[__('Low <60%'),$cf['low'],'bg-stamp']] as [$lbl,$val,$bar])
               <div class="flex items-center gap-2 text-sm">
                 <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
                 <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$cfTotal*100 }}%"></span></span>
@@ -115,7 +115,7 @@
 
       {{-- Top HS chapters --}}
       <div>
-        <p class="kicker mb-2">Top categories (HS chapter)</p>
+        <p class="kicker mb-2">{{ __('Top categories (HS chapter)') }}</p>
         @forelse($report['chapters'] as $ch)
           <div class="flex items-center gap-2 text-sm mb-1.5">
             <span class="w-28 shrink-0 truncate">{{ $chName[$ch->chapter] ?? ('Ch '.$ch->chapter) }}</span>
@@ -123,7 +123,7 @@
             <span class="tnum text-faint w-8 text-right">{{ $ch->c }}</span>
           </div>
         @empty
-          <p class="text-muted text-sm">No classified codes yet.</p>
+          <p class="text-muted text-sm">{{ __('No classified codes yet.') }}</p>
         @endforelse
       </div>
     </div>
@@ -142,15 +142,15 @@
   {{-- Bulk actions for a single upload --}}
   @if($batch !== 'all')
     <div class="flex flex-wrap items-center gap-2 mb-5">
-      <span class="text-sm text-muted">This upload:</span>
+      <span class="text-sm text-muted">{{ __('This upload:') }}</span>
       <button wire:click="confirmAll" wire:confirm="Confirm all {{ $pendingCount }} pending items in this upload?"
               @disabled($pendingCount === 0)
-              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✓ Confirm all ({{ $pendingCount }})</button>
+              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✓ {{ __('Confirm all') }} ({{ $pendingCount }})</button>
       <button wire:click="rejectAll" wire:confirm="Reject all {{ $pendingCount }} pending items in this upload?"
               @disabled($pendingCount === 0)
-              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✕ Reject all</button>
+              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✕ {{ __('Reject all') }}</button>
       <button wire:click="deleteBatch" wire:confirm="Delete this entire upload and all its items? This cannot be undone."
-              class="btn btn-ghost btn-sm text-stamp ml-auto">🗑 Delete upload</button>
+              class="btn btn-ghost btn-sm text-stamp ml-auto">🗑 {{ __('Delete upload') }}</button>
     </div>
   @endif
 
@@ -160,10 +160,10 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
-            <span class="font-mono text-sm">{{ $item->matched_code ?? 'no match' }}</span>
+            <span class="font-mono text-sm">{{ $item->matched_code ?? __('no match') }}</span>
             <span class="text-faint text-xs tnum">{{ $item->confidence !== null ? number_format($item->confidence*100,0).'%' : '' }}</span>
             @if($batch === 'all' && $item->batch)
-              <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? 'Earlier import', 26) }}</span>
+              <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
             @endif
           </div>
           <p class="font-medium">{{ $item->source_text }}</p>
@@ -185,14 +185,14 @@
               <select x-model="code"
                       class="w-full px-2.5 py-1.5 rounded-lg text-xs border hair bg-surface focus:border-ink outline-none mb-2">
                 @if(!$hasMatched && $item->matched_code)
-                  <option value="{{ $item->matched_code }}">{{ $item->matched_code }} — AI pick</option>
+                  <option value="{{ $item->matched_code }}">{{ $item->matched_code }} — {{ __('AI pick') }}</option>
                 @endif
                 @foreach($cands as $cand)
                   <option value="{{ $cand['code'] }}">{{ $cand['code'] }} · {{ \Illuminate\Support\Str::limit($cand['name'] ?? '', 44) }}{{ (string) ($cand['code']) === (string) $item->matched_code ? '  ← AI' : '' }}</option>
                 @endforeach
               </select>
               <div class="flex gap-2 justify-end">
-                <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ Reject</button>
+                <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ {{ __('Reject') }}</button>
                 <button x-on:click="$wire.confirmWith({{ $item->id }}, code)"
                         class="btn btn-ink btn-sm"
                         x-text="code === @js((string) $item->matched_code) ? '✓ Confirm' : '✓ Save fix'"></button>
@@ -204,7 +204,7 @@
         </div>
       </div>
     @empty
-      <div class="card-flat p-10 text-center text-muted">Nothing here. Classify some items first.</div>
+      <div class="card-flat p-10 text-center text-muted">{{ __('Nothing here. Classify some items first.') }}</div>
     @endforelse
   </div>
 

@@ -31,7 +31,7 @@ class UploadInvoices extends Component
 
         $ext = strtolower((string) $this->file->getClientOriginalExtension());
         if (! in_array($ext, ['xlsx', 'xls', 'csv'], true)) {
-            $this->addError('file', 'Please upload a .xlsx, .xls or .csv file.');
+            $this->addError('file', __('Please upload a .xlsx, .xls or .csv file.'));
             $this->reset('file');
 
             return;

@@ -40,9 +40,14 @@ class ReportProblem extends Component
 
     public function submit(): void
     {
-        $data = $this->validate([
-            'message' => ['required', 'string', 'min:3', 'max:5000'],
-        ]);
+        $data = $this->validate(
+            ['message' => ['required', 'string', 'min:3', 'max:5000']],
+            [
+                'message.required' => __('Please describe the problem.'),
+                'message.min' => __('Please add a bit more detail.'),
+                'message.max' => __('Message is too long (max :max characters).'),
+            ],
+        );
 
         $report = BugReport::create([
             'user_id' => auth()->id(),
