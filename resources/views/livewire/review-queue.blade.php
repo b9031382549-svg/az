@@ -13,16 +13,20 @@
       <p class="kicker mb-1.5">Quality control</p>
       <h1 class="font-display text-4xl">Review queue</h1>
     </div>
-    <label class="flex items-center gap-2 text-sm">
-      <span class="text-muted">Upload:</span>
-      <select wire:model.live="batch"
-              class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none max-w-[280px]">
-        <option value="all">All uploads</option>
-        @foreach($batches as $b)
-          <option value="{{ $b->key }}">{{ \Illuminate\Support\Str::limit($b->label, 32) }} · {{ $b->total }} items</option>
-        @endforeach
-      </select>
-    </label>
+    <div class="flex items-center gap-3 flex-wrap">
+      <label class="flex items-center gap-2 text-sm">
+        <span class="text-muted">Upload:</span>
+        <select wire:model.live="batch"
+                class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none max-w-[280px]">
+          <option value="all">All uploads</option>
+          @foreach($batches as $b)
+            <option value="{{ $b->key }}">{{ \Illuminate\Support\Str::limit($b->label, 32) }} · {{ $b->total }} items</option>
+          @endforeach
+        </select>
+      </label>
+      <a href="{{ route('review.export', ['batch' => $batch, 'filter' => $filter]) }}"
+         class="btn btn-ghost btn-sm" title="Export the current view (upload + status filter) to Excel">⬇ Export Excel</a>
+    </div>
   </div>
 
   {{-- Distribution report --}}
@@ -170,10 +174,30 @@
             <p class="text-faint text-xs mt-1">{{ Str::limit($item->explanation, 130) }}</p>
           @endif
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          @if(in_array($item->status, ['needs_review','auto_confirmed']))
-            <button wire:click="confirm({{ $item->id }})" class="btn btn-ghost btn-sm">✓ Confirm</button>
-            <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ Reject</button>
+        <div class="shrink-0 w-full sm:w-[340px]">
+          @if(in_array($item->status, ['needs_review','auto_confirmed','confirmed']))
+            @php
+              $cands = collect($item->candidates ?? []);
+              $codes = $cands->pluck('code')->map(fn ($c) => (string) $c)->all();
+              $hasMatched = $item->matched_code && in_array((string) $item->matched_code, $codes, true);
+            @endphp
+            <div x-data="{ code: @js((string) $item->matched_code) }">
+              <select x-model="code"
+                      class="w-full px-2.5 py-1.5 rounded-lg text-xs border hair bg-surface focus:border-ink outline-none mb-2">
+                @if(!$hasMatched && $item->matched_code)
+                  <option value="{{ $item->matched_code }}">{{ $item->matched_code }} — AI pick</option>
+                @endif
+                @foreach($cands as $cand)
+                  <option value="{{ $cand['code'] }}">{{ $cand['code'] }} · {{ \Illuminate\Support\Str::limit($cand['name'] ?? '', 44) }}{{ (string) ($cand['code']) === (string) $item->matched_code ? '  ← AI' : '' }}</option>
+                @endforeach
+              </select>
+              <div class="flex gap-2 justify-end">
+                <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ Reject</button>
+                <button x-on:click="$wire.confirmWith({{ $item->id }}, code)"
+                        class="btn btn-ink btn-sm"
+                        x-text="code === @js((string) $item->matched_code) ? '✓ Confirm' : '✓ Save fix'"></button>
+              </div>
+            </div>
           @else
             <span class="text-xs text-faint">{{ str_replace('_',' ',$item->status) }}</span>
           @endif

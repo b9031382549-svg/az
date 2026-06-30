@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\ReviewExportController;
 use App\Livewire\AskAi;
 use App\Livewire\Catalog;
 use App\Livewire\Classify;
@@ -31,6 +32,7 @@ Route::middleware('auth')->group(function () {
     // Task 2 — goods/services classifier
     Route::get('/classify', Classify::class)->name('classify');
     Route::get('/review', ReviewQueue::class)->name('review');
+    Route::get('/review/export', ReviewExportController::class)->name('review.export');
     Route::get('/catalog', Catalog::class)->name('catalog');
 
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');

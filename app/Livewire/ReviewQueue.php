@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\CatalogCode;
 use App\Models\Classification;
 use App\Models\ImportBatch;
 use App\Support\Audit;
@@ -47,10 +48,57 @@ class ReviewQueue extends Component
         $this->resetPage();
     }
 
-    public function confirm(int $id): void
+    /**
+     * Confirm an item with the chosen candidate code — the reviewer can keep the
+     * model's pick or correct it to another candidate the model chose from.
+     */
+    public function confirmWith(int $id, string $code): void
     {
-        Classification::whereKey($id)->update(['status' => 'confirmed']);
-        Audit::log('classification.confirm', ['id' => $id]);
+        $item = Classification::find($id);
+        if (! $item) {
+            return;
+        }
+
+        // Only allow codes the model actually considered for THIS item (its
+        // stored candidates, plus its own current pick) — never an arbitrary code.
+        $allowed = collect($item->candidates ?? [])
+            ->pluck('code')
+            ->push($item->matched_code)
+            ->filter()
+            ->map(fn ($c) => (string) $c)
+            ->all();
+
+        if (! in_array($code, $allowed, true)) {
+            return;
+        }
+
+        $cand = CatalogCode::where('code', $code)->first();
+        if (! $cand) {
+            return;
+        }
+
+        $was = $item->matched_code;
+        $corrected = (string) $was !== $code;
+
+        $update = [
+            'matched_code' => $cand->code,
+            'catalog_id' => $cand->id,
+            'kind' => $cand->kind, // authoritative (99 => service)
+            'status' => 'confirmed',
+        ];
+        if ($corrected) {
+            // The model's confidence/explanation were for the OLD pick — drop them
+            // so the export and report don't attribute them to the corrected code.
+            $update['confidence'] = null;
+            $update['explanation'] = 'Manually corrected by reviewer (was '.$was.').';
+        }
+        $item->update($update);
+
+        Audit::log(
+            $corrected ? 'classification.corrected' : 'classification.confirm',
+            ['id' => $id, 'code' => $code, 'was' => $was],
+            $item,
+        );
     }
 
     public function reject(int $id): void
