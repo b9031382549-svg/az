@@ -16,7 +16,8 @@ use Illuminate\Console\Command;
 class TranslateItems extends Command
 {
     protected $signature = 'items:translate
-        {--limit=0 : max distinct items to translate this run (0 = all)}';
+        {--limit=0 : max distinct items to translate this run (0 = all)}
+        {--fresh : re-translate every item, overwriting existing translations}';
 
     protected $description = 'Backfill uploaded-item display translations (en/ru) into item_translations';
 
@@ -35,8 +36,12 @@ class TranslateItems extends Command
             });
         $this->info("source_hash backfilled on {$backfilled} classification(s).");
 
-        // 2) Distinct items still missing a complete translation.
-        $hashesDone = ItemTranslation::query()
+        // 2) Distinct items to translate. With --fresh, every item is re-done
+        //    (overwriting existing translations); otherwise only items that lack
+        //    a complete (en + ru) dictionary entry.
+        $fresh = (bool) $this->option('fresh');
+
+        $hashesDone = $fresh ? collect() : ItemTranslation::query()
             ->whereNotNull('en')->where('en', '!=', '')
             ->whereNotNull('ru')->where('ru', '!=', '')
             ->pluck('source_hash')
@@ -72,7 +77,7 @@ class TranslateItems extends Command
         $ok = 0;
         $failed = 0;
         foreach ($items as $text) {
-            $row = $translator->ensure($text);
+            $row = $translator->ensure($text, $fresh);
             if ($row && ($row->en ?? '') !== '' && ($row->ru ?? '') !== '') {
                 $ok++;
             } else {

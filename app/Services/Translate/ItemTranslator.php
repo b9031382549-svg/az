@@ -23,7 +23,7 @@ class ItemTranslator
      * languages is returned untouched — no LLM call. Concurrency-safe via the
      * unique source_hash (a racing insert resolves to the same row).
      */
-    public function ensure(string $text): ?ItemTranslation
+    public function ensure(string $text, bool $force = false): ?ItemTranslation
     {
         $text = trim($text);
         if ($text === '') {
@@ -37,8 +37,9 @@ class ItemTranslator
             ['source_text' => $text],
         );
 
-        // Already translated (both languages present) — nothing to do.
-        if (($row->en ?? '') !== '' && ($row->ru ?? '') !== '') {
+        // Already translated (both languages present) — nothing to do, unless a
+        // re-translation is forced (e.g. to replace poor earlier translations).
+        if (! $force && ($row->en ?? '') !== '' && ($row->ru ?? '') !== '') {
             return $row;
         }
 
@@ -74,7 +75,9 @@ class ItemTranslator
             ['role' => 'user', 'content' => $text],
         ];
 
-        $response = $this->llm->jsonWithUsage($messages);
+        $response = $this->llm->jsonWithUsage($messages, [
+            'model' => (string) config('classify.translate_model'),
+        ]);
 
         LlmLog::record(
             'translate_item', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
@@ -95,9 +98,17 @@ class ItemTranslator
         numbers, sizes, units and barcodes.
 
         Rules:
-        - Translate the product/service words faithfully and concisely.
-        - KEEP brand names, model/article numbers, sizes, units and codes as-is
-          (transliterate a brand only if that is the conventional spelling).
+        - Translate EVERY descriptive Azerbaijani word: the product type, flavour,
+          ingredient and attribute. Examples: çiyələkli = strawberry / клубничный;
+          kişmişli = with raisins / с изюмом; küncütlü = with sesame / с кунжутом;
+          ballı = with honey / с мёдом; çörək = bread; bulka = bun / булочка;
+          çörəkçi = bakery / пекарня.
+        - Keep UNCHANGED only genuine proper-noun brand names and alphanumeric
+          codes/model numbers, plus sizes and units (transliterate a brand only if
+          that is its conventional spelling).
+        - If you do not know a word, transliterate it literally — NEVER replace it
+          with a different ingredient, flavour or meaning, and never leave a plain
+          Azerbaijani word untranslated.
         - Do not add explanations, notes or extra words.
         - If the item is already in the target language, return it cleaned up.
 
