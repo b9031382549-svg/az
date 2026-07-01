@@ -95,17 +95,25 @@ class ItemTranslator
         return <<<'PROMPT'
         You translate a single e-invoice line item from Azerbaijani into English
         and Russian, for display in a UI. The text may contain brand names, model
-        numbers, sizes, units and barcodes.
+        numbers, sizes, units and barcodes, and is often noisy or half-English.
 
         Rules:
-        - Translate EVERY descriptive Azerbaijani word: the product type, flavour,
-          ingredient and attribute. Examples: çiyələkli = strawberry / клубничный;
-          kişmişli = with raisins / с изюмом; küncütlü = with sesame / с кунжутом;
-          ballı = with honey / с мёдом; çörək = bread; bulka = bun / булочка;
-          çörəkçi = bakery / пекарня.
-        - Keep UNCHANGED only genuine proper-noun brand names and alphanumeric
-          codes/model numbers, plus sizes and units (transliterate a brand only if
-          that is its conventional spelling).
+        - Translate EVERY descriptive Azerbaijani word: product type, flavour,
+          ingredient and attribute — even when the rest of the line is already in
+          English and even when the word sits right next to a brand. Examples:
+          çiyələkli = strawberry / клубничный; kişmişli = with raisins / с изюмом;
+          küncütlü = with sesame / с кунжутом; fındıqlı = with hazelnut / с фундуком;
+          ballı = with honey / с мёдом; dənli = multigrain / со злаками;
+          pəhriz = diet / диетический; yulaflı = with oats / с овсом;
+          çörək = bread; bulka = bun / булочка; çörəkçi = bakery / пекарня.
+        - A BRAND is a distinctive proper name (e.g. Delifrance, "Yumo Yum", Milla).
+          A common word is NOT a brand just because it is capitalised, romanised or
+          standing next to a real brand — translate it and keep ONLY the distinctive
+          brand token(s). E.g. "ÇÖRƏKÇİ YUMO YUM ... küncütlü" -> "YUMO YUM bakery ...
+          with sesame" (çörəkçi is a word; YUMO YUM is the brand).
+        - Keep UNCHANGED only genuine proper-noun brands and alphanumeric codes /
+          model numbers; keep sizes and units (transliterate a brand only if that
+          is its conventional spelling).
         - If you do not know a word, transliterate it literally — NEVER replace it
           with a different ingredient, flavour or meaning, and never leave a plain
           Azerbaijani word untranslated.

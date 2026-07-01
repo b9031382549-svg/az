@@ -261,7 +261,9 @@ class ClassifierService
                 ['role' => 'user', 'content' => $text],
             ];
 
-            $response = $this->llm->jsonWithUsage($messages);
+            $response = $this->llm->jsonWithUsage($messages, [
+                'model' => (string) config('classify.expand_model'),
+            ]);
 
             LlmLog::record(
                 'expand', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
