@@ -36,7 +36,7 @@ class ReviewExportController extends Controller
         $batchOk = $batch !== 'all' && Str::isUuid($batch); // request_id/batch are uuids
 
         $rows = Classification::query()
-            ->with('code:id,name')
+            ->with(['code:id,name,name_en,name_ru', 'translation:source_hash,en,ru'])
             ->when($batchOk, fn ($q) => $q->where('batch', $batch))
             ->when($filter !== 'all', fn ($q) => $q->where('status', $filter))
             ->latest()

@@ -166,9 +166,9 @@
               <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
             @endif
           </div>
-          <p class="font-medium">{{ $item->source_text }}</p>
+          <p class="font-medium">{{ $item->localizedSourceText() }}</p>
           @if($item->code)
-            <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->code->name, 110) }}</p>
+            <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->code->localizedName(), 110) }}</p>
           @endif
           @if($item->explanation)
             <p class="text-faint text-xs mt-1">{{ Str::limit($item->explanation, 130) }}</p>
@@ -188,14 +188,14 @@
                   <option value="{{ $item->matched_code }}">{{ $item->matched_code }} — {{ __('AI pick') }}</option>
                 @endif
                 @foreach($cands as $cand)
-                  <option value="{{ $cand['code'] }}">{{ $cand['code'] }} · {{ \Illuminate\Support\Str::limit($cand['name'] ?? '', 44) }}{{ (string) ($cand['code']) === (string) $item->matched_code ? '  ← AI' : '' }}</option>
+                  <option value="{{ $cand['code'] }}">{{ $cand['code'] }} · {{ \Illuminate\Support\Str::limit($catalogNames[$cand['code']] ?? ($cand['name'] ?? ''), 44) }}{{ (string) ($cand['code']) === (string) $item->matched_code ? '  ← AI' : '' }}</option>
                 @endforeach
               </select>
               <div class="flex gap-2 justify-end">
                 <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ {{ __('Reject') }}</button>
                 <button x-on:click="$wire.confirmWith({{ $item->id }}, code)"
                         class="btn btn-ink btn-sm"
-                        x-text="code === @js((string) $item->matched_code) ? '✓ Confirm' : '✓ Save fix'"></button>
+                        x-text="'✓ ' + (code === @js((string) $item->matched_code) ? @js(__('Confirm')) : @js(__('Save fix')))"></button>
               </div>
             </div>
           @else

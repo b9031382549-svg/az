@@ -35,7 +35,7 @@
             <tr wire:key="cat-{{ $row->id }}" class="border-b hair last:border-0 hover:bg-paper/40">
               <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $row->code }}</td>
               <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($row->kind) }}">{{ $row->kind }}</span></td>
-              <td class="px-4 py-3 text-muted max-w-[640px]">{{ Str::limit($row->name, 140) }}</td>
+              <td class="px-4 py-3 text-muted max-w-[640px]">{{ Str::limit($row->localizedName(), 140) }}</td>
               <td class="px-4 py-3 text-faint whitespace-nowrap">{{ $row->unit ?? '—' }}</td>
             </tr>
           @empty
