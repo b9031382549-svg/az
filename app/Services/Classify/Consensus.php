@@ -39,13 +39,24 @@ class Consensus
         }
 
         $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
-        $results = $item->results()->get();
+        $shadow = (array) config('classify.mechanisms.shadow', []);
 
-        if ($results->count() < count($enabled)) {
-            return; // stay 'pending' until all mechanisms report
+        // Shadow mechanisms run and are stored, but only the authoritative ones
+        // drive the resolution — so a new mechanism can be measured before it
+        // starts routing items to humans.
+        $authoritative = array_values(array_diff($enabled, $shadow));
+        if ($authoritative === []) {
+            $authoritative = $enabled; // never shadow everything
         }
 
-        $item->update($this->resolve($results));
+        $results = $item->results()->get();
+        $authResults = $results->whereIn('mechanism', $authoritative)->values();
+
+        if ($authResults->count() < count($authoritative)) {
+            return; // stay 'pending' until every authoritative mechanism reports
+        }
+
+        $item->update($this->resolve($authResults));
     }
 
     /**

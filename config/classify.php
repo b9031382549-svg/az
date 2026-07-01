@@ -8,7 +8,15 @@ return [
     'mechanisms' => [
         'enabled' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector')),
+            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker')),
+        ))),
+        // Mechanisms that RUN and are stored but do NOT drive the consensus yet —
+        // so a new mechanism can be measured/calibrated (broker:eval, shadow) on
+        // real data before it becomes authoritative. Clear it to make broker
+        // authoritative: CLASSIFY_SHADOW_MECHANISMS=
+        'shadow' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('CLASSIFY_SHADOW_MECHANISMS', 'broker')),
         ))),
     ],
 

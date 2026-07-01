@@ -14,6 +14,44 @@ class ConsensusTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Existing cases test pure all-must-report behaviour; shadow has its own
+        // tests below.
+        config()->set('classify.mechanisms.shadow', []);
+    }
+
+    public function test_shadow_mechanism_is_stored_but_does_not_drive_consensus(): void
+    {
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker']);
+        config()->set('classify.mechanisms.shadow', ['broker']);
+
+        $item = $this->item();
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => 'C2', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        (new Consensus)->finalize($item);
+
+        // Broker (shadow) disagreement is ignored — vector alone drives it.
+        $this->assertSame('agreed', $item->fresh()->resolution);
+        $this->assertSame('C1', $item->fresh()->final_code);
+    }
+
+    public function test_without_shadow_the_same_disagreement_is_a_conflict(): void
+    {
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker']);
+        config()->set('classify.mechanisms.shadow', []);
+
+        $item = $this->item();
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => 'C2', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        (new Consensus)->finalize($item);
+
+        $this->assertSame('conflict', $item->fresh()->resolution);
+    }
+
     private function makeResult(?string $code, string $status = 'auto_confirmed', ?int $catalogId = 1): ClassificationResult
     {
         return new ClassificationResult([
