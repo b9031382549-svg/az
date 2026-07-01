@@ -10,13 +10,13 @@ return [
             'trim',
             explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker')),
         ))),
-        // Mechanisms that RUN and are stored but do NOT drive the consensus yet —
-        // so a new mechanism can be measured/calibrated (broker:eval, shadow) on
-        // real data before it becomes authoritative. Clear it to make broker
-        // authoritative: CLASSIFY_SHADOW_MECHANISMS=
+        // Mechanisms that RUN and are stored but do NOT drive the consensus — for
+        // measuring/calibrating a mechanism before it becomes authoritative. Now
+        // empty: the broker is AUTHORITATIVE (vector↔broker disagreement becomes a
+        // conflict routed to a human). Re-shadow it with CLASSIFY_SHADOW_MECHANISMS=broker.
         'shadow' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('CLASSIFY_SHADOW_MECHANISMS', 'broker')),
+            explode(',', (string) env('CLASSIFY_SHADOW_MECHANISMS', '')),
         ))),
     ],
 
