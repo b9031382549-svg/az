@@ -63,6 +63,9 @@ jobs:
             git pull --ff-only origin main
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml run --rm app php artisan migrate --force
+            # Rebuild the rubricator tree from the catalog (deterministic, idempotent,
+            # titles need no LLM). Required by the broker mechanism.
+            docker compose -f docker-compose.prod.yml run --rm app php artisan data:build-rubricator
             docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
             # Horizon 5 self-serves its dashboard assets; the worker container is
