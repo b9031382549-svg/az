@@ -16,7 +16,10 @@ return new class extends Migration
         });
 
         // Trigram index so synonyms participate in fast ILIKE / similarity search.
-        DB::statement('CREATE INDEX catalog_synonyms_trgm ON catalog USING gin (synonyms gin_trgm_ops)');
+        // Postgres-only; skip on sqlite (tests).
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('CREATE INDEX catalog_synonyms_trgm ON catalog USING gin (synonyms gin_trgm_ops)');
+        }
     }
 
     public function down(): void

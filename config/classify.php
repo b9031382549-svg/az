@@ -1,6 +1,17 @@
 <?php
 
 return [
+    // Independent search mechanisms run in parallel per item; their results are
+    // stored side by side (classification_results) and reconciled into a
+    // consensus. 'enabled' is the active set, in priority order. New mechanisms
+    // are wired in AppServiceProvider's MechanismRegistry binding.
+    'mechanisms' => [
+        'enabled' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector')),
+        ))),
+    ],
+
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 

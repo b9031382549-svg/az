@@ -26,13 +26,18 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-        DB::statement('ALTER TABLE catalog ADD COLUMN embedding vector(1024)');
+        // pgvector + pg_trgm are Postgres-only; skip on sqlite (tests). The
+        // embedding column and trigram/HNSW indexes back retrieval, which is
+        // only exercised against Postgres.
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+            DB::statement('ALTER TABLE catalog ADD COLUMN embedding vector(1024)');
 
-        // Lexical candidate generation (brands, specs, exact tokens).
-        DB::statement('CREATE INDEX catalog_name_trgm ON catalog USING gin (name gin_trgm_ops)');
-        // Semantic candidate generation (cosine distance).
-        DB::statement('CREATE INDEX catalog_embedding_hnsw ON catalog USING hnsw (embedding vector_cosine_ops)');
+            // Lexical candidate generation (brands, specs, exact tokens).
+            DB::statement('CREATE INDEX catalog_name_trgm ON catalog USING gin (name gin_trgm_ops)');
+            // Semantic candidate generation (cosine distance).
+            DB::statement('CREATE INDEX catalog_embedding_hnsw ON catalog USING hnsw (embedding vector_cosine_ops)');
+        }
     }
 
     public function down(): void

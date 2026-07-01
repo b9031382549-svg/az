@@ -14,6 +14,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return; // Postgres role/grants; skip on sqlite (tests).
+        }
+
         $user = (string) config('database.connections.pgsql_ro.username');
         $pass = (string) config('database.connections.pgsql_ro.password');
         $db = (string) config('database.connections.pgsql.database');
@@ -50,6 +54,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         $user = (string) config('database.connections.pgsql_ro.username');
         $db = (string) config('database.connections.pgsql.database');
         $ident = $this->quoteIdent($user);
