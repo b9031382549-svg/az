@@ -359,28 +359,44 @@ class ClassifierService
     private function expandPrompt(): string
     {
         return <<<'PROMPT'
-        You normalize a noisy e-invoice line item into a canonical product or
-        service description for catalogue lookup. The item is usually Azerbaijani
-        and may contain brand names, article numbers, sizes and packaging.
+        You normalize a noisy e-invoice line item into a SHORT canonical product
+        or service description for XİF MN customs-catalogue vector lookup. The
+        item is usually Azerbaijani and may contain brand names, article numbers,
+        sizes and packaging.
 
-        Output what the item fundamentally IS — its MAIN product noun + purpose —
-        in 2-6 words IN AZERBAIJANI. Drop brand names, article numbers and sizes.
+        Output IN AZERBAIJANI, 2-6 words: the CONCRETE product noun PLUS the
+        characteristics that change WHAT the item IS for classification.
 
-        Important:
-        - Return the HEAD product, not an ingredient, flavour, sauce or material.
-          "fruit cake" -> cake; "fish in tomato sauce" -> canned fish (not sauce).
+        Keep, when present:
+        - form / state: konserv, dondurulmuş, nəm, quru, steril, toz, maye,
+          konsentrat;
+        - the functional type that distinguishes the customs category, e.g.
+          antibakterial, tibbi, uşaq, birdəfəlik.
+        Always drop: brand names, article/barcode numbers, sizes, weights,
+        quantities, package counts, and flavour-only words that do not change the
+        category.
+
+        Rules:
+        - Keep the CONCRETE head noun — do NOT abstract up to a broad category
+          word when a concrete noun exists: keep "biskvit ruleti" / "tort" (NOT
+          "şirniyyat"), "balıq konservi" (NOT "ərzaq"), "tibbi şpris" (NOT "tibbi
+          alət").
+        - Classify by what the item IS (its function / purpose), NOT by the
+          material it is made of.
         - Resolve compound words by their WHOLE meaning, not a sub-word.
           "çay dəsmalı" is a tea TOWEL -> "mətbəx dəsmalı" (NOT tea/çay).
-          "qrilyaj" is a grillage SWEET -> "şirniyyat" (NOT a grill/stove).
+          "qrilyaj" is a grillage SWEET -> "şirniyyat qrilyaj" (NOT a grill/stove).
         - Expand obvious abbreviations: "cath" -> "kateter".
 
         Examples:
         - "5337 ZEWA DELUXE BRT 8 3PLY CAMOMILE" -> "tualet kağızı"
-        - "Şpris 5ml 23G BLİSSET" -> "tibbi şpris"
-        - "OWOM ÇAY DƏSMALI VAF" -> "mətbəx dəsmalı"
-        - "OVEN MEYVELI TORTU" -> "tort şirniyyat"
+        - "Şpris 5ml 23G rezin porşenli BLİSSET" -> "tibbi şpris"
+        - "OWOM ÇAY DƏSMALI VAF 40X70" -> "mətbəx dəsmalı"
+        - "OVEN MEYVELI TORTU 450qr" -> "meyvəli tort"
+        - "Yyldyz vanil şokoladlı biskvit ruleti 40qr*45" -> "biskvit ruleti"
         - "SARDINA tomatda 240qr" -> "balıq konservi"
-        - "Su (Pizza Hut)" -> "içməli su"
+        - "Nəm salfet antibakterial pantenol №15" -> "antibakterial nəm salfet"
+        - "Dondurulmuş qızıl balıq filesi 1kq" -> "dondurulmuş balıq filesi"
 
         Respond with strict JSON only: {"description": "..."}
         PROMPT;
