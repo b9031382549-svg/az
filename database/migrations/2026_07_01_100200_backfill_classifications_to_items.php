@@ -12,6 +12,13 @@ use Illuminate\Support\Facades\Schema;
 // old table is empty (e.g. fresh sqlite test DB).
 return new class extends Migration
 {
+    // Run OUTSIDE a transaction: a large catalogue of legacy rows inserted with
+    // FK constraints in one transaction exhausts Postgres' lock table
+    // ("out of shared memory / max_locks_per_transaction"). Each chunk's writes
+    // auto-commit instead; safe because the backfill is idempotent (firstOrCreate
+    // / updateOrCreate), so a re-run resumes cleanly.
+    public $withinTransaction = false;
+
     /** old status => parent resolution */
     private array $resolution = [
         'auto_confirmed' => 'agreed',
