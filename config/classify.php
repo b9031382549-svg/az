@@ -21,9 +21,16 @@ return [
     // use the fallback model directly.
     'two_tier' => (bool) env('CLASSIFY_TWO_TIER', true),
 
-    // Normalize a noisy item into a canonical product description (via the cheap
-    // model) before retrieval, so branded/coded names still find candidates.
+    // Normalize a noisy item into a short canonical product description before
+    // retrieval, so branded/coded/long names still find candidates.
     'expand_query' => (bool) env('CLASSIFY_EXPAND_QUERY', true),
+
+    // Model for the expansion (query-normalization) step. This runs on EVERY
+    // item, so it is a per-item cost. gpt-4o-mini mis-reads mixed AZ/RU noisy
+    // names (garbled transliterations, wrong sense) — and the short canonical
+    // name it produces is exactly what the vector search matches on — so
+    // expansion defaults to the stronger model. Override per environment.
+    'expand_model' => (string) env('CLASSIFY_EXPAND_MODEL', 'openai/gpt-4o'),
 
     // Translate uploaded item names (en/ru) for display, caching each in the
     // item_translations dictionary (translated once, reused everywhere). Display
