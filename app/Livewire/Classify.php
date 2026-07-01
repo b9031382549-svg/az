@@ -2,9 +2,11 @@
 
 namespace App\Livewire;
 
-use App\Jobs\ClassifyItemJob;
-use App\Models\Classification;
+use App\Jobs\ClassifyMechanismJob;
+use App\Jobs\TranslateItemJob;
+use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
+use App\Models\ItemTranslation;
 use App\Models\LlmUsage;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
@@ -52,9 +54,9 @@ class Classify extends Component
     }
 
     /**
-     * Queue the textarea items for background classification (one job each) and
-     * hand off to the live progress panel — so the request returns immediately
-     * instead of blocking on the LLM for every line.
+     * Queue the textarea items for background classification and hand off to the
+     * live progress panel — the request returns immediately instead of blocking
+     * on the LLM for every line.
      */
     public function run(): void
     {
@@ -78,16 +80,13 @@ class Classify extends Component
             'item_count' => $lines->count(),
         ]);
 
-        foreach ($lines as $line) {
-            ClassifyItemJob::dispatch($line, $batch);
-        }
-
-        Audit::log('classify.manual', ['count' => $lines->count(), 'batch' => $batch]);
+        $count = $this->enqueue($lines->all(), $batch);
+        Audit::log('classify.manual', ['count' => $count, 'batch' => $batch]);
 
         $this->queued = [
             'batch' => $batch,
-            'count' => $lines->count(),
-            'total' => $lines->count(),
+            'count' => $count,
+            'total' => $count,
             'source' => 'manual',
             'label' => 'Manual entry',
         ];
@@ -111,9 +110,8 @@ class Classify extends Component
         set_time_limit(110);
 
         $path = $this->file->getRealPath();
-        // Parse once (don't load the workbook twice) and de-duplicate: the job is
-        // idempotent per (batch, source_text), so duplicate rows would never be
-        // re-created and the progress bar would never reach 100%.
+        // Parse once and de-duplicate up front (items are also de-duped per
+        // (batch, source_hash) when the parent rows are created).
         $items = array_values(array_unique($parser->parse($path, self::FILE_LIMIT)));
         $total = count($items);
 
@@ -130,34 +128,76 @@ class Classify extends Component
             'label' => $label,
             'source' => 'file',
             'user_id' => auth()->id(),
-            'item_count' => count($items),
+            'item_count' => $total,
         ]);
 
-        // Push jobs in bulk chunks instead of one dispatch() per row, so enqueuing
-        // thousands of items is a handful of round-trips, not thousands.
-        foreach (array_chunk($items, self::DISPATCH_CHUNK) as $chunk) {
-            Queue::bulk(
-                array_map(fn ($text) => new ClassifyItemJob($text, $batch), $chunk),
-                '',
-                'default',
-            );
-        }
-
+        $count = $this->enqueue($items, $batch);
         Audit::log('classify.file_upload', [
             'file' => $label,
-            'queued' => count($items),
+            'queued' => $count,
             'total' => $total,
             'batch' => $batch,
         ]);
 
         $this->queued = [
             'batch' => $batch,
-            'count' => count($items),
+            'count' => $count,
             'total' => $total,
             'source' => 'file',
             'label' => $label,
         ];
         $this->reset('file');
+    }
+
+    /**
+     * Create one parent ClassificationItem per unique (batch, source_hash) and
+     * fan out a ClassifyMechanismJob per enabled mechanism, plus one background
+     * translation job per item. Returns the number of distinct items enqueued.
+     *
+     * @param  array<int, string>  $texts
+     */
+    private function enqueue(array $texts, string $batch): int
+    {
+        $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
+        $now = now();
+
+        // Parent rows in bulk. keyBy(source_hash) so a single upsert never
+        // targets the same (batch, source_hash) row twice.
+        $rows = collect($texts)
+            ->map(fn ($t) => [
+                'batch' => $batch,
+                'source_hash' => ItemTranslation::hashFor($t),
+                'source_text' => $t,
+                'resolution' => 'pending',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])
+            ->keyBy('source_hash')
+            ->values()
+            ->all();
+
+        ClassificationItem::upsert($rows, ['batch', 'source_hash'], ['source_text']);
+
+        $ids = ClassificationItem::where('batch', $batch)->pluck('id');
+
+        $jobs = [];
+        foreach ($ids as $id) {
+            foreach ($enabled as $mechanism) {
+                $jobs[] = new ClassifyMechanismJob((int) $id, (string) $mechanism);
+            }
+        }
+        foreach (array_chunk($jobs, self::DISPATCH_CHUNK) as $chunk) {
+            Queue::bulk($chunk, '', 'default');
+        }
+
+        if (config('classify.translate_items', true)) {
+            $translate = collect($texts)->unique()->map(fn ($t) => new TranslateItemJob($t))->all();
+            foreach (array_chunk($translate, self::DISPATCH_CHUNK) as $chunk) {
+                Queue::bulk($chunk, '', 'default');
+            }
+        }
+
+        return $ids->count();
     }
 
     /** Dismiss the progress panel and start a fresh classification. */
@@ -172,14 +212,14 @@ class Classify extends Component
 
         if ($this->queued) {
             $batch = $this->queued['batch'];
-            $done = Classification::where('batch', $batch)->count();
+            $done = ClassificationItem::where('batch', $batch)->where('resolution', '!=', 'pending')->count();
 
             $progress = [
                 'done' => $done,
                 'count' => (int) $this->queued['count'],
                 'complete' => $done >= (int) $this->queued['count'],
-                'rows' => Classification::where('batch', $batch)
-                    ->with(['code', 'translation'])
+                'rows' => ClassificationItem::where('batch', $batch)
+                    ->with(['finalCode', 'translation', 'results'])
                     ->latest()
                     ->limit(50)
                     ->get(),
@@ -190,9 +230,9 @@ class Classify extends Component
             'progress' => $progress,
             'fileLimit' => self::FILE_LIMIT,
             'stats' => [
-                'total' => Classification::count(),
-                'auto' => Classification::where('status', 'auto_confirmed')->count(),
-                'review' => Classification::where('status', 'needs_review')->count(),
+                'total' => ClassificationItem::count(),
+                'auto' => ClassificationItem::where('resolution', 'agreed')->count(),
+                'review' => ClassificationItem::whereIn('resolution', ['review', 'conflict', 'blocked_on_fact'])->count(),
                 'tokensAll' => (int) LlmUsage::sum('total_tokens'),
             ],
         ]);

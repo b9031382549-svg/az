@@ -1,9 +1,15 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
-    $tabs = ['needs_review' => __('Needs review'), 'auto_confirmed' => __('Auto-confirmed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match')];
-    if (($counts['error'] ?? 0) > 0) { $tabs['error'] = __('Error'); }
+    $tabs = ['open' => __('Needs attention'), 'agreed' => __('Agreed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match')];
     $tabs['all'] = __('All');
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
+    $resBadge = fn ($s) => match ($s) {
+        'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
+        'review', 'blocked_on_fact' => 'bg-amber/15 text-amber',
+        'conflict' => 'bg-stamp/12 text-stamp',
+        default => 'bg-line/40 text-muted',
+    };
+    $tabCount = fn ($key) => $key === 'all' ? $counts->sum() : ($key === 'open' ? $openCount : ($counts[$key] ?? 0));
   @endphp
 
   @php $batchLabels = $batches->keyBy('key'); @endphp
@@ -41,7 +47,7 @@
       '76'=>'Aluminium','82'=>'Tools','84'=>'Machinery','85'=>'Electrical','90'=>'Medical/optical',
       '94'=>'Furniture/lamps','95'=>'Toys','96'=>'Misc. mfg','99'=>'Services',
     ];
-    $cf = $report['conf']; $cfTotal = max(1, $cf['high']+$cf['mid']+$cf['low']);
+    $cs = $report['consensus']; $csTotal = max(1, $report['total']);
     $gs = $report['good'] + $report['service'];
     $maxCh = max(1, optional($report['chapters']->first())->c ?? 1);
   @endphp
@@ -52,7 +58,7 @@
     </button>
 
     <div x-show="open" class="mt-4 grid lg:grid-cols-3 gap-7">
-      {{-- Status donut --}}
+      {{-- Resolution donut --}}
       <div class="flex items-center gap-4">
         <div class="relative shrink-0" style="width:120px;height:120px">
           <svg viewBox="0 0 120 120" width="120" height="120">
@@ -86,7 +92,7 @@
         </div>
       </div>
 
-      {{-- Good/service + confidence --}}
+      {{-- Good/service + consensus --}}
       <div class="space-y-4">
         <div>
           <p class="kicker mb-2">{{ __('Good vs service') }}</p>
@@ -100,12 +106,12 @@
           </div>
         </div>
         <div>
-          <p class="kicker mb-2">{{ __('Confidence') }}</p>
+          <p class="kicker mb-2">{{ __('Mechanism consensus') }}</p>
           <div class="space-y-1.5">
-            @foreach([[__('High ≥85%'),$cf['high'],'bg-ledger'],[__('Medium 60–85%'),$cf['mid'],'bg-amber'],[__('Low <60%'),$cf['low'],'bg-stamp']] as [$lbl,$val,$bar])
+            @foreach([[__('Agreed'),$cs['agreed'],'bg-ledger'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
               <div class="flex items-center gap-2 text-sm">
                 <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
-                <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$cfTotal*100 }}%"></span></span>
+                <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$csTotal*100 }}%"></span></span>
                 <span class="tnum text-faint w-8 text-right">{{ $val }}</span>
               </div>
             @endforeach
@@ -134,7 +140,7 @@
       <button wire:click="setFilter('{{ $key }}')"
               class="px-3 py-1.5 rounded-lg text-sm border hair transition {{ $filter === $key ? 'bg-ink text-paper border-ink' : 'bg-surface hover:border-ink' }}">
         {{ $label }}
-        <span class="opacity-60">{{ $key === 'all' ? $counts->sum() : ($counts[$key] ?? 0) }}</span>
+        <span class="opacity-60">{{ $tabCount($key) }}</span>
       </button>
     @endforeach
   </div>
@@ -143,12 +149,12 @@
   @if($batch !== 'all')
     <div class="flex flex-wrap items-center gap-2 mb-5">
       <span class="text-sm text-muted">{{ __('This upload:') }}</span>
-      <button wire:click="confirmAll" wire:confirm="Confirm all {{ $pendingCount }} pending items in this upload?"
-              @disabled($pendingCount === 0)
-              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✓ {{ __('Confirm all') }} ({{ $pendingCount }})</button>
-      <button wire:click="rejectAll" wire:confirm="Reject all {{ $pendingCount }} pending items in this upload?"
-              @disabled($pendingCount === 0)
-              class="btn btn-ghost btn-sm {{ $pendingCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✕ {{ __('Reject all') }}</button>
+      <button wire:click="confirmAll" wire:confirm="Confirm all agreed items in this upload?"
+              @disabled($actionableCount === 0)
+              class="btn btn-ghost btn-sm {{ $actionableCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✓ {{ __('Confirm agreed') }}</button>
+      <button wire:click="rejectAll" wire:confirm="Reject all {{ $actionableCount }} open items in this upload?"
+              @disabled($actionableCount === 0)
+              class="btn btn-ghost btn-sm {{ $actionableCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✕ {{ __('Reject all') }} ({{ $actionableCount }})</button>
       <button wire:click="deleteBatch" wire:confirm="Delete this entire upload and all its items? This cannot be undone."
               class="btn btn-ghost btn-sm text-stamp ml-auto">🗑 {{ __('Delete upload') }}</button>
     </div>
@@ -156,50 +162,62 @@
 
   <div class="space-y-3">
     @forelse($items as $item)
-      <div wire:key="cls-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4">
+      @php
+        $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed'], true);
+        $allowed = $item->allowedCodes();
+        $default = (string) ($item->final_code ?? ($allowed[0] ?? ''));
+      @endphp
+      <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $resBadge($item->resolution) }}">{{ str_replace('_',' ',$item->resolution) }}</span>
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
-            <span class="font-mono text-sm">{{ $item->matched_code ?? __('no match') }}</span>
-            <span class="text-faint text-xs tnum">{{ $item->confidence !== null ? number_format($item->confidence*100,0).'%' : '' }}</span>
+            <span class="font-mono text-sm">{{ $item->final_code ?? __('—') }}</span>
             @if($batch === 'all' && $item->batch)
               <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
             @endif
           </div>
           <p class="font-medium">{{ $item->localizedSourceText() }}</p>
-          @if($item->code)
-            <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->code->localizedName(), 110) }}</p>
+          @if($item->finalCode)
+            <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->finalCode->localizedName(), 110) }}</p>
           @endif
-          @if($item->explanation)
-            <p class="text-faint text-xs mt-1">{{ Str::limit($item->explanation, 130) }}</p>
-          @endif
+
+          {{-- Per-mechanism answers --}}
+          <div class="flex flex-col gap-1 mt-2">
+            @foreach($item->results as $res)
+              @php $isFinal = $item->final_code && (string) $res->matched_code === (string) $item->final_code; @endphp
+              <div class="flex items-center gap-2 text-xs">
+                <span class="uppercase tracking-wide text-faint w-16 shrink-0">{{ $res->mechanism }}</span>
+                <span class="font-mono {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $res->matched_code ?? __('no match') }}</span>
+                @if($res->confidence !== null)
+                  <span class="text-faint tnum">{{ number_format($res->confidence*100,0) }}%</span>
+                @endif
+                @if($res->matched_code && isset($catalogNames[(string) $res->matched_code]))
+                  <span class="text-faint truncate">· {{ \Illuminate\Support\Str::limit($catalogNames[(string) $res->matched_code], 40) }}</span>
+                @endif
+              </div>
+            @endforeach
+          </div>
         </div>
+
         <div class="shrink-0 w-full sm:w-[340px]">
-          @if(in_array($item->status, ['needs_review','auto_confirmed','confirmed']))
-            @php
-              $cands = collect($item->candidates ?? []);
-              $codes = $cands->pluck('code')->map(fn ($c) => (string) $c)->all();
-              $hasMatched = $item->matched_code && in_array((string) $item->matched_code, $codes, true);
-            @endphp
-            <div x-data="{ code: @js((string) $item->matched_code) }">
+          @if($editable && count($allowed) > 0)
+            <div x-data="{ code: @js($default) }">
               <select x-model="code"
                       class="w-full px-2.5 py-1.5 rounded-lg text-xs border hair bg-surface focus:border-ink outline-none mb-2">
-                @if(!$hasMatched && $item->matched_code)
-                  <option value="{{ $item->matched_code }}">{{ $item->matched_code }} — {{ __('AI pick') }}</option>
-                @endif
-                @foreach($cands as $cand)
-                  <option value="{{ $cand['code'] }}">{{ $cand['code'] }} · {{ \Illuminate\Support\Str::limit($catalogNames[$cand['code']] ?? ($cand['name'] ?? ''), 44) }}{{ (string) ($cand['code']) === (string) $item->matched_code ? '  ← AI' : '' }}</option>
+                @foreach($allowed as $c)
+                  <option value="{{ $c }}">{{ $c }} · {{ \Illuminate\Support\Str::limit($catalogNames[$c] ?? '', 44) }}{{ (string) $c === (string) $item->final_code ? '  ← final' : '' }}</option>
                 @endforeach
               </select>
               <div class="flex gap-2 justify-end">
                 <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ {{ __('Reject') }}</button>
                 <button x-on:click="$wire.confirmWith({{ $item->id }}, code)"
                         class="btn btn-ink btn-sm"
-                        x-text="'✓ ' + (code === @js((string) $item->matched_code) ? @js(__('Confirm')) : @js(__('Save fix')))"></button>
+                        x-text="'✓ ' + (code === @js((string) $item->final_code) ? @js(__('Confirm')) : @js(__('Save fix')))"></button>
               </div>
             </div>
           @else
-            <span class="text-xs text-faint">{{ str_replace('_',' ',$item->status) }}</span>
+            <span class="text-xs text-faint">{{ str_replace('_',' ',$item->resolution) }}</span>
           @endif
         </div>
       </div>

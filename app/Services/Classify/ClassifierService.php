@@ -2,8 +2,6 @@
 
 namespace App\Services\Classify;
 
-use App\Models\Classification;
-use App\Models\ItemTranslation;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
 use Illuminate\Support\Arr;
@@ -110,22 +108,6 @@ class ClassifierService
         }
 
         return $result;
-    }
-
-    public function record(array $result, ?string $batch = null): Classification
-    {
-        return Classification::create([
-            'source_text' => $result['text'],
-            'source_hash' => ItemTranslation::hashFor($result['text']),
-            'kind' => $result['kind'],
-            'catalog_id' => $result['catalog_id'],
-            'matched_code' => $result['code'],
-            'confidence' => $result['confidence'],
-            'status' => $result['status'],
-            'candidates' => $result['candidates'],
-            'explanation' => $result['reason'],
-            'batch' => $batch,
-        ]);
     }
 
     /**

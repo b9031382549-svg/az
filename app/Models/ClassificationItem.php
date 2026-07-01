@@ -36,6 +36,30 @@ class ClassificationItem extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    /**
+     * Codes a reviewer may confirm for this item: every candidate any mechanism
+     * considered, plus each mechanism's own pick (a mechanism's pick may not be
+     * in another's candidate list). Requires `results` to be loaded.
+     *
+     * @return array<int, string>
+     */
+    public function allowedCodes(): array
+    {
+        return $this->results
+            ->flatMap(fn ($r) => collect($r->candidates ?? [])->pluck('code')->push($r->matched_code))
+            ->filter()
+            ->map(fn ($c) => (string) $c)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** Confidence of the mechanism result backing the final code, if any. */
+    public function finalConfidence(): ?float
+    {
+        return $this->results->firstWhere('matched_code', $this->final_code)?->confidence;
+    }
+
     /** Cached display translation of this item's name, keyed by source_hash. */
     public function translation(): BelongsTo
     {

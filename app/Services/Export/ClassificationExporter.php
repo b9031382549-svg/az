@@ -2,6 +2,7 @@
 
 namespace App\Services\Export;
 
+use App\Models\ClassificationItem;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -17,12 +18,12 @@ class ClassificationExporter
     private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 46, 'D' => 46, 'E' => 16, 'F' => 10, 'G' => 46, 'H' => 11, 'I' => 14, 'J' => 24, 'K' => 16];
 
     /**
-     * @param  Collection<int, \App\Models\Classification>  $rows
+     * @param  Collection<int, ClassificationItem>  $rows
      * @param  Collection<string, string>  $labels  batch key => upload label
      */
     public function build(Collection $rows, Collection $labels): Spreadsheet
     {
-        $ss = new Spreadsheet();
+        $ss = new Spreadsheet;
         $sheet = $ss->getActiveSheet();
         $sheet->setTitle('Classifications');
 
@@ -40,15 +41,16 @@ class ClassificationExporter
             // Free-text fields are written as EXPLICIT strings so a value that
             // starts with =, +, -, @ can't be interpreted as an Excel formula
             // (CSV/spreadsheet formula injection).
+            $confidence = $row->finalConfidence();
             $sheet->setCellValue("A{$i}", $n + 1);
             $sheet->setCellValueExplicit("B{$i}", (string) $row->source_text, DataType::TYPE_STRING);
             $sheet->setCellValueExplicit("C{$i}", (string) ($row->translation?->en ?? ''), DataType::TYPE_STRING);
             $sheet->setCellValueExplicit("D{$i}", (string) ($row->translation?->ru ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("E{$i}", (string) ($row->matched_code ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("E{$i}", (string) ($row->final_code ?? ''), DataType::TYPE_STRING);
             $sheet->setCellValueExplicit("F{$i}", (string) ($row->kind ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("G{$i}", (string) ($row->code?->localizedName() ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValue("H{$i}", $row->confidence !== null ? round((float) $row->confidence, 3) : null);
-            $sheet->setCellValue("I{$i}", str_replace('_', ' ', (string) $row->status));
+            $sheet->setCellValueExplicit("G{$i}", (string) ($row->finalCode?->localizedName() ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValue("H{$i}", $confidence !== null ? round((float) $confidence, 3) : null);
+            $sheet->setCellValue("I{$i}", str_replace('_', ' ', (string) $row->resolution));
             $sheet->setCellValueExplicit("J{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
             $sheet->setCellValue("K{$i}", optional($row->created_at)->format('Y-m-d H:i'));
             $i++;

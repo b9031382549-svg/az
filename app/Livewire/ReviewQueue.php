@@ -3,9 +3,10 @@
 namespace App\Livewire;
 
 use App\Models\CatalogCode;
-use App\Models\Classification;
+use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Support\Audit;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -17,21 +18,25 @@ class ReviewQueue extends Component
 {
     use WithPagination;
 
-    /** Statuses that are still actionable (bulk confirm/reject targets). */
-    private const PENDING = ['needs_review', 'auto_confirmed'];
+    /** Resolutions that still need a human ("open"). */
+    private const OPEN = ['review', 'conflict', 'blocked_on_fact'];
 
-    /** Status display metadata for the report donut + legend. */
-    private const STATUS_META = [
-        'auto_confirmed' => ['label' => 'Auto-confirmed', 'color' => '#3f6b4f'],
+    /** Resolutions a bulk reject may target (not yet human-decided, not no_match). */
+    private const ACTIONABLE = ['agreed', 'review', 'conflict', 'blocked_on_fact'];
+
+    /** Resolution display metadata for the report donut + legend. */
+    private const RESOLUTION_META = [
+        'agreed' => ['label' => 'Agreed', 'color' => '#3f6b4f'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
-        'needs_review' => ['label' => 'Needs review', 'color' => '#c2872b'],
-        'rejected' => ['label' => 'Rejected', 'color' => '#B5462E'],
+        'review' => ['label' => 'Review', 'color' => '#c2872b'],
+        'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
+        'blocked_on_fact' => ['label' => 'Blocked (fact)', 'color' => '#7c5cbf'],
         'no_match' => ['label' => 'No match', 'color' => '#9a9183'],
-        'error' => ['label' => 'Error', 'color' => '#7c5cbf'],
+        'rejected' => ['label' => 'Rejected', 'color' => '#8a8175'],
     ];
 
     #[Url]
-    public string $filter = 'needs_review';
+    public string $filter = 'open';
 
     /** Selected upload (batch key), or "all". */
     #[Url]
@@ -49,26 +54,18 @@ class ReviewQueue extends Component
     }
 
     /**
-     * Confirm an item with the chosen candidate code — the reviewer can keep the
-     * model's pick or correct it to another candidate the model chose from.
+     * Confirm an item with the chosen code — keep the agreed pick or (for a
+     * conflict) pick which mechanism's answer is right. Only codes some mechanism
+     * actually considered for THIS item are allowed.
      */
     public function confirmWith(int $id, string $code): void
     {
-        $item = Classification::find($id);
+        $item = ClassificationItem::with('results')->find($id);
         if (! $item) {
             return;
         }
 
-        // Only allow codes the model actually considered for THIS item (its
-        // stored candidates, plus its own current pick) — never an arbitrary code.
-        $allowed = collect($item->candidates ?? [])
-            ->pluck('code')
-            ->push($item->matched_code)
-            ->filter()
-            ->map(fn ($c) => (string) $c)
-            ->all();
-
-        if (! in_array($code, $allowed, true)) {
+        if (! in_array($code, $item->allowedCodes(), true)) {
             return;
         }
 
@@ -77,25 +74,18 @@ class ReviewQueue extends Component
             return;
         }
 
-        $was = $item->matched_code;
-        $corrected = (string) $was !== $code;
-
-        $update = [
-            'matched_code' => $cand->code,
-            'catalog_id' => $cand->id,
+        $was = $item->final_code;
+        $item->update([
+            'final_code' => $cand->code,
+            'final_catalog_id' => $cand->id,
             'kind' => $cand->kind, // authoritative (99 => service)
-            'status' => 'confirmed',
-        ];
-        if ($corrected) {
-            // The model's confidence/explanation were for the OLD pick — drop them
-            // so the export and report don't attribute them to the corrected code.
-            $update['confidence'] = null;
-            $update['explanation'] = 'Manually corrected by reviewer (was '.$was.').';
-        }
-        $item->update($update);
+            'resolution' => 'confirmed',
+            'confirmed_by' => auth()->id(),
+            'confirmed_at' => now(),
+        ]);
 
         Audit::log(
-            $corrected ? 'classification.corrected' : 'classification.confirm',
+            ((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
             ['id' => $id, 'code' => $code, 'was' => $was],
             $item,
         );
@@ -103,31 +93,53 @@ class ReviewQueue extends Component
 
     public function reject(int $id): void
     {
-        Classification::whereKey($id)->update(['status' => 'rejected']);
+        ClassificationItem::whereKey($id)->update(['resolution' => 'rejected']);
         Audit::log('classification.reject', ['id' => $id]);
     }
 
-    /** Confirm every still-pending item in the selected upload. */
+    /** Confirm every item in the selected upload that already has an agreed code. */
     public function confirmAll(): void
     {
-        $this->bulkUpdate('confirmed');
+        if ($this->batch === 'all') {
+            return;
+        }
+
+        $updated = ClassificationItem::where('batch', $this->batch)
+            ->whereIn('resolution', ['agreed', 'review'])
+            ->update([
+                'resolution' => 'confirmed',
+                'confirmed_by' => auth()->id(),
+                'confirmed_at' => now(),
+            ]);
+
+        Audit::log('batch.bulk_confirmed', ['batch' => $this->batch, 'updated' => $updated]);
+        $this->resetPage();
     }
 
-    /** Reject every still-pending item in the selected upload. */
+    /** Reject every still-actionable item in the selected upload. */
     public function rejectAll(): void
     {
-        $this->bulkUpdate('rejected');
+        if ($this->batch === 'all') {
+            return;
+        }
+
+        $updated = ClassificationItem::where('batch', $this->batch)
+            ->whereIn('resolution', self::ACTIONABLE)
+            ->update(['resolution' => 'rejected']);
+
+        Audit::log('batch.bulk_rejected', ['batch' => $this->batch, 'updated' => $updated]);
+        $this->resetPage();
     }
 
-    /** Delete the selected upload entirely (its items + the batch record). */
+    /** Delete the selected upload entirely (its items + results + batch record). */
     public function deleteBatch(): void
     {
         if ($this->batch === 'all') {
             return;
         }
 
-        $deleted = Classification::where('batch', $this->batch)->count();
-        Classification::where('batch', $this->batch)->delete();
+        $deleted = ClassificationItem::where('batch', $this->batch)->count();
+        ClassificationItem::where('batch', $this->batch)->delete(); // cascades to results
         ImportBatch::where('key', $this->batch)->delete();
         Audit::log('batch.delete', ['batch' => $this->batch, 'deleted' => $deleted]);
 
@@ -135,42 +147,28 @@ class ReviewQueue extends Component
         $this->resetPage();
     }
 
-    private function bulkUpdate(string $status): void
-    {
-        if ($this->batch === 'all') {
-            return; // bulk actions are scoped to a single upload, never "all"
-        }
-
-        $updated = Classification::where('batch', $this->batch)
-            ->whereIn('status', self::PENDING)
-            ->update(['status' => $status]);
-
-        Audit::log('batch.bulk_'.$status, ['batch' => $this->batch, 'updated' => $updated]);
-        $this->resetPage();
-    }
-
     public function render()
     {
-        // Scope the list, the tab counts and the report to the selected upload.
-        $scoped = fn () => Classification::query()
+        $scoped = fn () => ClassificationItem::query()
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
         $items = $scoped()
-            ->with(['code', 'translation'])
-            ->when($this->filter !== 'all', fn ($q) => $q->where('status', $this->filter))
+            ->with(['finalCode', 'translation', 'results'])
+            ->when($this->filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
+            ->when(! in_array($this->filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $this->filter))
             ->latest()
             ->paginate(15);
 
         $counts = $scoped()
-            ->selectRaw('status, count(*) as c')
-            ->groupBy('status')
-            ->pluck('c', 'status');
+            ->selectRaw('resolution, count(*) as c')
+            ->groupBy('resolution')
+            ->pluck('c', 'resolution');
 
-        // Localized catalog names for the candidate dropdowns (code -> name in the
-        // active locale, falling back to the base name when no translation exists).
+        // Localized catalog names for the candidate dropdowns.
         $codes = $items->getCollection()
-            ->flatMap(fn ($c) => collect($c->candidates ?? [])->pluck('code'))
-            ->merge($items->getCollection()->pluck('matched_code'))
+            ->flatMap(fn ($item) => $item->results
+                ->flatMap(fn ($r) => collect($r->candidates ?? [])->pluck('code')->push($r->matched_code))
+                ->push($item->final_code))
             ->filter()
             ->map(fn ($c) => (string) $c)
             ->unique()
@@ -181,26 +179,28 @@ class ReviewQueue extends Component
             ->get(['code', 'name', 'name_en', 'name_ru'])
             ->mapWithKeys(fn ($c) => [(string) $c->code => $c->localizedName()]);
 
+        $openCount = collect(self::OPEN)->sum(fn ($r) => (int) ($counts[$r] ?? 0));
+
         return view('livewire.review-queue', [
             'items' => $items,
             'counts' => $counts,
+            'openCount' => $openCount,
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
-            'pendingCount' => ($counts['needs_review'] ?? 0) + ($counts['auto_confirmed'] ?? 0),
+            'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($counts[$r] ?? 0)),
             'catalogNames' => $catalogNames,
         ]);
     }
 
     /**
-     * Recent uploads for the filter dropdown — derived from the classifications
-     * themselves (so pre-existing batches still appear), labelled from
-     * import_batches where a record exists.
+     * Recent uploads for the filter dropdown — derived from the items themselves
+     * (so pre-existing batches still appear), labelled from import_batches.
      *
      * @return Collection<int, object>
      */
     private function batchOptions(): Collection
     {
-        $rows = Classification::query()
+        $rows = ClassificationItem::query()
             ->whereNotNull('batch')
             ->selectRaw('batch, count(*) as total, max(created_at) as last_at')
             ->groupBy('batch')
@@ -219,23 +219,22 @@ class ReviewQueue extends Component
     }
 
     /**
-     * Distribution report for the current scope: status donut, good/service
-     * split, confidence buckets and the top HS chapters.
+     * Distribution report for the current scope: resolution donut, good/service
+     * split, consensus breakdown and the top HS chapters.
      *
-     * @param  callable():\Illuminate\Database\Eloquent\Builder  $scoped
-     * @param  Collection<string,int>  $counts
+     * @param  callable():Builder  $scoped
+     * @param  Collection<string, int>  $counts
      * @return array<string, mixed>
      */
     private function report(callable $scoped, Collection $counts): array
     {
         $total = (int) $counts->sum();
 
-        // Status donut segments (SVG stroke-dasharray).
         $r = 54.0;
         $circ = 2 * M_PI * $r;
         $segments = [];
         $cumulative = 0.0;
-        foreach (self::STATUS_META as $key => $meta) {
+        foreach (self::RESOLUTION_META as $key => $meta) {
             $c = (int) ($counts[$key] ?? 0);
             if ($c === 0) {
                 continue;
@@ -256,15 +255,9 @@ class ReviewQueue extends Component
 
         $kind = $scoped()->selectRaw('kind, count(*) as c')->groupBy('kind')->pluck('c', 'kind');
 
-        $conf = $scoped()->selectRaw(
-            'count(*) filter (where confidence >= 0.85) as high,
-             count(*) filter (where confidence >= 0.6 and confidence < 0.85) as mid,
-             count(*) filter (where confidence < 0.6 or confidence is null) as low'
-        )->first();
-
         $chapters = $scoped()
-            ->whereNotNull('matched_code')
-            ->selectRaw('substr(matched_code, 1, 2) as chapter, count(*) as c')
+            ->whereNotNull('final_code')
+            ->selectRaw('substr(final_code, 1, 2) as chapter, count(*) as c')
             ->groupBy('chapter')
             ->orderByDesc('c')
             ->limit(8)
@@ -275,10 +268,10 @@ class ReviewQueue extends Component
             'donut' => ['r' => $r, 'circ' => $circ, 'segments' => $segments],
             'good' => (int) ($kind['good'] ?? 0),
             'service' => (int) ($kind['service'] ?? 0),
-            'conf' => [
-                'high' => (int) ($conf->high ?? 0),
-                'mid' => (int) ($conf->mid ?? 0),
-                'low' => (int) ($conf->low ?? 0),
+            'consensus' => [
+                'agreed' => (int) ($counts['agreed'] ?? 0),
+                'review' => (int) ($counts['review'] ?? 0),
+                'conflict' => (int) ($counts['conflict'] ?? 0),
             ],
             'chapters' => $chapters,
         ];

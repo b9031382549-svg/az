@@ -2,7 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ClassificationItem;
+use App\Models\ItemTranslation;
 use App\Services\Classify\ClassifierService;
+use App\Services\Classify\Consensus;
+use App\Services\Classify\Mechanisms\VectorMechanism;
 use Illuminate\Console\Command;
 
 class ClassifyItem extends Command
@@ -20,6 +24,7 @@ class ClassifyItem extends Command
 
         if ($r['error']) {
             $this->error('Error: '.$r['error']);
+
             return self::FAILURE;
         }
 
@@ -42,8 +47,13 @@ class ClassifyItem extends Command
         }
 
         if ($this->option('save')) {
-            $classifier->record($r);
-            $this->info('Saved to classifications.');
+            $item = ClassificationItem::firstOrCreate(
+                ['batch' => 'cli', 'source_hash' => ItemTranslation::hashFor($text)],
+                ['source_text' => $text, 'resolution' => 'pending'],
+            );
+            $item->results()->updateOrCreate(['mechanism' => 'vector'], VectorMechanism::mapResult($r)->toRow());
+            app(Consensus::class)->finalize($item);
+            $this->info('Saved (mechanism: vector).');
         }
 
         return self::SUCCESS;

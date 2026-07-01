@@ -19,8 +19,16 @@ final class VectorMechanism implements ClassifierMechanism
 
     public function classify(string $text): MechanismResult
     {
-        $r = $this->classifier->classify($text);
+        return self::mapResult($this->classifier->classify($text));
+    }
 
+    /**
+     * Map ClassifierService::classify()'s result array onto a MechanismResult.
+     *
+     * @param  array<string, mixed>  $r
+     */
+    public static function mapResult(array $r): MechanismResult
+    {
         $tier = $r['tier'] ?? null;
         $model = $tier === 1
             ? (string) config('services.openrouter.classify_model_tier1')

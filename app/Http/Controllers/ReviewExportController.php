@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Classification;
+use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Services\Export\ClassificationExporter;
 use App\Support\Audit;
@@ -18,7 +18,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReviewExportController extends Controller
 {
-    private const STATUSES = ['needs_review', 'auto_confirmed', 'confirmed', 'rejected', 'no_match', 'error', 'all'];
+    private const STATUSES = ['open', 'agreed', 'review', 'conflict', 'blocked_on_fact', 'confirmed', 'rejected', 'no_match', 'all'];
+
+    /** Resolutions grouped under the "open" (needs a human) filter. */
+    private const OPEN = ['review', 'conflict', 'blocked_on_fact'];
 
     private const MAX_ROWS = 20000;
 
@@ -35,10 +38,15 @@ class ReviewExportController extends Controller
         $batch = (string) $request->query('batch', 'all');
         $batchOk = $batch !== 'all' && Str::isUuid($batch); // request_id/batch are uuids
 
-        $rows = Classification::query()
-            ->with(['code:id,name,name_en,name_ru', 'translation:source_hash,en,ru'])
+        $rows = ClassificationItem::query()
+            ->with([
+                'finalCode:id,name,name_en,name_ru',
+                'translation:source_hash,en,ru',
+                'results:id,classification_item_id,matched_code,confidence',
+            ])
             ->when($batchOk, fn ($q) => $q->where('batch', $batch))
-            ->when($filter !== 'all', fn ($q) => $q->where('status', $filter))
+            ->when($filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
+            ->when(! in_array($filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $filter))
             ->latest()
             ->limit(self::MAX_ROWS)
             ->get();
