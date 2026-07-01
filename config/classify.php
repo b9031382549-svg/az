@@ -31,6 +31,12 @@ return [
     // missing. Set false to skip translation entirely (originals only).
     'translate_items' => (bool) env('CLASSIFY_TRANSLATE_ITEMS', true),
 
+    // Model used to translate item names. gpt-4o-mini handles Azerbaijani food/
+    // nomenclature vocabulary poorly (hallucinates flavours, e.g. çiyələkli
+    // "strawberry" -> "chocolate", and leaves words untranslated), so item
+    // translation uses the stronger model by default.
+    'translate_model' => (string) env('CLASSIFY_TRANSLATE_MODEL', 'openai/gpt-4o'),
+
     // Domain disambiguation map for Azerbaijani invoice traps: homonyms / false
     // friends / abbreviations whose sub-word matches the wrong category. When a
     // key (case-insensitive substring) is present, the hint is appended to the
