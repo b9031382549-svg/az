@@ -112,10 +112,10 @@
               <tbody>
                 @foreach($progress['rows'] as $r)
                   <tr wire:key="res-{{ $r->id }}" class="border-b hair last:border-0 align-top">
-                    <td class="px-4 py-3 max-w-[220px]">{{ $r->source_text }}</td>
+                    <td class="px-4 py-3 max-w-[220px]">{{ $r->localizedSourceText() }}</td>
                     <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($r->kind) }}">{{ $r->kind ?? '—' }}</span></td>
                     <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $r->matched_code ?? '—' }}</td>
-                    <td class="px-4 py-3 text-muted max-w-[320px]">{{ Str::limit(optional($r->code)->name ?? ($r->explanation ?? '—'), 90) }}</td>
+                    <td class="px-4 py-3 text-muted max-w-[320px]">{{ Str::limit($r->code?->localizedName() ?? ($r->explanation ?? '—'), 90) }}</td>
                     <td class="px-4 py-3 tnum text-right">{{ $r->confidence !== null ? number_format($r->confidence*100,0).'%' : '—' }}</td>
                     <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($r->status) }}">{{ str_replace('_',' ',$r->status) }}</span></td>
                   </tr>

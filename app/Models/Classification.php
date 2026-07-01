@@ -21,4 +21,28 @@ class Classification extends Model
     {
         return $this->belongsTo(CatalogCode::class, 'catalog_id');
     }
+
+    /** Cached display translation of this item's name, keyed by source_hash. */
+    public function translation(): BelongsTo
+    {
+        return $this->belongsTo(ItemTranslation::class, 'source_hash', 'source_hash');
+    }
+
+    /**
+     * The item name for the active UI locale, falling back to the original
+     * Azerbaijani text when no translation exists. Display-only — never used for
+     * retrieval/matching.
+     */
+    public function localizedSourceText(): string
+    {
+        $locale = app()->getLocale();
+        if ($locale !== 'az') {
+            $name = $this->translation?->forLocale($locale);
+            if ($name !== null) {
+                return $name;
+            }
+        }
+
+        return (string) $this->source_text;
+    }
 }

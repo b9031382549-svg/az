@@ -12,9 +12,9 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
  */
 class ClassificationExporter
 {
-    private const HEADERS = ['#', 'Item', 'Code', 'Kind', 'Matched name', 'Confidence', 'Status', 'Upload', 'Date'];
+    private const HEADERS = ['#', 'Item', 'Item (EN)', 'Item (RU)', 'Code', 'Kind', 'Matched name', 'Confidence', 'Status', 'Upload', 'Date'];
 
-    private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 16, 'D' => 10, 'E' => 46, 'F' => 11, 'G' => 14, 'H' => 24, 'I' => 16];
+    private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 46, 'D' => 46, 'E' => 16, 'F' => 10, 'G' => 46, 'H' => 11, 'I' => 14, 'J' => 24, 'K' => 16];
 
     /**
      * @param  Collection<int, \App\Models\Classification>  $rows
@@ -27,9 +27,9 @@ class ClassificationExporter
         $sheet->setTitle('Classifications');
 
         $sheet->fromArray(self::HEADERS, null, 'A1');
-        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
         // Force the Code column to text so leading zeros (e.g. 0207606100) survive.
-        $sheet->getStyle('C')->getNumberFormat()->setFormatCode('@');
+        $sheet->getStyle('E')->getNumberFormat()->setFormatCode('@');
 
         foreach (self::WIDTHS as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
@@ -42,13 +42,15 @@ class ClassificationExporter
             // (CSV/spreadsheet formula injection).
             $sheet->setCellValue("A{$i}", $n + 1);
             $sheet->setCellValueExplicit("B{$i}", (string) $row->source_text, DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("C{$i}", (string) ($row->matched_code ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("D{$i}", (string) ($row->kind ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("E{$i}", (string) (optional($row->code)->name ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValue("F{$i}", $row->confidence !== null ? round((float) $row->confidence, 3) : null);
-            $sheet->setCellValue("G{$i}", str_replace('_', ' ', (string) $row->status));
-            $sheet->setCellValueExplicit("H{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValue("I{$i}", optional($row->created_at)->format('Y-m-d H:i'));
+            $sheet->setCellValueExplicit("C{$i}", (string) ($row->translation?->en ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("D{$i}", (string) ($row->translation?->ru ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("E{$i}", (string) ($row->matched_code ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("F{$i}", (string) ($row->kind ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("G{$i}", (string) ($row->code?->localizedName() ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValue("H{$i}", $row->confidence !== null ? round((float) $row->confidence, 3) : null);
+            $sheet->setCellValue("I{$i}", str_replace('_', ' ', (string) $row->status));
+            $sheet->setCellValueExplicit("J{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValue("K{$i}", optional($row->created_at)->format('Y-m-d H:i'));
             $i++;
         }
 

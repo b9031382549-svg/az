@@ -39,7 +39,10 @@ class Catalog extends Component
                 if (preg_match('/^\d+$/', $term)) {
                     $q->where('code', 'like', $term.'%');
                 } else {
-                    $q->where('name', 'ilike', '%'.$term.'%');
+                    $like = '%'.$term.'%';
+                    $q->where(fn ($w) => $w->where('name', 'ilike', $like)
+                        ->orWhere('name_en', 'ilike', $like)
+                        ->orWhere('name_ru', 'ilike', $like));
                 }
             })
             ->orderBy('code')

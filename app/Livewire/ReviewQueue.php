@@ -156,7 +156,7 @@ class ReviewQueue extends Component
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
         $items = $scoped()
-            ->with('code')
+            ->with(['code', 'translation'])
             ->when($this->filter !== 'all', fn ($q) => $q->where('status', $this->filter))
             ->latest()
             ->paginate(15);
@@ -166,12 +166,28 @@ class ReviewQueue extends Component
             ->groupBy('status')
             ->pluck('c', 'status');
 
+        // Localized catalog names for the candidate dropdowns (code -> name in the
+        // active locale, falling back to the base name when no translation exists).
+        $codes = $items->getCollection()
+            ->flatMap(fn ($c) => collect($c->candidates ?? [])->pluck('code'))
+            ->merge($items->getCollection()->pluck('matched_code'))
+            ->filter()
+            ->map(fn ($c) => (string) $c)
+            ->unique()
+            ->values();
+
+        $catalogNames = CatalogCode::query()
+            ->whereIn('code', $codes)
+            ->get(['code', 'name', 'name_en', 'name_ru'])
+            ->mapWithKeys(fn ($c) => [(string) $c->code => $c->localizedName()]);
+
         return view('livewire.review-queue', [
             'items' => $items,
             'counts' => $counts,
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
             'pendingCount' => ($counts['needs_review'] ?? 0) + ($counts['auto_confirmed'] ?? 0),
+            'catalogNames' => $catalogNames,
         ]);
     }
 

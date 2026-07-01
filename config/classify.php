@@ -25,6 +25,12 @@ return [
     // model) before retrieval, so branded/coded names still find candidates.
     'expand_query' => (bool) env('CLASSIFY_EXPAND_QUERY', true),
 
+    // Translate uploaded item names (en/ru) for display, caching each in the
+    // item_translations dictionary (translated once, reused everywhere). Display
+    // always falls back to the original Azerbaijani text when a translation is
+    // missing. Set false to skip translation entirely (originals only).
+    'translate_items' => (bool) env('CLASSIFY_TRANSLATE_ITEMS', true),
+
     // Domain disambiguation map for Azerbaijani invoice traps: homonyms / false
     // friends / abbreviations whose sub-word matches the wrong category. When a
     // key (case-insensitive substring) is present, the hint is appended to the

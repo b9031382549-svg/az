@@ -38,5 +38,11 @@ class ClassifyItemJob implements ShouldQueue
 
         $result = $classifier->classify($this->text);
         $classifier->record($result, $this->batch);
+
+        // Populate the display-translation dictionary out of band (dictionary hit
+        // = no-op). Decoupled so a translation failure never fails classification.
+        if (config('classify.translate_items', true)) {
+            TranslateItemJob::dispatch($this->text);
+        }
     }
 }

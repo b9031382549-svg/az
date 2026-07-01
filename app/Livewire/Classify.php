@@ -179,7 +179,7 @@ class Classify extends Component
                 'count' => (int) $this->queued['count'],
                 'complete' => $done >= (int) $this->queued['count'],
                 'rows' => Classification::where('batch', $batch)
-                    ->with('code')
+                    ->with(['code', 'translation'])
                     ->latest()
                     ->limit(50)
                     ->get(),
