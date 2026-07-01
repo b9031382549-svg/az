@@ -24,7 +24,9 @@ class GenerateRubricTitles extends Command
 
     public function handle(OpenRouterClient $llm): int
     {
-        $model = (string) ($this->option('model') ?: config('services.openrouter.model'));
+        // Titles are Azerbaijani nomenclature — gpt-4o-mini mangles it (same
+        // reason item translation uses the strong model), so default to translate_model.
+        $model = (string) ($this->option('model') ?: config('classify.translate_model', 'openai/gpt-4o'));
 
         $query = RubricatorNode::whereNull('title')->orderBy('level')->orderBy('code');
         if (($limit = (int) $this->option('limit')) > 0) {
