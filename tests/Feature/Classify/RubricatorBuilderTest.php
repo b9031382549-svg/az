@@ -5,6 +5,7 @@ namespace Tests\Feature\Classify;
 use App\Models\CatalogCode;
 use App\Models\RubricatorNode;
 use App\Support\HsChapters;
+use App\Support\ServiceRubrics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -48,7 +49,7 @@ class RubricatorBuilderTest extends TestCase
         $this->assertSame($pos->id, $sub->parent_id);
     }
 
-    public function test_services_get_a_root_node_and_null_titles_for_ai(): void
+    public function test_services_get_a_root_and_authored_and_derived_titles(): void
     {
         $this->seedCatalog();
         $this->artisan('data:build-rubricator')->assertSuccessful();
@@ -57,10 +58,15 @@ class RubricatorBuilderTest extends TestCase
         $this->assertSame('Xidmətlər', $root->title);
         $this->assertSame('service', $root->kind);
 
+        // Position title comes from the hand-authored ServiceRubrics reference.
         $svcPos = RubricatorNode::where('code', '9946')->first();
         $this->assertSame('service', $svcPos->kind);
         $this->assertSame($root->id, $svcPos->parent_id);
-        $this->assertNull($svcPos->title); // flat names -> filled by rubricator:generate-titles
+        $this->assertSame(ServiceRubrics::POSITIONS['9946'], $svcPos->title);
+
+        // Subposition title is derived from its own leaf name.
+        $svcSub = RubricatorNode::where('code', '994611')->first();
+        $this->assertSame('Diri heyvanların topdansatışı üzrə xidmətlər', $svcSub->title);
     }
 
     public function test_sample_leaves_reads_catalog_by_prefix(): void

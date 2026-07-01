@@ -5,15 +5,15 @@ namespace App\Console\Commands;
 use App\Models\CatalogCode;
 use App\Models\RubricatorNode;
 use App\Support\HsChapters;
+use App\Support\ServiceRubrics;
 use Illuminate\Console\Command;
 
 /**
  * Builds the rubricator tree (chapter -> position -> subposition) purely from
- * catalog code prefixes. Goods titles are derived from catalog.name's HS
- * breadcrumb; chapter titles come from the HsChapters reference list; service
- * node titles are left null for `rubricator:generate-titles` (their names are
- * flat, so nothing is derivable). Idempotent — safe to re-run after a catalog
- * re-import.
+ * catalog code prefixes. Titles: goods positions/subpositions from catalog.name's
+ * HS breadcrumb; goods chapters from the HsChapters reference list; service
+ * positions from the ServiceRubrics reference list; service subpositions derived
+ * from their own (flat) leaf names. Idempotent — safe to re-run after a re-import.
  */
 class BuildRubricator extends Command
 {
@@ -29,7 +29,7 @@ class BuildRubricator extends Command
         }
 
         $goods = CatalogCode::where('kind', 'good')->get(['code', 'chapter', 'position', 'subposition', 'name']);
-        $services = CatalogCode::where('kind', 'service')->get(['code', 'position', 'subposition']);
+        $services = CatalogCode::where('kind', 'service')->get(['code', 'position', 'subposition', 'name']);
 
         // Derive goods titles from the HS breadcrumb: heading (4-digit) = the
         // first ':'-segment; subheading (6-digit) = the first dash-level.
@@ -39,6 +39,12 @@ class BuildRubricator extends Command
             $segs = $this->segments((string) $g->name);
             $posSegments[$g->position][] = $segs[0] ?? '';
             $subSegments[$g->subposition][] = $segs[1] ?? ($segs[0] ?? '');
+        }
+
+        // Service subposition titles are derived from their own leaf names.
+        $svcSubNames = [];
+        foreach ($services as $s) {
+            $svcSubNames[$s->subposition][] = (string) $s->name;
         }
 
         $map = [];   // code => id, to wire parent_id
@@ -59,7 +65,7 @@ class BuildRubricator extends Command
         foreach ($positions as $pos) {
             $chapter = substr($pos, 0, 2);
             $isService = $chapter === '99';
-            $title = $isService ? null : $this->mode($posSegments[$pos] ?? []);
+            $title = $isService ? ServiceRubrics::title($pos) : $this->mode($posSegments[$pos] ?? []);
             $map[$pos] = $this->upsert($pos, $map[$chapter] ?? null, 2, $title, $isService ? 'service' : 'good');
             $counts['position']++;
         }
@@ -70,7 +76,9 @@ class BuildRubricator extends Command
             $chapter = substr($sub, 0, 2);
             $pos = substr($sub, 0, 4);
             $isService = $chapter === '99';
-            $title = $isService ? null : ($this->mode($subSegments[$sub] ?? []) ?: $this->mode($posSegments[$pos] ?? []));
+            $title = $isService
+                ? ($this->serviceSubTitle($svcSubNames[$sub] ?? []) ?: ServiceRubrics::title($pos))
+                : ($this->mode($subSegments[$sub] ?? []) ?: $this->mode($posSegments[$pos] ?? []));
             $map[$sub] = $this->upsert($sub, $map[$pos] ?? null, 3, $title, $isService ? 'service' : 'good');
             $counts['subposition']++;
         }
@@ -106,6 +114,31 @@ class BuildRubricator extends Command
             array_map(fn ($p) => trim($p, " \t\u{2013}-"), $parts),
             fn ($p) => $p !== '',
         ));
+    }
+
+    /**
+     * A representative title for a service subposition, taken from its own leaf
+     * names (services are flat, so a leaf name IS the description). Prefers a
+     * specific leaf over a generic "others" one; picks the shortest as the label.
+     *
+     * @param  array<int, string>  $names
+     */
+    private function serviceSubTitle(array $names): ?string
+    {
+        $names = array_values(array_filter(array_map('trim', $names), fn ($n) => $n !== ''));
+        if ($names === []) {
+            return null;
+        }
+
+        $generic = ['digərləri', 'sair', 'sair xidmətlər', 'digər'];
+        $specific = array_values(array_filter(
+            $names,
+            fn ($n) => ! in_array(mb_strtolower($n), $generic, true) && mb_strlen($n) >= 4,
+        ));
+        $pool = $specific !== [] ? $specific : $names;
+        usort($pool, fn ($a, $b) => mb_strlen($a) <=> mb_strlen($b));
+
+        return mb_substr($pool[0], 0, 90);
     }
 
     /**
