@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Classify\Mechanisms\BrokerDescentMechanism;
 use App\Services\Classify\Mechanisms\ClassifierMechanism;
 use App\Services\Classify\Mechanisms\MechanismRegistry;
 use App\Services\Classify\Mechanisms\VectorMechanism;
@@ -19,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private const MECHANISMS = [
         'vector' => VectorMechanism::class,
-        // 'broker' => BrokerDescentMechanism::class, // added in Phase 7
+        'broker' => BrokerDescentMechanism::class,
     ];
 
     /**

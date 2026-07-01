@@ -12,6 +12,19 @@ return [
         ))),
     ],
 
+    // Broker-descent mechanism: walks the rubricator top-down, deciding each fork
+    // by the sample leaves under its children (not the bare title). Strong model
+    // only — the local tier is too weak for functional/GIR reasoning.
+    'broker' => [
+        'model' => (string) env('CLASSIFY_BROKER_MODEL', 'openai/gpt-4o'),
+        'max_depth' => (int) env('CLASSIFY_BROKER_MAX_DEPTH', 5),
+        'node_min_conf' => (float) env('CLASSIFY_BROKER_NODE_MIN_CONF', 0.6),
+        'sample_leaves' => (int) env('CLASSIFY_BROKER_SAMPLE_LEAVES', 12),
+        'leaf_direct_max' => (int) env('CLASSIFY_BROKER_LEAF_DIRECT_MAX', 20),
+        'max_lookups' => (int) env('CLASSIFY_BROKER_MAX_LOOKUPS', 1),
+        'fact_min' => (float) env('CLASSIFY_BROKER_FACT_MIN', 0.7),
+    ],
+
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 
