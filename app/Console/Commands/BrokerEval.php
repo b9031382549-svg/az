@@ -22,8 +22,28 @@ class BrokerEval extends Command
         $mechanisms = $this->option('mechanism') ?: (array) config('classify.mechanisms.enabled', ['vector']);
         $report = $evaluator->evaluate($mechanisms);
 
+        if ($report['total'] === 0) {
+            $this->warn('No classified items yet — classify a batch first.');
+
+            return self::SUCCESS;
+        }
+
+        // Overall (shadow) signal — needs no ground truth.
+        $this->info("Overall: {$report['total']} items classified.");
+        $resline = collect($report['resolutions'])->map(fn ($c, $r) => "{$r}={$c}")->implode('  ');
+        $this->line('  resolutions: '.$resline);
+        foreach ($report['mechanisms'] as $mech => $m) {
+            $this->line("  {$mech}: produced a code for {$m['coverageAll']} items");
+        }
+        if ($report['agreement'] !== null) {
+            $a = $report['agreement'];
+            $pct = $a['both'] > 0 ? round($a['match'] / $a['both'] * 100).'%' : '—';
+            $this->line("  agreement {$a['a']} vs {$a['b']}: {$a['match']}/{$a['both']} ({$pct}) — the rest are conflicts a human resolves.");
+        }
+        $this->newLine();
+
         if ($report['sampleSize'] === 0) {
-            $this->warn('No human-confirmed items yet — confirm some in the review queue to build the gold set.');
+            $this->warn('No human-confirmed items yet — confirm some in the review queue to measure accuracy.');
 
             return self::SUCCESS;
         }
@@ -45,13 +65,6 @@ class BrokerEval extends Command
                 $acc = $b['n'] > 0 ? round($b['exact'] / $b['n'] * 100).'%' : '—';
                 $this->line("  conf {$b['label']}:  {$b['exact']}/{$b['n']} exact  ({$acc})");
             }
-        }
-
-        if ($report['agreement'] !== null) {
-            $a = $report['agreement'];
-            $pct = $a['both'] > 0 ? round($a['match'] / $a['both'] * 100).'%' : '—';
-            $this->newLine();
-            $this->info("Agreement {$a['a']} vs {$a['b']}: {$a['match']}/{$a['both']} ({$pct}) — the rest are the conflicts a human resolves.");
         }
 
         return self::SUCCESS;

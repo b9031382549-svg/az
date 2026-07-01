@@ -20,20 +20,27 @@ class BrokerEvaluator
      */
     public function evaluate(array $mechanisms): array
     {
-        $items = ClassificationItem::query()
-            ->where('resolution', 'confirmed')
-            ->whereNotNull('final_code')
-            ->with('results')
-            ->get();
+        $all = ClassificationItem::with('results')->get();
+        $gold = $all->filter(fn ($i) => $i->resolution === 'confirmed' && $i->final_code !== null)->values();
 
-        $result = ['sampleSize' => $items->count(), 'mechanisms' => [], 'agreement' => null];
+        $result = [
+            'total' => $all->count(),
+            'sampleSize' => $gold->count(),
+            'resolutions' => $all->groupBy('resolution')->map->count()->sortKeys()->toArray(),
+            'mechanisms' => [],
+            'agreement' => null,
+        ];
 
         foreach ($mechanisms as $mech) {
-            $result['mechanisms'][$mech] = $this->metrics($items, $mech);
+            $result['mechanisms'][$mech] = $this->metrics($gold, $mech) + [
+                'coverageAll' => $all->filter(fn ($i) => ($r = $i->results->firstWhere('mechanism', $mech)) && $r->matched_code !== null)->count(),
+            ];
         }
 
+        // Agreement is measured over ALL items (no ground truth needed) — the key
+        // shadow-mode signal for how often the mechanisms already concur.
         if (count($mechanisms) >= 2) {
-            $result['agreement'] = $this->agreement($items, $mechanisms[0], $mechanisms[1]);
+            $result['agreement'] = $this->agreement($all, $mechanisms[0], $mechanisms[1]);
         }
 
         return $result;
