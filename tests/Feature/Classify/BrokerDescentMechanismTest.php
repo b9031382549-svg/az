@@ -47,6 +47,7 @@ class BrokerDescentMechanismTest extends TestCase
     public function test_clean_descent_reaches_a_leaf_and_auto_confirms(): void
     {
         $this->seedTree();
+        config()->set('classify.expand_query', false); // canonicalize() makes no LLM call in tests
 
         $llm = Mockery::mock(OpenRouterClient::class);
         $llm->shouldReceive('jsonWithUsage')->andReturn(
@@ -55,6 +56,12 @@ class BrokerDescentMechanismTest extends TestCase
             $this->leafResponse('8471300000', 0.9),    // leaf pick among 847130's 2 leaves
         );
         $this->instance(OpenRouterClient::class, $llm);
+
+        // Broker gates auto-confirm on semantic backing (cosine of the pick);
+        // sqlite has no pgvector, so stub it above the min_semantic bar.
+        $retriever = Mockery::mock(CatalogRetriever::class);
+        $retriever->shouldReceive('semanticSimilarity')->andReturn(0.7);
+        $this->instance(CatalogRetriever::class, $retriever);
 
         $result = app(BrokerDescentMechanism::class)->classify('Dell Latitude noutbuk');
 
@@ -69,6 +76,7 @@ class BrokerDescentMechanismTest extends TestCase
     public function test_undecided_fork_falls_back_to_constrained_retrieval(): void
     {
         $this->seedTree();
+        config()->set('classify.expand_query', false);
 
         $llm = Mockery::mock(OpenRouterClient::class);
         // Root fork is not decisive and gives no question -> fallback.

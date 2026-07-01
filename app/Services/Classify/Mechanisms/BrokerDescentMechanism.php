@@ -5,6 +5,7 @@ namespace App\Services\Classify\Mechanisms;
 use App\Models\CatalogCode;
 use App\Models\RubricatorNode;
 use App\Services\Classify\CatalogRetriever;
+use App\Services\Classify\ClassifierService;
 use App\Services\Classify\ProductFactLookupService;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
@@ -26,6 +27,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         private readonly OpenRouterClient $llm,
         private readonly CatalogRetriever $retriever,
         private readonly ProductFactLookupService $facts,
+        private readonly ClassifierService $classifier,
     ) {}
 
     public function key(): string
@@ -48,7 +50,17 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             return $this->result(null, $path, $usage, [], 'error', 'Empty item.', [], $model);
         }
 
+        // Reason over the item's ESSENCE, not a bare noisy token — the same
+        // canonical description that drives vector retrieval. A context-free word
+        // (e.g. "qrelka") otherwise makes the top fork a blind guess.
+        $q = $text;
+
         try {
+            $essence = trim($this->classifier->canonicalize($text));
+            if ($essence !== '' && mb_strtolower($essence) !== mb_strtolower($text)) {
+                $q = $text."\nNormalized: ".$essence;
+            }
+
             $children = RubricatorNode::whereNull('parent_id')->orderBy('code')->get();
 
             for ($depth = 0; $depth < (int) ($cfg['max_depth'] ?? 5); $depth++) {
@@ -64,7 +76,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                     continue;
                 }
 
-                $decision = $this->decide($text, $children, $model, $usage);
+                $decision = $this->decide($q, $children, $model, $usage);
                 $chosen = $this->pick($children, $decision['choice']);
                 $ok = $this->decisive($decision, $chosen, $cfg);
 
@@ -73,7 +85,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                     $lookups++;
                     $fact = $this->facts->lookup($text, $decision['question'], (float) ($cfg['fact_min'] ?? 0.7));
                     if ($fact !== null) {
-                        $decision = $this->decide($text, $children, $model, $usage, $fact);
+                        $decision = $this->decide($q, $children, $model, $usage, $fact);
                         $chosen = $this->pick($children, $decision['choice']);
                         $ok = $this->decisive($decision, $chosen, $cfg);
                     }
@@ -82,7 +94,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                 if (! $ok) {
                     // Undecided: do NOT guess deeper — constrain a retrieval
                     // fallback to the deepest prefix we are still confident about.
-                    return $this->fallback($text, $node, $path, $usage, $confidences, $model, 'Undecided fork; constrained fallback.');
+                    return $this->fallback($q, $node, $path, $usage, $confidences, $model, 'Undecided fork; constrained fallback.');
                 }
 
                 $node = $chosen;
@@ -91,9 +103,9 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                 $children = $node->children;
             }
 
-            return $this->leafMode($text, $node, $path, $usage, $confidences, $model);
+            return $this->leafMode($q, $node, $path, $usage, $confidences, $model);
         } catch (Throwable $e) {
-            return $this->fallback($text, $node, $path, $usage, $confidences, $model, 'Broker error: '.$e->getMessage());
+            return $this->fallback($q, $node, $path, $usage, $confidences, $model, 'Broker error: '.$e->getMessage());
         }
     }
 
@@ -120,7 +132,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             $leaf = $leaves->first();
             $path[] = ['code' => $leaf->code, 'by' => 'single-leaf'];
 
-            return $this->finalize($leaf->code, $path, $usage, $confidences, null, $this->candidates($leaves), $model, clean: true);
+            return $this->finalize($leaf->code, $path, $usage, $confidences, null, $this->candidates($leaves), $model, clean: true, query: $text);
         }
 
         $pick = $this->leafPick($text, $leaves, $model, $usage);
@@ -129,7 +141,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             $confidences[] = $pick['confidence'];
         }
 
-        return $this->finalize($pick['code'], $path, $usage, $confidences, $pick['reason'], $this->candidates($leaves), $model, clean: true);
+        return $this->finalize($pick['code'], $path, $usage, $confidences, $pick['reason'], $this->candidates($leaves), $model, clean: true, query: $text);
     }
 
     /**
@@ -162,11 +174,11 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $pick = $this->leafPick($text, $leaves, $model, $usage);
 
         // Fallback picks never count as a clean descent — they go to review.
-        return $this->finalize($pick['code'], $path, $usage, $confidences, $reason ?? $pick['reason'], $this->candidates($leaves), $model, clean: false);
+        return $this->finalize($pick['code'], $path, $usage, $confidences, $reason ?? $pick['reason'], $this->candidates($leaves), $model, clean: false, query: $text);
     }
 
     /** @param array<int, array<string, mixed>> $path @param array<string, int> $usage @param array<int, float> $confidences @param array<int, mixed> $candidates */
-    private function finalize(?string $code, array $path, array $usage, array $confidences, ?string $reason, array $candidates, string $model, bool $clean): MechanismResult
+    private function finalize(?string $code, array $path, array $usage, array $confidences, ?string $reason, array $candidates, string $model, bool $clean, string $query = ''): MechanismResult
     {
         if ($code === null) {
             return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'No confident match.', $candidates, $model);
@@ -179,7 +191,16 @@ final class BrokerDescentMechanism implements ClassifierMechanism
 
         // Confidence is the WEAKEST link across the descent + leaf pick.
         $confidence = $confidences !== [] ? round(min($confidences), 3) : null;
-        $backed = $clean && $confidence !== null && $confidence >= (float) config('classify.auto_confirm', 0.8);
+
+        // Auto-confirm needs a clean, confident descent AND semantic backing —
+        // the cosine of the item to the chosen leaf clears min_semantic (same gate
+        // as vector). A confident-but-context-starved guess ("qrelka" -> a donkey)
+        // has weak cosine backing, so it drops to review instead of auto-confirm.
+        $backed = false;
+        if ($clean && $confidence !== null && $confidence >= (float) config('classify.auto_confirm', 0.8)) {
+            $sim = $this->retriever->semanticSimilarity($query, $cat->code);
+            $backed = $sim !== null && $sim >= (float) config('classify.min_semantic', 0.5);
+        }
 
         return new MechanismResult(
             matchedCode: $cat->code,

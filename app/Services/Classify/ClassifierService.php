@@ -111,6 +111,19 @@ class ClassifierService
     }
 
     /**
+     * The LLM-normalized canonical description of a noisy item (the same essence
+     * used to drive retrieval) — exposed so other mechanisms (e.g. broker) can
+     * reason about what the item IS instead of a bare, context-free token. Falls
+     * back to the noise-stripped/raw text when expansion is off or fails.
+     */
+    public function canonicalize(string $text): string
+    {
+        [$queries] = $this->expandForRetrieval($text);
+
+        return $queries[0] ?? trim($text);
+    }
+
+    /**
      * Two-tier re-ranking (ТЗ): a cheap/local-equivalent model ranks first; if
      * its pick is not confident AND semantically backed, the item is escalated
      * to the stronger fallback model. Each tier is logged separately in

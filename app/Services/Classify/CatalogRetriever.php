@@ -56,6 +56,32 @@ class CatalogRetriever
     }
 
     /**
+     * Cosine similarity of a free-text query to ONE catalog code's embedding, or
+     * null when unavailable (no embedding, or not Postgres). Lets a non-retrieval
+     * mechanism (the broker) gate its pick on the same semantic backing as vector.
+     */
+    public function semanticSimilarity(string $query, string $code): ?float
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return null; // pgvector-only; sqlite tests have no embeddings
+        }
+
+        $q = $this->normalize($query);
+        if ($q === '') {
+            return null;
+        }
+
+        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($q));
+        $row = DB::selectOne(
+            'SELECT 1 - (embedding <=> ?::vector) AS sim
+             FROM catalog WHERE code = ? AND embedding IS NOT NULL',
+            [$vector, $code],
+        );
+
+        return $row !== null ? round((float) $row->sim, 4) : null;
+    }
+
+    /**
      * Cosine similarity of the query to every candidate's embedding — the
      * retrieval signal used to gate auto-confirmation against an over-confident
      * LLM, regardless of which retriever surfaced the candidate.
