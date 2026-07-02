@@ -65,7 +65,7 @@
             <div class="text-xs space-y-0.5 max-h-64 overflow-auto">
               @foreach(array_slice($res->candidates, 0, 24) as $c)
                 <div class="{{ (string)($c['code'] ?? '') === (string)$res->matched_code ? 'font-medium text-ink' : 'text-muted' }}">
-                  <span class="font-mono">{{ $c['code'] ?? '' }}</span> · {{ \Illuminate\Support\Str::limit($nm($c['code'] ?? '') ?: ($c['name'] ?? ''), 70) }}
+                  <span class="font-mono">{{ $c['code'] ?? '' }}</span> · {{ $nm($c['code'] ?? '') ?: ($c['name'] ?? '') }}
                 </div>
               @endforeach
             </div>
@@ -114,7 +114,7 @@
                   <div class="space-y-0.5 max-h-52 overflow-auto">
                     @foreach(($s['options'] ?? []) as $o)
                       @php $chosen = (string)($o['code'] ?? '') === (string)($s['chosen'] ?? ''); @endphp
-                      <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ \Illuminate\Support\Str::limit($nm($o['code'] ?? '') ?: ($o['name'] ?? ''), 80) }}</div>
+                      <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ $nm($o['code'] ?? '') ?: ($o['name'] ?? '') }}</div>
                     @endforeach
                   </div>
                   @if(!empty($s['reason']))<p class="text-faint text-xs mt-1">{{ $s['reason'] }}</p>@endif
@@ -124,7 +124,7 @@
                     <div class="space-y-0.5 max-h-52 overflow-auto mt-1">
                       @foreach(($s['options'] ?? []) as $o)
                         @php $chosen = (string)($o['code'] ?? '') === (string)($s['chosen'] ?? ''); @endphp
-                        <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ \Illuminate\Support\Str::limit($nm($o['code'] ?? '') ?: ($o['name'] ?? ''), 80) }}</div>
+                        <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ $nm($o['code'] ?? '') ?: ($o['name'] ?? '') }}</div>
                       @endforeach
                     </div>
                   </div>
@@ -152,16 +152,16 @@
             <div class="rounded-lg border hair p-3">
               <span class="kicker">{{ __('Candidates') }} ({{ count($t['candidates'] ?? []) }}) — {{ __('the shortlist the model chose from') }}</span>
               <div class="mt-2 text-xs space-y-0.5 max-h-72 overflow-auto">
-                <div class="flex text-faint">
-                  <span class="w-28">{{ __('Code') }}</span><span class="flex-1">{{ __('Name') }}</span><span class="w-12 text-right">score</span><span class="w-14 text-right">cosine</span>
+                <div class="flex items-start gap-2 text-faint">
+                  <span class="w-28 shrink-0">{{ __('Code') }}</span><span class="flex-1">{{ __('Name') }}</span><span class="w-12 shrink-0 text-right">score</span><span class="w-14 shrink-0 text-right">cosine</span>
                 </div>
                 @foreach(($t['candidates'] ?? []) as $c)
                   @php $chosen = (string)($c['code'] ?? '') === (string)$res->matched_code; @endphp
-                  <div class="flex {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}">
-                    <span class="w-28 font-mono">{{ $chosen ? '→ ' : '' }}{{ $c['code'] ?? '' }}</span>
-                    <span class="flex-1 truncate">{{ \Illuminate\Support\Str::limit($nm($c['code'] ?? '') ?: ($c['name'] ?? ''), 60) }}</span>
-                    <span class="w-12 text-right tnum">{{ isset($c['score']) ? number_format((float)$c['score'], 3) : '' }}</span>
-                    <span class="w-14 text-right tnum">{{ isset($c['semantic_sim']) && $c['semantic_sim'] !== null ? number_format((float)$c['semantic_sim'], 2) : '—' }}</span>
+                  <div class="flex items-start gap-2 {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}">
+                    <span class="w-28 shrink-0 font-mono">{{ $chosen ? '→ ' : '' }}{{ $c['code'] ?? '' }}</span>
+                    <span class="flex-1 break-words">{{ $nm($c['code'] ?? '') ?: ($c['name'] ?? '') }}</span>
+                    <span class="w-12 shrink-0 text-right tnum">{{ isset($c['score']) ? number_format((float)$c['score'], 3) : '' }}</span>
+                    <span class="w-14 shrink-0 text-right tnum">{{ isset($c['semantic_sim']) && $c['semantic_sim'] !== null ? number_format((float)$c['semantic_sim'], 2) : '—' }}</span>
                   </div>
                 @endforeach
               </div>
