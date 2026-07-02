@@ -60,7 +60,7 @@ class SchemaContext
      * allow-listed tables in the public schema.
      *
      * @param  array<int, string>  $tables
-     * @return array<string, array<string, string>>  table => [column => type]
+     * @return array<string, array<string, string>> table => [column => type]
      */
     private function columnsFromDatabase(array $tables): array
     {

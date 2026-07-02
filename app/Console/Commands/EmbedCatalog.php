@@ -32,12 +32,14 @@ class EmbedCatalog extends Command
         $pending = $runner->pendingCount();
         if ($pending === 0) {
             $this->info('Nothing to embed — all catalog rows already have embeddings.');
+
             return self::SUCCESS;
         }
 
         if ($this->option('queue')) {
             GenerateCatalogEmbeddings::dispatch($chunk);
             $this->info("Dispatched embedding of {$pending} rows to the queue (processed by the worker).");
+
             return self::SUCCESS;
         }
 

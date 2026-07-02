@@ -16,6 +16,7 @@ class ImportSynonyms extends Command
         $path = $this->argument('path');
         if (! is_file($path)) {
             $this->error("File not found: {$path}");
+
             return self::FAILURE;
         }
 
@@ -39,6 +40,7 @@ class ImportSynonyms extends Command
 
                 if ($code === '' || $synonyms === '') {
                     $skipped++;
+
                     continue;
                 }
 
@@ -53,6 +55,7 @@ class ImportSynonyms extends Command
             DB::rollBack();
             fclose($handle);
             $this->error("Failed at line {$line}: ".$e->getMessage());
+
             return self::FAILURE;
         }
         fclose($handle);

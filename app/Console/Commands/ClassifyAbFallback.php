@@ -132,7 +132,7 @@ class ClassifyAbFallback extends Command
     }
 
     /**
-     * @param array<int, object> $candidates
+     * @param  array<int, object>  $candidates
      * @return array{0:?string,1:float,2:int,3:float,4:?string} [code, confidence, tokens, ms, error]
      */
     private function rerank(OpenRouterClient $llm, string $model, string $text, array $candidates): array
@@ -202,9 +202,9 @@ class ClassifyAbFallback extends Command
     }
 
     /**
-     * @param array<int, array{0:string,1:string}> $sample
-     * @param array<int, string> $models
-     * @param array<int, array<string, mixed>> $results
+     * @param  array<int, array{0:string,1:string}>  $sample
+     * @param  array<int, string>  $models
+     * @param  array<int, array<string, mixed>>  $results
      */
     private function renderPerItem(array $sample, array $models, array $results): void
     {
@@ -237,11 +237,11 @@ class ClassifyAbFallback extends Command
     }
 
     /**
-     * @param array<int, array{0:string,1:string}> $sample
-     * @param array<int, string> $models
-     * @param array<int, array<string, mixed>> $results
-     * @param array<string, int> $tokens
-     * @param array<string, float> $millis
+     * @param  array<int, array{0:string,1:string}>  $sample
+     * @param  array<int, string>  $models
+     * @param  array<int, array<string, mixed>>  $results
+     * @param  array<string, int>  $tokens
+     * @param  array<string, float>  $millis
      */
     private function renderSummary(array $sample, array $models, array $results, array $tokens, array $millis): void
     {

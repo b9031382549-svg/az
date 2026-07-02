@@ -39,7 +39,7 @@ class LangCheck extends Command
                 continue;
             }
 
-            $this->warn("  {$locale}: ".count($missing)." missing");
+            $this->warn("  {$locale}: ".count($missing).' missing');
             foreach ($missing as $k) {
                 $this->line('    · '.$k);
             }

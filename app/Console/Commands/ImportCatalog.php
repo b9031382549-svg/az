@@ -22,6 +22,7 @@ class ImportCatalog extends Command
         $path = $this->argument('path');
         if (! is_file($path)) {
             $this->error("File not found: {$path}");
+
             return self::FAILURE;
         }
 
@@ -47,6 +48,7 @@ class ImportCatalog extends Command
             $name = trim((string) ($row[1] ?? ''));
             if ($code === '' || $name === '') {
                 $bar->advance();
+
                 continue;
             }
             $unit = trim((string) ($row[2] ?? ''));

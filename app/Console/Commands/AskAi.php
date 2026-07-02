@@ -39,6 +39,7 @@ class AskAi extends Command
         if ($result['error']) {
             $this->newLine();
             $this->error('Error: '.$result['error']);
+
             return self::FAILURE;
         }
 
