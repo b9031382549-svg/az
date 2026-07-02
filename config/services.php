@@ -62,4 +62,10 @@ return [
         'dimensions' => (int) env('EMBED_DIMENSIONS', 1024),
     ],
 
+    // Read-only results API: lets external tooling pull classification results +
+    // decision traces (per item and per upload). Unset key = API disabled (401).
+    'results_api' => [
+        'key' => env('RESULTS_API_KEY'),
+    ],
+
 ];
