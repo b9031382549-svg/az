@@ -61,6 +61,10 @@ jobs:
             set -euo pipefail
             cd /opt/az
             git pull --ff-only origin main
+            # Read-only results API key: keep .env in sync with the RESULTS_API_KEY
+            # GitHub Actions secret (added once; value masked in the log; optimize
+            # below re-caches config so the key takes effect).
+            grep -q '^RESULTS_API_KEY=' .env || printf '\nRESULTS_API_KEY=%s\n' "${{ secrets.RESULTS_API_KEY }}" >> .env
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml run --rm app php artisan migrate --force
             # Rebuild the rubricator tree from the catalog (deterministic, idempotent,
