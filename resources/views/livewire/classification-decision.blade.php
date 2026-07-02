@@ -1,6 +1,9 @@
 <section class="p-5 sm:p-8 max-w-[1000px]">
   @php
     $nm = fn ($c) => $names[(string) $c] ?? '';
+    // Localized rubricator title by code, falling back to the title stored in the
+    // trace (older traces recorded the Azerbaijani title inline).
+    $rt = fn ($c, $fallback = '') => $rubricTitles[(string) $c] ?? ($fallback ?? '');
     $statusBadge = fn ($s) => match ($s) {
         'auto_confirmed', 'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
         'needs_review', 'review', 'blocked_on_fact' => 'bg-amber/15 text-amber',
@@ -84,14 +87,14 @@
                       @php $chosen = (string)($o['code'] ?? '') === (string)($s['chosen'] ?? ''); @endphp
                       <div class="text-xs {{ $chosen ? 'text-ink' : 'text-muted' }}">
                         <span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span>
-                        <span class="{{ $chosen ? 'font-medium' : '' }}">{{ $o['title'] ?? '' }}</span>
+                        <span class="{{ $chosen ? 'font-medium' : '' }}">{{ $rt($o['code'] ?? '', $o['title'] ?? '') }}</span>
                         @if(!empty($o['samples']))<span class="text-faint"> — {{ \Illuminate\Support\Str::limit($o['samples'], 90) }}</span>@endif
                       </div>
                     @endforeach
                   </div>
                   @if(!empty($s['question']))<p class="text-amber text-xs mt-2">{{ __('Missing fact') }}: {{ $s['question'] }}</p>@endif
                 @elseif($type === 'auto')
-                  <span class="text-muted"><span class="kicker">{{ __('Only child') }}</span> — <span class="font-mono">{{ $s['code'] ?? '' }}</span> {{ $s['title'] ?? '' }}</span>
+                  <span class="text-muted"><span class="kicker">{{ __('Only child') }}</span> — <span class="font-mono">{{ $s['code'] ?? '' }}</span> {{ $rt($s['code'] ?? '', $s['title'] ?? '') }}</span>
                 @elseif($type === 'fact')
                   <div><span class="kicker">{{ __('Fact lookup') }}</span>
                     <p class="text-muted mt-1">{{ __('Asked') }}: {{ $s['question'] ?? '' }}</p>
@@ -105,7 +108,7 @@
                   <div class="space-y-0.5 max-h-52 overflow-auto">
                     @foreach(($s['options'] ?? []) as $o)
                       @php $chosen = (string)($o['code'] ?? '') === (string)($s['chosen'] ?? ''); @endphp
-                      <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ \Illuminate\Support\Str::limit($o['name'] ?? '', 80) }}</div>
+                      <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ \Illuminate\Support\Str::limit($nm($o['code'] ?? '') ?: ($o['name'] ?? ''), 80) }}</div>
                     @endforeach
                   </div>
                   @if(!empty($s['reason']))<p class="text-faint text-xs mt-1">{{ $s['reason'] }}</p>@endif
@@ -115,7 +118,7 @@
                     <div class="space-y-0.5 max-h-52 overflow-auto mt-1">
                       @foreach(($s['options'] ?? []) as $o)
                         @php $chosen = (string)($o['code'] ?? '') === (string)($s['chosen'] ?? ''); @endphp
-                        <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ \Illuminate\Support\Str::limit($o['name'] ?? '', 80) }}</div>
+                        <div class="text-xs {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}"><span class="font-mono">{{ $chosen ? '→ ' : '  ' }}{{ $o['code'] ?? '' }}</span> {{ \Illuminate\Support\Str::limit($nm($o['code'] ?? '') ?: ($o['name'] ?? ''), 80) }}</div>
                       @endforeach
                     </div>
                   </div>

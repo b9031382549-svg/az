@@ -79,6 +79,47 @@ class RubricatorBuilderTest extends TestCase
         $this->assertEqualsCanonicalizing(['8471300000', '8471410000'], $leaves->pluck('code')->all());
     }
 
+    public function test_populates_localized_titles_from_catalog_and_reference_lists(): void
+    {
+        // Goods leaves carry en/ru breadcrumbs; the ru first segment ends in "р"
+        // (bytes D1 80) — a byte-wise trim mask would slice the trailing 0x80 and
+        // corrupt the string, so this doubles as a regression guard.
+        CatalogCode::create(['code' => '8471300000', 'kind' => 'good', 'chapter' => '84', 'position' => '8471', 'subposition' => '847130', 'is_active' => true,
+            'name' => 'Hesablayıcı maşınlar:– portativ',
+            'name_en' => 'Calculating machines:– portable',
+            'name_ru' => 'Счётные калькулятор:– портативные']);
+        CatalogCode::create(['code' => '9946111100', 'kind' => 'service', 'chapter' => '99', 'position' => '9946', 'subposition' => '994611', 'is_active' => true,
+            'name' => 'Diri heyvanların topdansatışı üzrə xidmətlər',
+            'name_en' => 'Wholesale services of live animals',
+            'name_ru' => 'Услуги оптовой торговли живыми животными']);
+
+        $this->artisan('data:build-rubricator')->assertSuccessful();
+
+        // Chapter titles come from the HS reference list in all three languages.
+        $ch = RubricatorNode::where('code', '84')->first();
+        $this->assertSame(HsChapters::EN['84'], $ch->title_en);
+        $this->assertSame(HsChapters::RU['84'], $ch->title_ru);
+
+        // Goods position titles are derived per-language from the catalog breadcrumb,
+        // and the Cyrillic segment survives intact (ends in "р", not corrupted).
+        $pos = RubricatorNode::where('code', '8471')->first();
+        $this->assertSame('Calculating machines', $pos->title_en);
+        $this->assertSame('Счётные калькулятор', $pos->title_ru);
+
+        // Service position titles come from the authored ServiceRubrics reference.
+        $svcPos = RubricatorNode::where('code', '9946')->first();
+        $this->assertSame(ServiceRubrics::POSITIONS_EN['9946'], $svcPos->title_en);
+        $this->assertSame(ServiceRubrics::POSITIONS_RU['9946'], $svcPos->title_ru);
+
+        // localizedTitle() follows the locale and falls back to the base title.
+        $this->app->setLocale('ru');
+        $this->assertSame('Счётные калькулятор', $pos->localizedTitle());
+        $this->app->setLocale('en');
+        $this->assertSame('Calculating machines', $pos->localizedTitle());
+        $pos->title_en = null;
+        $this->assertSame($pos->title, $pos->localizedTitle());
+    }
+
     public function test_build_is_idempotent(): void
     {
         $this->seedCatalog();

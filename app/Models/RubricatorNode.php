@@ -25,6 +25,21 @@ class RubricatorNode extends Model
         ];
     }
 
+    /**
+     * The category title for the active UI locale, falling back to the base
+     * Azerbaijani title. Display-only; navigation/matching use the base title.
+     */
+    public function localizedTitle(): string
+    {
+        $t = match (app()->getLocale()) {
+            'en' => $this->title_en,
+            'ru' => $this->title_ru,
+            default => null,
+        };
+
+        return ($t !== null && $t !== '') ? $t : (string) $this->title;
+    }
+
     /** @return BelongsTo<RubricatorNode, $this> */
     public function parent(): BelongsTo
     {
