@@ -4,6 +4,11 @@
     // Localized rubricator title by code, falling back to the title stored in the
     // trace (older traces recorded the Azerbaijani title inline).
     $rt = fn ($c, $fallback = '') => $rubricTitles[(string) $c] ?? ($fallback ?? '');
+    // The display translation of the classified text, shown as an aid under the
+    // trace's "Input" line (which stays the literal, original-language string the
+    // classifier actually processed). Null in az mode or when no translation exists.
+    $srcTranslation = app()->getLocale() !== 'az' ? $item->localizedSourceText() : null;
+    $srcTranslation = ($srcTranslation !== null && $srcTranslation !== $item->source_text) ? $srcTranslation : null;
     $statusBadge = fn ($s) => match ($s) {
         'auto_confirmed', 'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
         'needs_review', 'review', 'blocked_on_fact' => 'bg-amber/15 text-amber',
@@ -70,6 +75,7 @@
           {{-- BROKER: descent trace --}}
           <div class="space-y-3 text-sm">
             <div><span class="text-faint">{{ __('Input') }}:</span> {{ $t['input'] ?? $item->source_text }}
+              @if($srcTranslation)<div class="text-muted mt-0.5">↳ {{ __('Translation') }}: <em>{{ $srcTranslation }}</em></div>@endif
               @if(!empty($t['essence']))<div class="text-muted mt-0.5">↳ {{ __('Normalized') }}: <em>{{ $t['essence'] }}</em></div>@endif
             </div>
 
@@ -132,7 +138,9 @@
         @else
           {{-- VECTOR: retrieval + rerank trace --}}
           <div class="space-y-3 text-sm">
-            <div><span class="text-faint">{{ __('Input') }}:</span> {{ $t['input'] ?? $item->source_text }}</div>
+            <div><span class="text-faint">{{ __('Input') }}:</span> {{ $t['input'] ?? $item->source_text }}
+              @if($srcTranslation)<div class="text-muted mt-0.5">↳ {{ __('Translation') }}: <em>{{ $srcTranslation }}</em></div>@endif
+            </div>
             @if(!empty($t['queries']))
               <div class="rounded-lg border hair p-3">
                 <span class="kicker">{{ __('Search queries') }}</span>
