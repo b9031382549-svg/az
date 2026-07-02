@@ -120,6 +120,43 @@ class RubricatorBuilderTest extends TestCase
         $this->assertSame($pos->title, $pos->localizedTitle());
     }
 
+    public function test_sample_leaves_spread_across_the_whole_branch(): void
+    {
+        // 12 leaves across four headings of chapter 84.
+        foreach (['8401', '8402', '8403', '8404'] as $pos) {
+            foreach (['10', '20', '30'] as $suffix) {
+                CatalogCode::create([
+                    'code' => $pos.'0000'.$suffix, 'kind' => 'good', 'chapter' => '84',
+                    'position' => $pos, 'subposition' => $pos.'00', 'is_active' => true,
+                    'name' => "Machine {$pos}-{$suffix}",
+                ]);
+            }
+        }
+        $node = RubricatorNode::create(['code' => '84', 'level' => 1, 'kind' => 'good', 'is_active' => true]);
+
+        $sample = $node->sampleLeaves(4);
+
+        // A first-N-by-code sample would be all in 8401; an even stride spans the
+        // range — includes the very first and the very last leaf.
+        $codes = $sample->pluck('code');
+        $this->assertSame(4, $codes->count());
+        $this->assertContains('8401000010', $codes->all());
+        $this->assertContains('8404000030', $codes->all());
+        $headings = $codes->map(fn ($c) => substr($c, 0, 4))->unique();
+        $this->assertGreaterThanOrEqual(3, $headings->count(), 'sample should span multiple headings');
+    }
+
+    public function test_sample_leaves_returns_all_when_fewer_than_limit(): void
+    {
+        $this->seedCatalog();
+        $node = RubricatorNode::create(['code' => '8471', 'level' => 2, 'kind' => 'good', 'is_active' => true]);
+
+        $this->assertEqualsCanonicalizing(
+            ['8471300000', '8471410000'],
+            $node->sampleLeaves(12)->pluck('code')->all(),
+        );
+    }
+
     public function test_build_is_idempotent(): void
     {
         $this->seedCatalog();

@@ -261,12 +261,12 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $options = [];
         $branchLines = [];
         foreach ($children as $c) {
-            // These sample leaves only CHARACTERIZE a branch (the first fork weighs
-            // all 97 chapters at once → ~1135 snippets); the exact code is chosen
-            // later from full names. So bound each sample tail-first to keep the
-            // prompt sane, rather than sending every leaf in full here.
+            // Sample leaves CHARACTERIZE a branch (deciding by function, not the
+            // bare title). Sent in full — the tail is what distinguishes them — and
+            // now drawn as an even cross-section of the branch (see sampleLeaves),
+            // so a broad chapter is represented by its whole range, not its start.
             $samples = $c->sampleLeaves($sample)->pluck('name')
-                ->map(fn ($n) => BreadcrumbName::fit((string) $n, 200))->implode('; ');
+                ->map(fn ($n) => (string) $n)->implode('; ');
             $title = $c->title ?: $c->code;
             $branchLines[] = "code={$c->code} | {$title}\n    e.g.: {$samples}";
             $options[] = ['code' => $c->code, 'title' => $title, 'samples' => mb_substr($samples, 0, 300)];

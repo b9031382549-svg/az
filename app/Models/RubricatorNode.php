@@ -57,6 +57,12 @@ class RubricatorNode extends Model
      * the broker judges a branch by (not the bare title). Uses catalog's indexed
      * chapter/position/subposition columns (equality, not LIKE).
      *
+     * The sample is spread EVENLY across the branch's code range, not the first N
+     * by code: a broad chapter (e.g. 84 has ~950 leaves across ~85 headings) would
+     * otherwise be represented only by its first heading, giving the broker a
+     * skewed view of what the branch actually contains. An even stride surfaces a
+     * true cross-section (first, last, and points between).
+     *
      * @return Collection<int, CatalogCode>
      */
     public function sampleLeaves(int $limit = 12): Collection
@@ -67,11 +73,21 @@ class RubricatorNode extends Model
             default => 'subposition',
         };
 
-        return CatalogCode::query()
-            ->where($column, $this->code)
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->limit($limit)
-            ->get(['code', 'name']);
+        $base = CatalogCode::query()->where($column, $this->code)->where('is_active', true);
+
+        $codes = (clone $base)->orderBy('code')->pluck('code')->values();
+        if ($limit <= 1 || $codes->count() <= $limit) {
+            return (clone $base)->orderBy('code')->limit(max(1, $limit))->get(['code', 'name']);
+        }
+
+        // Evenly-spaced indices over the ordered codes, inclusive of both ends.
+        $step = ($codes->count() - 1) / ($limit - 1);
+        $picked = [];
+        for ($i = 0; $i < $limit; $i++) {
+            $picked[] = $codes[(int) round($i * $step)];
+        }
+        $picked = array_values(array_unique($picked));
+
+        return CatalogCode::whereIn('code', $picked)->orderBy('code')->get(['code', 'name']);
     }
 }
