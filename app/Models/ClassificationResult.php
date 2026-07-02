@@ -17,6 +17,7 @@ class ClassificationResult extends Model
         return [
             'candidates' => 'array',
             'path' => 'array',
+            'trace' => 'array',
             'usage' => 'array',
             'confidence' => 'float',
             'tier' => 'integer',

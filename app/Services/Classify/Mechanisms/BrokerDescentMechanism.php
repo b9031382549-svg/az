@@ -20,6 +20,9 @@ use Throwable;
  * an undecided fork it tries to acquire the one missing fact, and otherwise
  * constrains a retrieval fallback to the deepest confident prefix (never a blind
  * guess). Uses the strong model only.
+ *
+ * Records a structured `trace` (input -> essence -> forks with alternatives ->
+ * leaf -> gate) for the "Decision" screen.
  */
 final class BrokerDescentMechanism implements ClassifierMechanism
 {
@@ -45,9 +48,10 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $confidences = [];
         $node = null;
         $lookups = 0;
+        $trace = ['input' => $text, 'essence' => null, 'steps' => [], 'gate' => null];
 
         if ($text === '') {
-            return $this->result(null, $path, $usage, [], 'error', 'Empty item.', [], $model);
+            return $this->result(null, $path, $usage, [], 'error', 'Empty item.', [], $model, $trace);
         }
 
         // Reason over the item's ESSENCE, not a bare noisy token — the same
@@ -59,6 +63,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             $essence = trim($this->classifier->canonicalize($text));
             if ($essence !== '' && mb_strtolower($essence) !== mb_strtolower($text)) {
                 $q = $text."\nNormalized: ".$essence;
+                $trace['essence'] = $essence;
             }
 
             $children = RubricatorNode::whereNull('parent_id')->orderBy('code')->get();
@@ -71,6 +76,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                 if ($children->count() === 1) {
                     $node = $children->first();
                     $path[] = $this->step($node, 'only-child');
+                    $trace['steps'][] = ['type' => 'auto', 'code' => $node->code, 'title' => $node->title];
                     $children = $node->children;
 
                     continue;
@@ -79,22 +85,25 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                 $decision = $this->decide($q, $children, $model, $usage);
                 $chosen = $this->pick($children, $decision['choice']);
                 $ok = $this->decisive($decision, $chosen, $cfg);
+                $trace['steps'][] = $this->forkStep($decision, $ok);
 
                 // One targeted fact-acquisition retry on an undecided fork.
                 if (! $ok && $decision['question'] !== null && $lookups < (int) ($cfg['max_lookups'] ?? 1)) {
                     $lookups++;
                     $fact = $this->facts->lookup($text, $decision['question'], (float) ($cfg['fact_min'] ?? 0.7));
+                    $trace['steps'][] = ['type' => 'fact', 'question' => $decision['question'], 'fact' => $fact];
                     if ($fact !== null) {
                         $decision = $this->decide($q, $children, $model, $usage, $fact);
                         $chosen = $this->pick($children, $decision['choice']);
                         $ok = $this->decisive($decision, $chosen, $cfg);
+                        $trace['steps'][] = $this->forkStep($decision, $ok, afterFact: true);
                     }
                 }
 
                 if (! $ok) {
                     // Undecided: do NOT guess deeper — constrain a retrieval
                     // fallback to the deepest prefix we are still confident about.
-                    return $this->fallback($q, $node, $path, $usage, $confidences, $model, 'Undecided fork; constrained fallback.');
+                    return $this->fallback($q, $node, $path, $usage, $confidences, $model, 'Undecided fork; constrained fallback.', $trace);
                 }
 
                 $node = $chosen;
@@ -103,9 +112,9 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                 $children = $node->children;
             }
 
-            return $this->leafMode($q, $node, $path, $usage, $confidences, $model);
+            return $this->leafMode($q, $node, $path, $usage, $confidences, $model, $trace);
         } catch (Throwable $e) {
-            return $this->fallback($q, $node, $path, $usage, $confidences, $model, 'Broker error: '.$e->getMessage());
+            return $this->fallback($q, $node, $path, $usage, $confidences, $model, 'Broker error: '.$e->getMessage(), $trace);
         }
     }
 
@@ -115,33 +124,36 @@ final class BrokerDescentMechanism implements ClassifierMechanism
      * @param  array<int, array<string, mixed>>  $path
      * @param  array<string, int>  $usage
      * @param  array<int, float>  $confidences
+     * @param  array<string, mixed>  $trace
      */
-    private function leafMode(string $text, ?RubricatorNode $node, array $path, array $usage, array $confidences, string $model): MechanismResult
+    private function leafMode(string $text, ?RubricatorNode $node, array $path, array $usage, array $confidences, string $model, array $trace): MechanismResult
     {
         if ($node === null) {
-            return $this->fallback($text, null, $path, $usage, $confidences, $model, 'No rubric reached.');
+            return $this->fallback($text, null, $path, $usage, $confidences, $model, 'No rubric reached.', $trace);
         }
 
         $leaves = $this->leavesUnder($node);
         if ($leaves->isEmpty() || $leaves->count() > (int) config('classify.broker.leaf_direct_max', 20)) {
             // Too many (or zero) direct leaves — narrow via retrieval on the prefix.
-            return $this->fallback($text, $node, $path, $usage, $confidences, $model, 'Leaf narrowing via retrieval.');
+            return $this->fallback($text, $node, $path, $usage, $confidences, $model, 'Leaf narrowing via retrieval.', $trace);
         }
 
         if ($leaves->count() === 1) {
             $leaf = $leaves->first();
             $path[] = ['code' => $leaf->code, 'by' => 'single-leaf'];
+            $trace['steps'][] = ['type' => 'leaf', 'options' => $this->leafOptions($leaves), 'chosen' => $leaf->code, 'note' => 'single leaf'];
 
-            return $this->finalize($leaf->code, $path, $usage, $confidences, null, $this->candidates($leaves), $model, clean: true, query: $text);
+            return $this->finalize($leaf->code, $path, $usage, $confidences, null, $this->candidates($leaves), $model, true, $text, $trace);
         }
 
         $pick = $this->leafPick($text, $leaves, $model, $usage);
         $path[] = ['code' => $pick['code'], 'by' => 'leaf-pick', 'confidence' => $pick['confidence']];
+        $trace['steps'][] = ['type' => 'leaf', 'options' => $this->leafOptions($leaves), 'chosen' => $pick['code'], 'confidence' => $pick['confidence'], 'reason' => $pick['reason']];
         if ($pick['code'] !== null) {
             $confidences[] = $pick['confidence'];
         }
 
-        return $this->finalize($pick['code'], $path, $usage, $confidences, $pick['reason'], $this->candidates($leaves), $model, clean: true, query: $text);
+        return $this->finalize($pick['code'], $path, $usage, $confidences, $pick['reason'], $this->candidates($leaves), $model, true, $text, $trace);
     }
 
     /**
@@ -152,8 +164,9 @@ final class BrokerDescentMechanism implements ClassifierMechanism
      * @param  array<int, array<string, mixed>>  $path
      * @param  array<string, int>  $usage
      * @param  array<int, float>  $confidences
+     * @param  array<string, mixed>  $trace
      */
-    private function fallback(string $text, ?RubricatorNode $node, array $path, array $usage, array $confidences, string $model, ?string $reason): MechanismResult
+    private function fallback(string $text, ?RubricatorNode $node, array $path, array $usage, array $confidences, string $model, ?string $reason, array $trace): MechanismResult
     {
         $objects = $this->retriever->candidates([$text], (int) config('classify.candidates', 24));
 
@@ -167,53 +180,76 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $path[] = ['by' => 'fallback', 'prefix' => $node?->code];
 
         if ($objects === []) {
-            return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'No candidates found.', [], $model);
+            $trace['steps'][] = ['type' => 'fallback', 'prefix' => $node?->code, 'reason' => $reason, 'options' => [], 'chosen' => null];
+
+            return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'No candidates found.', [], $model, $trace);
         }
 
         $leaves = collect($objects)->map(fn ($c) => (object) ['code' => $c->code, 'name' => $c->name, 'kind' => $c->kind]);
         $pick = $this->leafPick($text, $leaves, $model, $usage);
+        $trace['steps'][] = ['type' => 'fallback', 'prefix' => $node?->code, 'reason' => $reason, 'options' => $this->leafOptions($leaves), 'chosen' => $pick['code'], 'confidence' => $pick['confidence']];
 
         // Fallback picks never count as a clean descent — they go to review.
-        return $this->finalize($pick['code'], $path, $usage, $confidences, $reason ?? $pick['reason'], $this->candidates($leaves), $model, clean: false, query: $text);
+        return $this->finalize($pick['code'], $path, $usage, $confidences, $reason ?? $pick['reason'], $this->candidates($leaves), $model, false, $text, $trace);
     }
 
-    /** @param array<int, array<string, mixed>> $path @param array<string, int> $usage @param array<int, float> $confidences @param array<int, mixed> $candidates */
-    private function finalize(?string $code, array $path, array $usage, array $confidences, ?string $reason, array $candidates, string $model, bool $clean, string $query = ''): MechanismResult
+    /**
+     * @param  array<int, array<string, mixed>>  $path
+     * @param  array<string, int>  $usage
+     * @param  array<int, float>  $confidences
+     * @param  array<int, mixed>  $candidates
+     * @param  array<string, mixed>  $trace
+     */
+    private function finalize(?string $code, array $path, array $usage, array $confidences, ?string $reason, array $candidates, string $model, bool $clean, string $query, array $trace): MechanismResult
     {
         if ($code === null) {
-            return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'No confident match.', $candidates, $model);
+            return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'No confident match.', $candidates, $model, $trace);
         }
 
         $cat = CatalogCode::where('code', $code)->first();
         if ($cat === null) {
-            return $this->result(null, $path, $usage, $confidences, 'no_match', 'Picked code not in catalog.', $candidates, $model);
+            return $this->result(null, $path, $usage, $confidences, 'no_match', 'Picked code not in catalog.', $candidates, $model, $trace);
         }
 
         // Confidence is the WEAKEST link across the descent + leaf pick.
         $confidence = $confidences !== [] ? round(min($confidences), 3) : null;
+        $autoConfirm = (float) config('classify.auto_confirm', 0.8);
+        $minSemantic = (float) config('classify.min_semantic', 0.5);
 
         // Auto-confirm needs a clean, confident descent AND semantic backing —
         // the cosine of the item to the chosen leaf clears min_semantic (same gate
         // as vector). A confident-but-context-starved guess ("qrelka" -> a donkey)
         // has weak cosine backing, so it drops to review instead of auto-confirm.
+        $sim = null;
         $backed = false;
-        if ($clean && $confidence !== null && $confidence >= (float) config('classify.auto_confirm', 0.8)) {
+        if ($clean && $confidence !== null && $confidence >= $autoConfirm) {
             $sim = $this->retriever->semanticSimilarity($query, $cat->code);
-            $backed = $sim !== null && $sim >= (float) config('classify.min_semantic', 0.5);
+            $backed = $sim !== null && $sim >= $minSemantic;
         }
+        $status = $backed ? 'auto_confirmed' : 'needs_review';
+
+        $trace['gate'] = [
+            'confidence' => $confidence,
+            'auto_confirm' => $autoConfirm,
+            'semantic_sim' => $sim,
+            'min_semantic' => $minSemantic,
+            'clean' => $clean,
+            'status' => $status,
+        ];
 
         return new MechanismResult(
             matchedCode: $cat->code,
             catalogId: $cat->id,
             kind: $cat->kind, // authoritative (99 => service)
             confidence: $confidence,
-            status: $backed ? 'auto_confirmed' : 'needs_review',
+            status: $status,
             candidates: $candidates,
             path: $path,
             explanation: $reason,
             model: $model,
             tier: null,
             usage: $usage,
+            trace: $trace,
         );
     }
 
@@ -221,18 +257,20 @@ final class BrokerDescentMechanism implements ClassifierMechanism
     private function decide(string $text, Collection $children, string $model, array &$usage, ?string $fact = null): array
     {
         $sample = (int) config('classify.broker.sample_leaves', 12);
-        $branches = $children->map(function (RubricatorNode $c) use ($sample) {
-            $leaves = $c->sampleLeaves($sample)->pluck('name')
+        $options = [];
+        $branchLines = [];
+        foreach ($children as $c) {
+            $samples = $c->sampleLeaves($sample)->pluck('name')
                 ->map(fn ($n) => mb_substr((string) $n, 0, 80))->implode('; ');
             $title = $c->title ?: $c->code;
-
-            return "code={$c->code} | {$title}\n    e.g.: {$leaves}";
-        })->implode("\n");
+            $branchLines[] = "code={$c->code} | {$title}\n    e.g.: {$samples}";
+            $options[] = ['code' => $c->code, 'title' => $title, 'samples' => mb_substr($samples, 0, 160)];
+        }
 
         $factLine = $fact !== null ? "\nKNOWN FACT: {$fact}" : '';
         $messages = [
             ['role' => 'system', 'content' => $this->decidePrompt()],
-            ['role' => 'user', 'content' => "ITEM: {$text}{$factLine}\n\nBRANCHES:\n{$branches}"],
+            ['role' => 'user', 'content' => "ITEM: {$text}{$factLine}\n\nBRANCHES:\n".implode("\n", $branchLines)],
         ];
 
         $response = $this->llm->jsonWithUsage($messages, ['model' => $model]);
@@ -250,6 +288,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             // A pick with no stated criterion is treated as a guess -> not decisive.
             'decisive' => (bool) ($d['decisive'] ?? false) && $criterion !== '',
             'question' => $this->str($d['question'] ?? null),
+            'options' => $options,
         ];
     }
 
@@ -307,6 +346,31 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         return $code !== null ? $children->firstWhere('code', $code) : null;
     }
 
+    /** A trace record for one fork: the alternatives it weighed and what it chose. */
+    private function forkStep(array $decision, bool $accepted, bool $afterFact = false): array
+    {
+        return [
+            'type' => 'fork',
+            'options' => $decision['options'],
+            'criterion' => $decision['criterion'],
+            'chosen' => $decision['choice'],
+            'confidence' => $decision['confidence'],
+            'decisive' => $decision['decisive'],
+            'question' => $decision['question'],
+            'accepted' => $accepted,
+            'after_fact' => $afterFact,
+        ];
+    }
+
+    /** @param Collection<int, object> $leaves @return array<int, array<string, string>> */
+    private function leafOptions(Collection $leaves): array
+    {
+        return $leaves->take(30)->map(fn ($l) => [
+            'code' => (string) $l->code,
+            'name' => mb_substr((string) $l->name, 0, 120),
+        ])->values()->all();
+    }
+
     /** @param Collection<int, object> $leaves @return array<int, array<string, mixed>> */
     private function candidates(Collection $leaves): array
     {
@@ -328,9 +392,17 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         ], fn ($v) => $v !== null);
     }
 
-    /** @param array<int, array<string, mixed>> $path @param array<string, int> $usage @param array<int, float> $confidences @param array<int, mixed> $candidates */
-    private function result(?string $code, array $path, array $usage, array $confidences, string $status, ?string $reason, array $candidates, string $model): MechanismResult
+    /**
+     * @param  array<int, array<string, mixed>>  $path
+     * @param  array<string, int>  $usage
+     * @param  array<int, float>  $confidences
+     * @param  array<int, mixed>  $candidates
+     * @param  array<string, mixed>  $trace
+     */
+    private function result(?string $code, array $path, array $usage, array $confidences, string $status, ?string $reason, array $candidates, string $model, array $trace): MechanismResult
     {
+        $trace['gate'] ??= ['status' => $status, 'confidence' => $confidences !== [] ? round(min($confidences), 3) : null];
+
         return new MechanismResult(
             matchedCode: $code,
             catalogId: null,
@@ -343,6 +415,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             model: $model,
             tier: null,
             usage: $usage,
+            trace: $trace,
         );
     }
 

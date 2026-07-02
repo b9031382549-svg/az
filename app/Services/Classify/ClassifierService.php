@@ -38,6 +38,7 @@ class ClassifierService
             'tier' => null,
             'escalated' => false,
             'error' => null,
+            'trace' => null,
         ];
 
         if ($text === '') {
@@ -54,6 +55,7 @@ class ClassifierService
             if (empty($candidates)) {
                 $result['usage'] = $expandUsage;
                 $result['reason'] = 'No catalog candidates found.';
+                $result['trace'] = ['input' => $text, 'queries' => $queries, 'candidates' => [], 'rerank' => null, 'gate' => ['status' => 'no_match']];
 
                 return $result;
             }
@@ -71,6 +73,17 @@ class ClassifierService
             $result['tier'] = $picked['tier'];
             $result['escalated'] = $picked['escalated'];
 
+            $rerankTrace = [
+                'tier' => $picked['tier'],
+                'escalated' => $picked['escalated'],
+                'model' => $picked['tier'] === 1
+                    ? (string) config('services.openrouter.classify_model_tier1')
+                    : (string) config('services.openrouter.classify_model'),
+                'code' => $picked['code'],
+                'confidence' => isset($picked['confidence']) ? round((float) $picked['confidence'], 3) : null,
+                'reason' => $picked['reason'] ?? null,
+            ];
+
             $result['usage'] = $this->sumUsage($expandUsage, $picked['usage']);
 
             $match = $picked['code']
@@ -81,6 +94,7 @@ class ClassifierService
                 $result['kind'] = $picked['kind'];
                 $result['confidence'] = round((float) $picked['confidence'], 3);
                 $result['reason'] = $picked['reason'] ?? 'No confident match among candidates.';
+                $result['trace'] = ['input' => $text, 'queries' => $queries, 'candidates' => $result['candidates'], 'rerank' => $rerankTrace, 'gate' => ['status' => 'no_match']];
 
                 return $result;
             }
@@ -102,9 +116,24 @@ class ClassifierService
             $confident = $confidence >= (float) config('classify.auto_confirm');
             $backed = $semanticSim !== null && $semanticSim >= (float) config('classify.min_semantic');
             $result['status'] = ($confident && $backed) ? 'auto_confirmed' : 'needs_review';
+
+            $result['trace'] = [
+                'input' => $text,
+                'queries' => $queries,
+                'candidates' => $result['candidates'],
+                'rerank' => $rerankTrace,
+                'gate' => [
+                    'confidence' => $confidence,
+                    'auto_confirm' => (float) config('classify.auto_confirm'),
+                    'semantic_sim' => $semanticSim,
+                    'min_semantic' => (float) config('classify.min_semantic'),
+                    'status' => $result['status'],
+                ],
+            ];
         } catch (Throwable $e) {
             $result['error'] = $e->getMessage();
             $result['status'] = 'error';
+            $result['trace'] = ['input' => $text, 'error' => $e->getMessage()];
         }
 
         return $result;

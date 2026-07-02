@@ -23,6 +23,7 @@ final class MechanismResult
         public readonly ?string $model = null,
         public readonly ?int $tier = null,
         public readonly array $usage = [],
+        public readonly array $trace = [],
     ) {}
 
     /** @return array<string, mixed> Column values for a classification_results row. */
@@ -40,6 +41,7 @@ final class MechanismResult
             'model' => $this->model,
             'tier' => $this->tier,
             'usage' => $this->usage !== [] ? $this->usage : null,
+            'trace' => $this->trace !== [] ? $this->trace : null,
         ];
     }
 }

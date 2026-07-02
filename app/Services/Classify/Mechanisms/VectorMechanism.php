@@ -45,6 +45,7 @@ final class VectorMechanism implements ClassifierMechanism
             model: ($r['code'] ?? null) !== null ? $model : null,
             tier: $tier,
             usage: $r['usage'] ?? [],
+            trace: $r['trace'] ?? [],
         );
     }
 }

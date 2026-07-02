@@ -198,6 +198,9 @@
               </div>
             @endforeach
           </div>
+
+          <a href="{{ route('review.decision', $item->id) }}" target="_blank"
+             class="inline-block mt-2 text-xs text-muted hover:text-ink underline decoration-dotted">🔍 {{ __('Decision flow') }}</a>
         </div>
 
         <div class="shrink-0 w-full sm:w-[340px]">
