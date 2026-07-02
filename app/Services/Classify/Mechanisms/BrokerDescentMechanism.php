@@ -8,6 +8,7 @@ use App\Services\Classify\CatalogRetriever;
 use App\Services\Classify\ClassifierService;
 use App\Services\Classify\ProductFactLookupService;
 use App\Services\Llm\OpenRouterClient;
+use App\Support\BreadcrumbName;
 use App\Support\LlmLog;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -261,10 +262,10 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $branchLines = [];
         foreach ($children as $c) {
             $samples = $c->sampleLeaves($sample)->pluck('name')
-                ->map(fn ($n) => mb_substr((string) $n, 0, 80))->implode('; ');
+                ->map(fn ($n) => BreadcrumbName::fit((string) $n, 200))->implode('; ');
             $title = $c->title ?: $c->code;
             $branchLines[] = "code={$c->code} | {$title}\n    e.g.: {$samples}";
-            $options[] = ['code' => $c->code, 'title' => $title, 'samples' => mb_substr($samples, 0, 160)];
+            $options[] = ['code' => $c->code, 'title' => $title, 'samples' => mb_substr($samples, 0, 300)];
         }
 
         $factLine = $fact !== null ? "\nKNOWN FACT: {$fact}" : '';
@@ -296,7 +297,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
     private function leafPick(string $text, Collection $leaves, string $model, array &$usage): array
     {
         $list = $leaves->values()
-            ->map(fn ($l, $i) => ($i + 1).". code={$l->code} ".mb_substr((string) $l->name, 0, 150))
+            ->map(fn ($l, $i) => ($i + 1).". code={$l->code} ".BreadcrumbName::fit((string) $l->name))
             ->implode("\n");
 
         $messages = [
@@ -367,7 +368,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
     {
         return $leaves->take(30)->map(fn ($l) => [
             'code' => (string) $l->code,
-            'name' => mb_substr((string) $l->name, 0, 120),
+            'name' => BreadcrumbName::fit((string) $l->name),
         ])->values()->all();
     }
 

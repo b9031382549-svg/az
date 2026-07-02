@@ -3,6 +3,7 @@
 namespace App\Services\Classify;
 
 use App\Services\Llm\OpenRouterClient;
+use App\Support\BreadcrumbName;
 use App\Support\LlmLog;
 use Illuminate\Support\Arr;
 use Throwable;
@@ -240,7 +241,7 @@ class ClassifierService
     {
         $lines = [];
         foreach (array_values($candidates) as $i => $c) {
-            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".mb_substr($c->name, 0, 180);
+            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".BreadcrumbName::fit((string) $c->name);
         }
 
         return implode("\n", $lines);
