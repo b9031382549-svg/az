@@ -261,6 +261,10 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $options = [];
         $branchLines = [];
         foreach ($children as $c) {
+            // These sample leaves only CHARACTERIZE a branch (the first fork weighs
+            // all 97 chapters at once → ~1135 snippets); the exact code is chosen
+            // later from full names. So bound each sample tail-first to keep the
+            // prompt sane, rather than sending every leaf in full here.
             $samples = $c->sampleLeaves($sample)->pluck('name')
                 ->map(fn ($n) => BreadcrumbName::fit((string) $n, 200))->implode('; ');
             $title = $c->title ?: $c->code;
@@ -296,8 +300,10 @@ final class BrokerDescentMechanism implements ClassifierMechanism
     /** One LEAF-PICK call: choose the final 10-digit code among sibling leaves. */
     private function leafPick(string $text, Collection $leaves, string $model, array &$usage): array
     {
+        // Full names, no truncation: this is the final code choice among a small
+        // set of sibling leaves, and the distinguishing detail is in the tail.
         $list = $leaves->values()
-            ->map(fn ($l, $i) => ($i + 1).". code={$l->code} ".BreadcrumbName::fit((string) $l->name))
+            ->map(fn ($l, $i) => ($i + 1).". code={$l->code} ".(string) $l->name)
             ->implode("\n");
 
         $messages = [

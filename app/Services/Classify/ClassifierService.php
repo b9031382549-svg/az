@@ -3,7 +3,6 @@
 namespace App\Services\Classify;
 
 use App\Services\Llm\OpenRouterClient;
-use App\Support\BreadcrumbName;
 use App\Support\LlmLog;
 use Illuminate\Support\Arr;
 use Throwable;
@@ -241,7 +240,11 @@ class ClassifierService
     {
         $lines = [];
         foreach (array_values($candidates) as $i => $c) {
-            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".BreadcrumbName::fit((string) $c->name);
+            // Full name, no truncation: the re-ranker chooses the final code from
+            // these ~24 candidates, and catalog names are breadcrumbs whose
+            // distinguishing detail is in the tail. Worst case is a few thousand
+            // tokens — cheap for the accuracy it buys.
+            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".$c->name;
         }
 
         return implode("\n", $lines);
