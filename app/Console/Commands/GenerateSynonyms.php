@@ -15,9 +15,9 @@ class GenerateSynonyms extends Command
 
     public function handle(): int
     {
-        $codesPath    = storage_path('app/catalog_codes.jsonl');
+        $codesPath = storage_path('app/catalog_codes.jsonl');
         $synonymsPath = storage_path('app/catalog_synonyms.jsonl');
-        $batchSize    = max(1, (int) $this->option('batch'));
+        $batchSize = max(1, (int) $this->option('batch'));
         $modelOverride = (string) ($this->option('model') ?? '');
 
         // 1. Load all source codes
@@ -40,26 +40,28 @@ class GenerateSynonyms extends Command
             }
         }
 
-        $pending = array_values(array_filter($allCodes, fn($r) => ! isset($done[$r['code']])));
-        $total   = count($pending);
+        $pending = array_values(array_filter($allCodes, fn ($r) => ! isset($done[$r['code']])));
+        $total = count($pending);
 
         $this->info(sprintf('%d total codes, %d done, %d pending', count($allCodes), count($done), $total));
 
         if ($total === 0) {
             $this->info('All codes already processed. Run catalog:import-synonyms to load into DB.');
+
             return self::SUCCESS;
         }
 
-        $llm        = OpenRouterClient::fromConfig();
-        $extraOpts  = $modelOverride !== '' ? ['model' => $modelOverride] : [];
-        $batches    = array_chunk($pending, $batchSize);
+        $llm = OpenRouterClient::fromConfig();
+        $extraOpts = $modelOverride !== '' ? ['model' => $modelOverride] : [];
+        $batches = array_chunk($pending, $batchSize);
         $numBatches = count($batches);
-        $totalTok   = 0;
+        $totalTok = 0;
         $totalWritten = 0;
 
         $out = fopen($synonymsPath, 'a');
         if ($out === false) {
             $this->error("Cannot open {$synonymsPath} for writing.");
+
             return self::FAILURE;
         }
 
@@ -81,19 +83,19 @@ class GenerateSynonyms extends Command
 
                 $written = 0;
                 foreach ((array) ($result['data']['results'] ?? []) as $item) {
-                    $code     = trim((string) ($item['code']     ?? ''));
+                    $code = trim((string) ($item['code'] ?? ''));
                     $synonyms = trim((string) ($item['synonyms'] ?? ''));
                     if ($code === '' || $synonyms === '') {
                         continue;
                     }
-                    fwrite($out, json_encode(['code' => $code, 'synonyms' => $synonyms], JSON_UNESCAPED_UNICODE) . "\n");
+                    fwrite($out, json_encode(['code' => $code, 'synonyms' => $synonyms], JSON_UNESCAPED_UNICODE)."\n");
                     $written++;
                 }
                 $totalWritten += $written;
                 $this->line(sprintf('  -> wrote %d/%d  tokens this batch: %d  total: %d',
                     $written, count($batch), $tok, $totalTok));
             } catch (\Throwable $e) {
-                $this->error('  Batch failed: ' . $e->getMessage());
+                $this->error('  Batch failed: '.$e->getMessage());
                 // continue — skipped codes will be picked up on next run
             }
         }
@@ -105,7 +107,7 @@ class GenerateSynonyms extends Command
             $totalWritten,
             $totalTok,
         ));
-        $this->info("Next step: docker compose run --rm app php artisan catalog:import-synonyms storage/app/catalog_synonyms.jsonl");
+        $this->info('Next step: docker compose run --rm app php artisan catalog:import-synonyms storage/app/catalog_synonyms.jsonl');
 
         return self::SUCCESS;
     }
@@ -140,6 +142,7 @@ SYSTEM;
             $name = str_replace(['"', "\n"], ["'", ' '], (string) $r['name']);
             $lines[] = sprintf('{"code":"%s","name":"%s","kind":"%s"}', $r['code'], $name, $r['kind']);
         }
-        return "Aşağıdakı kodlar üçün sinonimlər ver:\n" . implode("\n", $lines);
+
+        return "Aşağıdakı kodlar üçün sinonimlər ver:\n".implode("\n", $lines);
     }
 }

@@ -72,6 +72,7 @@ class ClassifyCompareRetrieval extends Command
             $cell = function (array $c) {
                 $r = $c['recall'] ? 'R' : '·';
                 $p = $c['pick'] ? '✓' : '✗';
+
                 return "{$c['chapter']} {$r}{$p}";
             };
             $rows[] = [
@@ -88,8 +89,8 @@ class ClassifyCompareRetrieval extends Command
     }
 
     /**
-     * @param array<int, array<string, array{chapter:string,pick:bool,recall:bool}>> $res
-     * @param array<int, string> $modes
+     * @param  array<int, array<string, array{chapter:string,pick:bool,recall:bool}>>  $res
+     * @param  array<int, string>  $modes
      */
     private function renderSummary(array $res, array $modes): void
     {
@@ -101,7 +102,7 @@ class ClassifyCompareRetrieval extends Command
                 $recall += $r[$m]['recall'] ? 1 : 0;
                 $pick += $r[$m]['pick'] ? 1 : 0;
             }
-            $rows[] = [$m, "{$recall}/{$n} (".round(100 * $recall / $n)."%)", "{$pick}/{$n} (".round(100 * $pick / $n)."%)"];
+            $rows[] = [$m, "{$recall}/{$n} (".round(100 * $recall / $n).'%)', "{$pick}/{$n} (".round(100 * $pick / $n).'%)'];
         }
         $this->newLine();
         $this->info('Summary:');

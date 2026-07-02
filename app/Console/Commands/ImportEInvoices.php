@@ -18,6 +18,7 @@ class ImportEInvoices extends Command
         $path = $this->argument('path');
         if (! is_file($path)) {
             $this->error("File not found: {$path}");
+
             return self::FAILURE;
         }
 
@@ -26,6 +27,7 @@ class ImportEInvoices extends Command
 
         if ($result['error']) {
             $this->error($result['error']);
+
             return self::FAILURE;
         }
 
