@@ -2,6 +2,7 @@
 
 namespace App\Services\Classify;
 
+use App\Models\CatalogCode;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
 use Illuminate\Support\Arr;
@@ -238,16 +239,45 @@ class ClassifierService
     /** @param array<int, object> $candidates */
     private function candidateList(array $candidates): string
     {
+        $codes = array_map(fn ($c) => (string) $c->code, array_values($candidates));
+        $synByCode = CatalogCode::whereIn('code', $codes)->pluck('synonyms', 'code');
+
         $lines = [];
         foreach (array_values($candidates) as $i => $c) {
             // Full name, no truncation: the re-ranker chooses the final code from
             // these ~24 candidates, and catalog names are breadcrumbs whose
             // distinguishing detail is in the tail. Worst case is a few thousand
             // tokens — cheap for the accuracy it buys.
-            $lines[] = ($i + 1).". code={$c->code} [{$c->kind}] ".$c->name;
+            $line = ($i + 1).". code={$c->code} [{$c->kind}] ".$c->name;
+
+            // Also show the colloquial synonyms, so the model can match everyday
+            // invoice terms the terse breadcrumb name omits (e.g. "qrelka",
+            // "kişi köynəyi"). Trimmed at a term boundary — never mid-word.
+            $syn = trim((string) ($synByCode[(string) $c->code] ?? ''));
+            if ($syn !== '') {
+                $line .= '  (həm: '.$this->clipTerms($syn, 600).')';
+            }
+            $lines[] = $line;
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Trim a comma-separated synonym list to a budget WITHOUT splitting a word:
+     * cut back to the last whole term (comma boundary), or a word boundary.
+     */
+    private function clipTerms(string $text, int $max): string
+    {
+        if (mb_strlen($text) <= $max) {
+            return $text;
+        }
+        $head = mb_substr($text, 0, $max);
+        $comma = mb_strrpos($head, ',');
+        $space = mb_strrpos($head, ' ');
+        $cut = $comma !== false ? $comma : $space;
+
+        return ($cut !== false && $cut > 0 ? rtrim(mb_substr($head, 0, $cut), ' ,') : rtrim($head)).' …';
     }
 
     /**
