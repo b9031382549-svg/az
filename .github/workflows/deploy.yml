@@ -74,6 +74,10 @@ jobs:
             # (idempotent upsert by code). Re-runs each deploy, so updating the JSON
             # + pushing refreshes the card data without a schema change.
             docker compose -f docker-compose.prod.yml run --rm app php artisan db:seed --class='Database\Seeders\HsCardsSeeder' --force
+            # Merge the cards' colloquial product synonyms into catalog.synonyms
+            # (precise 6-digit mapping, idempotent). Lexical retrieval benefits
+            # immediately; the vector leg after the next embedding refresh.
+            docker compose -f docker-compose.prod.yml run --rm app php artisan catalog:sync-card-synonyms
             docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
             # Horizon 5 self-serves its dashboard assets; the worker container is
