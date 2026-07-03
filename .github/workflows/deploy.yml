@@ -78,6 +78,10 @@ jobs:
             # (precise 6-digit mapping, idempotent). Lexical retrieval benefits
             # immediately; the vector leg after the next embedding refresh.
             docker compose -f docker-compose.prod.yml run --rm app php artisan catalog:sync-card-synonyms
+            # Rebuild the diacritic-folded search_text (name + synonyms) so lexical
+            # retrieval matches invoice terms typed without Azerbaijani special
+            # letters (kisi koynek == kişi köynəyi). Vector/embeddings untouched.
+            docker compose -f docker-compose.prod.yml run --rm app php artisan catalog:build-search-text
             docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml exec -T app php artisan optimize
             # Horizon 5 self-serves its dashboard assets; the worker container is

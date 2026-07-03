@@ -3,6 +3,7 @@
 namespace App\Services\Classify;
 
 use App\Services\Embeddings\OllamaEmbedder;
+use App\Support\AzFold;
 use Illuminate\Support\Facades\DB;
 
 class CatalogRetriever
@@ -136,10 +137,18 @@ class CatalogRetriever
      */
     private function lexical(string $text, int $per, string $kindSql, array $kindBind): array
     {
-        $tokens = $this->tokens($text);
+        // Diacritic-fold the query so a stripped invoice term ("kisi koynek")
+        // matches the catalog's correct spelling. Matching runs against the folded
+        // search_text column (name + synonyms, folded); the embeddings/vector leg
+        // are untouched. Fall back to the raw text where search_text is not built.
+        $folded = AzFold::fold($text);
+        $tokens = $this->tokens($folded);
 
-        // Search name + everyday synonyms together.
-        $haystack = "(name || ' ' || coalesce(synonyms, ''))";
+        // Bare column (not an expression) so the trigram GIN index on search_text
+        // is used. It is populated for every row by catalog:build-search-text on
+        // deploy; the brief NULL window (migrate → build) just falls back to the
+        // vector leg for lexical matches.
+        $haystack = 'search_text';
 
         if (empty($tokens)) {
             return DB::select(
@@ -148,20 +157,21 @@ class CatalogRetriever
                  WHERE TRUE {$kindSql}
                  ORDER BY word_similarity(?, {$haystack}) DESC
                  LIMIT {$per}",
-                array_merge([$text], $kindBind, [$text]),
+                array_merge([$folded], $kindBind, [$folded]),
             );
         }
 
         // Process tokens rarest-first: a code matched by a distinctive word
-        // (e.g. "şpris", in 5 names) is far more relevant than one matched by a
+        // (e.g. "spris", in 5 names) is far more relevant than one matched by a
         // common word (e.g. "rezin", in hundreds). Each token contributes its
         // best matches, so the rare-but-decisive code is not crowded out.
         $freq = [];
         foreach ($tokens as $token) {
             $like = '%'.$token.'%';
-            $freq[$token] = (int) DB::table('catalog')
-                ->where(fn ($q) => $q->where('name', 'ILIKE', $like)->orWhere('synonyms', 'ILIKE', $like))
-                ->count();
+            $freq[$token] = (int) DB::selectOne(
+                "SELECT count(*) AS c FROM catalog WHERE {$haystack} ILIKE ?",
+                [$like],
+            )->c;
         }
         $freq = array_filter($freq, fn ($c) => $c > 0);
         asort($freq);
@@ -176,10 +186,10 @@ class CatalogRetriever
             $rows = DB::select(
                 "SELECT id, code, name, kind, word_similarity(?, {$haystack}) AS sim
                  FROM catalog
-                 WHERE (name ILIKE ? OR synonyms ILIKE ?) {$kindSql}
+                 WHERE {$haystack} ILIKE ? {$kindSql}
                  ORDER BY word_similarity(?, {$haystack}) DESC
                  LIMIT {$perToken}",
-                array_merge([$text, $like, $like], $kindBind, [$text]),
+                array_merge([$folded, $like], $kindBind, [$folded]),
             );
             foreach ($rows as $row) {
                 if (! isset($seen[$row->id])) {
