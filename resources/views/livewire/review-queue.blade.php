@@ -186,14 +186,11 @@
           <div class="flex flex-col gap-1 mt-2">
             @foreach($item->results as $res)
               @php $isFinal = $item->final_code && (string) $res->matched_code === (string) $item->final_code; @endphp
-              <div class="flex items-center gap-2 text-xs">
+              <div class="flex items-start gap-2 text-xs">
                 <span class="uppercase tracking-wide text-faint w-16 shrink-0">{{ $res->mechanism }}</span>
-                <span class="font-mono {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $res->matched_code ?? __('no match') }}</span>
-                @if($res->confidence !== null)
-                  <span class="text-faint tnum">{{ number_format($res->confidence*100,0) }}%</span>
-                @endif
+                <span class="font-mono shrink-0 {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $res->matched_code ?? __('no match') }}</span>
                 @if($res->matched_code && isset($catalogNames[(string) $res->matched_code]))
-                  <span class="text-faint truncate">· {{ \Illuminate\Support\Str::limit($catalogNames[(string) $res->matched_code], 40) }}</span>
+                  <span class="text-faint flex-1 min-w-0 break-words">· {{ \Illuminate\Support\Str::limit($catalogNames[(string) $res->matched_code], 140) }}</span>
                 @endif
               </div>
             @endforeach
