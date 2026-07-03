@@ -3,6 +3,7 @@
 namespace App\Services\Classify\Mechanisms;
 
 use App\Models\CatalogCode;
+use App\Models\HsCard;
 use App\Models\RubricatorNode;
 use App\Services\Classify\CatalogRetriever;
 use App\Services\Classify\ClassifierService;
@@ -254,10 +255,32 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         );
     }
 
+    /**
+     * The distilled legal cards for this fork's branches, keyed by code. Empty
+     * unless enabled (config) and cards exist — so the broker only uses the
+     * rulebook where we have authored it, and is unchanged elsewhere.
+     *
+     * @param  Collection<int, RubricatorNode>  $children
+     * @return array<string, HsCard>
+     */
+    private function cardsFor(Collection $children): array
+    {
+        if (! config('classify.broker.use_cards', false)) {
+            return [];
+        }
+
+        return HsCard::whereIn('code', $children->pluck('code'))
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('code')
+            ->all();
+    }
+
     /** One DECIDE-NODE call: name the criterion, judge branches by their leaves, pick a child. */
     private function decide(string $text, Collection $children, string $model, array &$usage, ?string $fact = null): array
     {
         $sample = (int) config('classify.broker.sample_leaves', 12);
+        $cards = $this->cardsFor($children);
         $options = [];
         $branchLines = [];
         foreach ($children as $c) {
@@ -268,7 +291,14 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             $samples = $c->sampleLeaves($sample)->pluck('name')
                 ->map(fn ($n) => (string) $n)->implode('; ');
             $title = $c->title ?: $c->code;
-            $branchLines[] = "code={$c->code} | {$title}\n    e.g.: {$samples}";
+
+            // If a distilled legal card exists for this branch, lead with its rules
+            // (COVERS/INCLUDES/EXCLUDES/CLOSED LIST) so the fork is decided by the
+            // rulebook, not by the sample leaves alone.
+            $cardText = isset($cards[$c->code]) ? $cards[$c->code]->promptBlock() : '';
+            $cardBlock = $cardText !== '' ? "\n".$cardText : '';
+
+            $branchLines[] = "code={$c->code} | {$title}{$cardBlock}\n    e.g.: {$samples}";
             $options[] = ['code' => $c->code, 'title' => $title, 'samples' => mb_substr($samples, 0, 300)];
         }
 
@@ -455,9 +485,17 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         BRANCHES, each with its code, title and a few EXAMPLE member items.
 
         Decide which single branch the item belongs under. Rules:
-        - Judge each branch by WHERE IT LEADS — its example items — not its title.
-        - Decide by what the item functionally IS (its purpose), not by a shared
-          word or the material it is made of.
+        - Some branches carry authoritative LEGAL RULES (COVERS / INCLUDES /
+          EXCLUDES / CLOSED LIST), distilled from the HS notes. These are BINDING
+          and OUTRANK the example items:
+            * If the item matches a branch's INCLUDES, choose that branch.
+            * If a branch EXCLUDES the item's kind (shown as "→ see heading X"),
+              do NOT choose it; choose the referenced branch when it is present.
+            * CLOSED LIST means ONLY the listed goods belong there — if the item
+              is not plainly one of them, do NOT choose that branch.
+            * When a rule decides it, cite that rule in "criterion".
+        - Otherwise judge each branch by WHERE IT LEADS — its example items — not
+          its title, and by what the item functionally IS (its purpose).
         - Name the ONE distinguishing criterion that separates these branches.
         - If two branches are genuinely equally plausible AND the item text lacks
           the fact that would decide between them, set "decisive" to false and put
