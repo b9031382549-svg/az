@@ -27,11 +27,24 @@ class SyncCardSynonyms extends Command
         $dry = (bool) $this->option('dry-run');
 
         // Build: 6-digit subheading => unique term list, from card includes whose
-        // note pins a subheading. Terms = product name + its synonyms.
+        // note pins a subheading. Terms = product name + its synonyms, each split
+        // on commas into atomic fragments — a card "product" is sometimes itself a
+        // comma-list ("Rezin qrelka, klizma balonları, …"). Storing it whole then
+        // re-splitting existing synonyms on commas would never round-trip, so the
+        // phrase got re-added every run (harmless but non-idempotent). Splitting
+        // here makes the merge converge to 0 new terms on a re-run.
         $bySub = [];
         foreach (HsCard::where('level', 2)->get(['includes']) as $card) {
             foreach ($card->includes ?? [] as $inc) {
-                $terms = array_filter(array_map('trim', array_merge([$inc['product'] ?? ''], $inc['syn'] ?? [])));
+                $terms = [];
+                foreach (array_merge([$inc['product'] ?? ''], $inc['syn'] ?? []) as $raw) {
+                    foreach (explode(',', (string) $raw) as $frag) {
+                        $frag = trim($frag);
+                        if ($frag !== '') {
+                            $terms[] = $frag;
+                        }
+                    }
+                }
                 if ($terms === []) {
                     continue;
                 }
