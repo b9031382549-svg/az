@@ -26,6 +26,12 @@ class ClassificationItem extends Model
         return $this->hasMany(ClassificationResult::class);
     }
 
+    /** @return HasMany<ClassificationAdjudication, $this> */
+    public function adjudications(): HasMany
+    {
+        return $this->hasMany(ClassificationAdjudication::class);
+    }
+
     public function finalCode(): BelongsTo
     {
         return $this->belongsTo(CatalogCode::class, 'final_catalog_id');

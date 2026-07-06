@@ -202,7 +202,24 @@
       <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $statusBadge($item->resolution) }}">{{ str_replace('_', ' ', $item->resolution) }}</span>
       @if($item->resolution === 'conflict') — {{ __('mechanisms disagreed → sent to a human') }}
       @elseif($item->resolution === 'agreed') — {{ __('all mechanisms agreed → auto-confirmed') }}
+      @elseif($item->resolution === 'ai_resolved') — {{ __('mechanisms diverged → AI adjudicator resolved it') }}
       @endif
     </p>
   </div>
+
+  @php $adj = $item->adjudications->sortByDesc('id')->first(); @endphp
+  @if($adj)
+    <div class="card-flat p-4 mt-3 text-sm">
+      <span class="kicker">{{ __('AI adjudicator') }} <span class="text-faint">({{ $adj->model }} · {{ $adj->mode }})</span></span>
+      <p class="mt-1">
+        <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $adj->verdict === 'resolved' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted' }}">{{ $adj->verdict }}</span>
+        @if($adj->winning_code)<span class="font-mono ml-1">{{ $adj->winning_code }}</span> <span class="text-faint">({{ $adj->which_mechanism }}, {{ $pct($adj->confidence) }})</span>@endif
+        @if(!$adj->stable)<span class="text-stamp text-xs ml-1">· {{ __('unstable → human') }}</span>@endif
+        @if($adj->holdout)<span class="text-amber text-xs ml-1">· {{ __('holdout → human') }}</span>@endif
+        @if($adj->applied)<span class="text-ledger text-xs ml-1">· {{ __('applied') }}</span>@endif
+      </p>
+      @if($adj->rule_basis)<p class="text-muted text-xs mt-1">{{ __('Basis') }}: {{ $adj->rule_basis }}</p>@endif
+      @if($adj->reason)<p class="text-faint text-xs mt-0.5">{{ $adj->reason }}</p>@endif
+    </div>
+  @endif
 </section>

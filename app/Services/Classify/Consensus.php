@@ -2,6 +2,7 @@
 
 namespace App\Services\Classify;
 
+use App\Jobs\AdjudicateItemJob;
 use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
 use Illuminate\Support\Collection;
@@ -57,6 +58,33 @@ class Consensus
         }
 
         $item->update($this->resolve($authResults));
+
+        $this->maybeAdjudicate($item);
+    }
+
+    /**
+     * Hand a DIVERGENT item (conflict / low-confidence review) to the AI
+     * adjudicator — a side effect kept out of the pure resolve(). Dispatched at
+     * most once per item: finalize() runs on every mechanism completion and on the
+     * failed() path, so the adjudicated_at atomic claim is the single-fire guard.
+     */
+    private function maybeAdjudicate(ClassificationItem $item): void
+    {
+        $cfg = (array) config('classify.adjudicator');
+        if (! ($cfg['enabled'] ?? false)) {
+            return;
+        }
+        if (! in_array($item->resolution, (array) ($cfg['scope'] ?? ['review', 'conflict']), true)) {
+            return;
+        }
+
+        $claimed = ClassificationItem::whereKey($item->id)
+            ->whereNull('adjudicated_at')
+            ->update(['adjudicated_at' => now()]);
+
+        if ($claimed === 1) {
+            AdjudicateItemJob::dispatch($item->id);
+        }
     }
 
     /**

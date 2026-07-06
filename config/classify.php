@@ -138,4 +138,36 @@ return [
     // confident picks needlessly in review (46% coverage); 0.50 lifts coverage to
     // ~75% at ~95% precision (see classify:calibrate).
     'min_semantic' => (float) env('CLASSIFY_MIN_SEMANTIC', 0.5),
+
+    // AI ADJUDICATOR: for DIVERGENT items (conflict / low-confidence review) a
+    // reasoning-model arbiter is asked whether ONE code is UNAMBIGUOUSLY correct,
+    // choosing only among the codes the mechanisms already surfaced. It can shed
+    // human-review load without lowering accuracy — but only under guards: it
+    // abstains by default, a stability re-sample must agree, and a random holdout
+    // stays with humans so precision remains observable.
+    //   mode=shadow  → judge + record only; the resolution is NOT changed (measure).
+    //   mode=active  → a stable, confident, on-list verdict flips the item to
+    //                  'ai_resolved' (a distinct, reversible, auditable state).
+    // Disabled by default; the judge is gpt-oss-120b (a DIFFERENT model family from
+    // the DeepSeek mechanisms, to decorrelate errors).
+    'adjudicator' => [
+        'enabled' => (bool) env('CLASSIFY_ADJUDICATOR_ENABLED', false),
+        'mode' => (string) env('CLASSIFY_ADJUDICATOR_MODE', 'shadow'), // shadow | active
+        'model' => (string) env('CLASSIFY_ADJUDICATOR_MODEL', 'openai/gpt-oss-120b'),
+        'prompt_version' => (string) env('CLASSIFY_ADJUDICATOR_VERSION', 'j1'),
+        // Resolutions the judge acts on. Abstention (a mechanism found no code) is
+        // included but flagged (had_abstention) so it can be measured separately.
+        'scope' => array_values(array_filter(array_map('trim', explode(',',
+            (string) env('CLASSIFY_ADJUDICATOR_SCOPE', 'review,conflict'))))),
+        // Stability: re-sample the judge; only a verdict whose winning code is the
+        // same across all samples may auto-resolve (turns R1/LLM flakiness into a
+        // usable disagreement signal instead of a self-reported boolean).
+        'samples' => (int) env('CLASSIFY_ADJUDICATOR_SAMPLES', 2),
+        'sample_temperature' => (float) env('CLASSIFY_ADJUDICATOR_SAMPLE_TEMP', 0.5),
+        'min_confidence' => (float) env('CLASSIFY_ADJUDICATOR_MIN_CONF', 0.8),
+        // Percent of judge-decidable items deliberately kept with humans (forever)
+        // so auto-resolved precision stays observable. Deterministic per item.
+        'holdout_pct' => (int) env('CLASSIFY_ADJUDICATOR_HOLDOUT_PCT', 10),
+        'timeout' => (int) env('CLASSIFY_ADJUDICATOR_TIMEOUT', 90), // per judge call (s)
+    ],
 ];
