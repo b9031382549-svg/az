@@ -31,6 +31,12 @@ return [
         'leaf_direct_max' => (int) env('CLASSIFY_BROKER_LEAF_DIRECT_MAX', 20),
         'max_lookups' => (int) env('CLASSIFY_BROKER_MAX_LOOKUPS', 1),
         'fact_min' => (float) env('CLASSIFY_BROKER_FACT_MIN', 0.7),
+        // Fact-acquisition model. The cheap default (gpt-4o-mini) is noisy on these
+        // judgments — it guesses inconsistently (same question: "rubber 0.9" one
+        // run, "plastic 0.5" the next). A strong model is better CALIBRATED: it
+        // answers confidently when the fact is knowable and abstains (known=false)
+        // when it genuinely is not, instead of guessing. It is one small call/item.
+        'fact_model' => (string) env('CLASSIFY_BROKER_FACT_MODEL', 'openai/gpt-4o'),
         // A fork with more children than this (the 97-chapter root) is "wide":
         // branches carry a COMPACT card (scope + excludes) and fewer/shorter sample
         // leaves, so the prompt stays within the model's context window.

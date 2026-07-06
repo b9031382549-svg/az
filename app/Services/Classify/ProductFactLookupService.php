@@ -39,7 +39,7 @@ class ProductFactLookupService
                 ['role' => 'system', 'content' => $this->prompt()],
                 ['role' => 'user', 'content' => "ITEM: {$text}\nQUESTION: {$question}"],
             ];
-            $response = $this->llm->jsonWithUsage($messages);
+            $response = $this->llm->jsonWithUsage($messages, ['model' => (string) config('classify.broker.fact_model', 'openai/gpt-4o')]);
             LlmLog::record('broker_fact', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
                 'ok', $response['raw'] ?? null, $messages, 'broker', null, ['q' => mb_substr($question, 0, 80)]);
 
