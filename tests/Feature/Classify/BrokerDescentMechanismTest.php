@@ -73,6 +73,31 @@ class BrokerDescentMechanismTest extends TestCase
         $this->assertContains('decided', array_column($result->path, 'by'));
     }
 
+    public function test_over_specific_fork_choice_maps_to_the_chapter_by_prefix(): void
+    {
+        $this->seedTree();
+        config()->set('classify.expand_query', false);
+
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->andReturn(
+            $this->decideResponse('8471', 0.9),        // ROOT: model answers a HEADING code, not chapter "84"
+            $this->decideResponse('847130', 0.85),     // 8471 subs
+            $this->leafResponse('8471300000', 0.9),
+        );
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $retriever = Mockery::mock(CatalogRetriever::class);
+        $retriever->shouldReceive('semanticSimilarity')->andReturn(0.7);
+        $this->instance(CatalogRetriever::class, $retriever);
+
+        $result = app(BrokerDescentMechanism::class)->classify('noutbuk');
+
+        // "8471" maps to chapter "84" by prefix → the descent continues instead of
+        // discarding a correct-but-too-precise answer as undecided.
+        $this->assertSame('8471300000', $result->matchedCode);
+        $this->assertContains('decided', array_column($result->path, 'by'));
+    }
+
     public function test_undecided_root_fork_abstains(): void
     {
         $this->seedTree();

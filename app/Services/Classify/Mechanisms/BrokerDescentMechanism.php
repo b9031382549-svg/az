@@ -405,7 +405,21 @@ final class BrokerDescentMechanism implements ClassifierMechanism
 
     private function pick(Collection $children, ?string $code): ?RubricatorNode
     {
-        return $code !== null ? $children->firstWhere('code', $code) : null;
+        if ($code === null || $code === '') {
+            return null;
+        }
+
+        $exact = $children->firstWhere('code', $code);
+        if ($exact !== null) {
+            return $exact;
+        }
+
+        // The model, made confident by the cards, sometimes answers with a MORE
+        // specific code than the fork level — e.g. "9018" (a heading) at the
+        // 97-chapter root instead of "90". Map it to the child whose code is a
+        // prefix, so a correct-but-too-precise answer is accepted (and the descent
+        // continues normally) rather than discarded as undecided.
+        return $children->first(fn ($c) => str_starts_with($code, (string) $c->code));
     }
 
     /** A trace record for one fork: the alternatives it weighed and what it chose. */
