@@ -160,12 +160,19 @@ class ProductBriefService
           sells, and never let a brand that merely resembles a word (Inci=pearl)
           override a clear product noun. If ONLY a brand/code remains with no product
           noun, set identity to the brand verbatim and confidence ≤ 0.3.
-        - MEDICAL SUPPLIES are common and easily misread as industrial/plumbing. AZ
-          cues: "sistem" / система = an IV infusion/transfusion SET (not a generic
-          "system"); "şlanq" in this context = medical tubing; together with "venöz",
-          "kateter", "kanül", "filtir/filtirli", "steril", "birdəfəlik", or a medical
-          brand (B.Braun/BD) → a medical device, NOT a hose, valve or machine part.
-          Name it as such in identity (e.g. "IV infusion set with filter").
+        - AZERBAIJANI DOMAIN TERMS — treat these as the MEANING, do not guess around
+          them: imalə = enema (irrigator / enema bulb); sistem / система = an IV
+          infusion / transfusion SET (not a generic "system"); şlanq = tubing/hose;
+          iynə = needle; şpris = syringe; sarğı = dressing/bandage; tənzif = gauze;
+          pambıq = cotton (wool); flaster / plastır = adhesive plaster; əlcək = glove;
+          maska = mask; damcı = drops; məhlul = solution; birdəfəlik = single-use;
+          steril = sterile; venöz / venadaxili = intravenous; sərt uclu = hard-tipped;
+          yumşaq uclu = soft-tipped.
+        - MEDICAL SUPPLIES are easily misread as industrial/plumbing. With kateter,
+          kanül, venöz, steril, filtirli, imalə, or a medical brand (B.Braun/BD) the
+          item is a MEDICAL DEVICE — NOT a hose, valve, can, machine part or emery
+          board. Name it precisely in identity (e.g. "IV infusion set with filter",
+          "enema bulb with hard tip").
         - NON-GOODS: a service or labour (xidmət, quraşdırılması, təmir, daşınma), an
           air ticket, a fee or a document is not a good — set function_class "service"
           and confidence 0.0.
