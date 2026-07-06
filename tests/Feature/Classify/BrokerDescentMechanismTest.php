@@ -34,6 +34,16 @@ class BrokerDescentMechanismTest extends TestCase
         return $this->wrap(['criterion' => 'function', 'choice' => $choice, 'confidence' => $confidence, 'decisive' => $decisive, 'question' => '', 'reason' => 'r']);
     }
 
+    /** @param array<string, mixed> $overrides */
+    private function briefResponse(array $overrides = []): array
+    {
+        return $this->wrap(array_merge([
+            'identity' => 'test article', 'purpose' => 'p', 'function_class' => 'article',
+            'material' => ['value' => 'rubber', 'basis' => 'typical'],
+            'decisive_axis' => 'material', 'confidence' => 0.8,
+        ], $overrides));
+    }
+
     private function leafResponse(?string $code, float $confidence): array
     {
         return $this->wrap(['code' => $code, 'confidence' => $confidence, 'reason' => 'r']);
@@ -48,6 +58,7 @@ class BrokerDescentMechanismTest extends TestCase
     {
         $this->seedTree();
         config()->set('classify.expand_query', false); // canonicalize() makes no LLM call in tests
+        config()->set('classify.broker.use_brief', false); // this suite tests the descent, not the brief
 
         $llm = Mockery::mock(OpenRouterClient::class);
         $llm->shouldReceive('jsonWithUsage')->andReturn(
@@ -77,6 +88,7 @@ class BrokerDescentMechanismTest extends TestCase
     {
         $this->seedTree();
         config()->set('classify.expand_query', false);
+        config()->set('classify.broker.use_brief', false);
 
         $llm = Mockery::mock(OpenRouterClient::class);
         $llm->shouldReceive('jsonWithUsage')->andReturn(
@@ -98,10 +110,69 @@ class BrokerDescentMechanismTest extends TestCase
         $this->assertContains('decided', array_column($result->path, 'by'));
     }
 
+    public function test_assumption_gate_forces_review_when_decisive_material_is_not_stated(): void
+    {
+        $this->seedTree();
+        config()->set('classify.expand_query', false);
+        config()->set('classify.broker.use_brief', true);
+
+        // A clean, confident descent that WOULD auto-confirm (min conf 0.85 >= 0.8,
+        // semantic backing stubbed above the bar). The brief runs first and reports
+        // the classification hinges on a material the text never stated
+        // (decisive_axis=material, basis=typical) → the gate must force review.
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->andReturn(
+            $this->briefResponse(['decisive_axis' => 'material', 'material' => ['value' => 'rubber', 'basis' => 'typical']]),
+            $this->decideResponse('84', 0.9),
+            $this->decideResponse('847130', 0.9),
+            $this->leafResponse('8471300000', 0.9),
+        );
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $retriever = Mockery::mock(CatalogRetriever::class);
+        $retriever->shouldReceive('semanticSimilarity')->andReturn(0.7); // backing clears min_semantic
+        $this->instance(CatalogRetriever::class, $retriever);
+
+        $result = app(BrokerDescentMechanism::class)->classify('Qrelka 2000 ml');
+
+        $this->assertSame('8471300000', $result->matchedCode);   // still descends and picks the code
+        $this->assertSame('needs_review', $result->status);       // but is NOT auto-confirmed
+        $this->assertNotEmpty($result->trace['gate']['review_forced'] ?? null);
+        $this->assertSame('material', $result->trace['brief']['decisive_axis'] ?? null);
+    }
+
+    public function test_stated_material_still_auto_confirms(): void
+    {
+        $this->seedTree();
+        config()->set('classify.expand_query', false);
+        config()->set('classify.broker.use_brief', true);
+
+        // Same clean descent, but the brief says the deciding material WAS stated —
+        // the assumption gate does not fire, so a confident backed pick auto-confirms.
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->andReturn(
+            $this->briefResponse(['decisive_axis' => 'material', 'material' => ['value' => 'rubber', 'basis' => 'stated']]),
+            $this->decideResponse('84', 0.9),
+            $this->decideResponse('847130', 0.9),
+            $this->leafResponse('8471300000', 0.9),
+        );
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $retriever = Mockery::mock(CatalogRetriever::class);
+        $retriever->shouldReceive('semanticSimilarity')->andReturn(0.7);
+        $this->instance(CatalogRetriever::class, $retriever);
+
+        $result = app(BrokerDescentMechanism::class)->classify('Rezin qrelka 2000 ml');
+
+        $this->assertSame('auto_confirmed', $result->status);
+        $this->assertNull($result->trace['gate']['review_forced'] ?? null);
+    }
+
     public function test_undecided_root_fork_abstains(): void
     {
         $this->seedTree();
         config()->set('classify.expand_query', false);
+        config()->set('classify.broker.use_brief', false);
 
         $llm = Mockery::mock(OpenRouterClient::class);
         // Root fork is not decisive and gives no question -> no chapter established.

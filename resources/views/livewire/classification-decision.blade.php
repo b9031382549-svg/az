@@ -79,6 +79,21 @@
               @if(!empty($t['essence']))<div class="text-muted mt-0.5">↳ {{ __('Normalized') }}: <em>{{ $t['essence'] }}</em></div>@endif
             </div>
 
+            @if(!empty($t['brief']))
+              @php $b = $t['brief']; @endphp
+              <div class="rounded-lg border hair p-3">
+                <span class="kicker">{{ __('Product brief') }}</span>
+                <p class="text-ink mt-1">{{ $b['identity'] ?? '' }}</p>
+                @if(!empty($b['purpose']))<p class="text-muted text-xs mt-0.5">{{ __('Purpose') }}: {{ $b['purpose'] }}</p>@endif
+                <div class="text-xs text-faint mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span>{{ __('Type') }}: {{ $b['function_class'] ?? '' }}</span>
+                  @if(!empty($b['material']['value']))<span>{{ __('Material') }}: {{ $b['material']['value'] }} ({{ $b['material']['basis'] ?? 'unknown' }})</span>@endif
+                  <span>{{ __('Decides') }}: {{ $b['decisive_axis'] ?? '' }}</span>
+                  <span>{{ $pct($b['confidence'] ?? null) }}</span>
+                </div>
+              </div>
+            @endif
+
             @foreach($t['steps'] as $i => $s)
               @php $type = $s['type'] ?? ''; @endphp
               <div class="rounded-lg border hair p-3">

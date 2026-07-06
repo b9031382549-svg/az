@@ -7,6 +7,7 @@ use App\Models\HsCard;
 use App\Models\RubricatorNode;
 use App\Services\Classify\CatalogRetriever;
 use App\Services\Classify\ClassifierService;
+use App\Services\Classify\ProductBriefService;
 use App\Services\Classify\ProductFactLookupService;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\BreadcrumbName;
@@ -33,7 +34,17 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         private readonly CatalogRetriever $retriever,
         private readonly ProductFactLookupService $facts,
         private readonly ClassifierService $classifier,
+        private readonly ProductBriefService $briefs,
     ) {}
+
+    // The upfront brief for the item being classified (null when disabled/failed);
+    // read by the review gate in finalize(). Set per-call in classify().
+    private ?array $brief = null;
+
+    // The query used ONLY for the semantic auto-confirm backing (cosine). Kept
+    // separate from the reasoning query $q so the broker's own brief never inflates
+    // its own confirmation — the backing must be an independent view of the item.
+    private string $backingQuery = '';
 
     public function key(): string
     {
@@ -56,19 +67,37 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             return $this->result(null, $path, $usage, [], 'error', 'Empty item.', [], $model, $trace);
         }
 
-        // Reason over the item's ESSENCE, not a bare noisy token — the same
-        // canonical description that drives vector retrieval. A context-free word
-        // (e.g. "qrelka") otherwise makes the top fork a blind guess. (Dropping it
-        // was tried and regressed syringe/kəpənək → the essence is net-positive;
-        // when it DOES mangle an input the root fork stays undecided and now
-        // abstains — see fallback() — instead of fabricating a code.)
+        // Reset per-call state (the mechanism may be resolved once and reused).
+        $this->brief = null;
+        $this->backingQuery = $text;
+
         $q = $text;
 
         try {
+            // Clean, brief-INDEPENDENT canonical essence: it is the reasoning substrate
+            // when there is no brief, AND always the auto-confirm cosine backing — the
+            // same normalized query the vector mechanism embeds — so min_semantic stays
+            // in its calibrated regime (0.5 was tuned against clean-query cosine, not raw
+            // noisy invoice text). canonicalize() is a separate call from the brief, so
+            // using it for backing never lets the brief confirm its own pick.
             $essence = trim($this->classifier->canonicalize($text));
             if ($essence !== '' && mb_strtolower($essence) !== mb_strtolower($text)) {
                 $q = $text."\nNormalized: ".$essence;
+                $this->backingQuery = $q;
                 $trace['essence'] = $essence;
+            }
+
+            // The product brief (what the item IS / is for / is made of) REPLACES the
+            // essence as the descent's REASONING query — brand/identity kept intact,
+            // nothing mangled — while the cosine backing stays on the essence above. Its
+            // decisive_axis + material.basis drive the review gate. Absent/failed brief →
+            // the essence path above (unchanged pre-brief behaviour); an undecided root
+            // still abstains — see fallback() — rather than fabricate a code.
+            $brief = $this->briefs->brief($text);
+            if ($brief !== null) {
+                $this->brief = $brief;
+                $q = $this->briefQuery($text, $brief);
+                $trace['brief'] = $brief;
             }
 
             $children = RubricatorNode::whereNull('parent_id')->orderBy('code')->get();
@@ -148,7 +177,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             $path[] = ['code' => $leaf->code, 'by' => 'single-leaf'];
             $trace['steps'][] = ['type' => 'leaf', 'options' => $this->leafOptions($leaves), 'chosen' => $leaf->code, 'note' => 'single leaf'];
 
-            return $this->finalize($leaf->code, $path, $usage, $confidences, null, $this->candidates($leaves), $model, true, $text, $trace);
+            return $this->finalize($leaf->code, $path, $usage, $confidences, null, $this->candidates($leaves), $model, true, $trace);
         }
 
         $pick = $this->leafPick($text, $leaves, $model, $usage);
@@ -158,7 +187,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             $confidences[] = $pick['confidence'];
         }
 
-        return $this->finalize($pick['code'], $path, $usage, $confidences, $pick['reason'], $this->candidates($leaves), $model, true, $text, $trace);
+        return $this->finalize($pick['code'], $path, $usage, $confidences, $pick['reason'], $this->candidates($leaves), $model, true, $trace);
     }
 
     /**
@@ -208,7 +237,51 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $trace['steps'][] = ['type' => 'fallback', 'prefix' => $node?->code, 'reason' => $reason, 'options' => $this->leafOptions($leaves), 'chosen' => $pick['code'], 'confidence' => $pick['confidence']];
 
         // Fallback picks never count as a clean descent — they go to review.
-        return $this->finalize($pick['code'], $path, $usage, $confidences, $reason ?? $pick['reason'], $this->candidates($leaves), $model, false, $text, $trace);
+        return $this->finalize($pick['code'], $path, $usage, $confidences, $reason ?? $pick['reason'], $this->candidates($leaves), $model, false, $trace);
+    }
+
+    /**
+     * The reasoning query for the descent: the raw item plus the brief's clean
+     * understanding (what it IS / is for / is made of). This REPLACES the noisy
+     * canonical essence — brand/identity slots stay intact, so nothing is mangled.
+     *
+     * @param  array<string, mixed>  $brief
+     */
+    private function briefQuery(string $text, array $brief): string
+    {
+        $lines = [$text];
+        if (($brief['identity'] ?? '') !== '') {
+            $lines[] = 'Understanding: '.$brief['identity'];
+        }
+        if (($brief['purpose'] ?? '') !== '') {
+            $lines[] = 'Purpose: '.$brief['purpose'];
+        }
+        $material = $brief['material']['value'] ?? null;
+        if ($material !== null && $material !== '') {
+            $lines[] = 'Made of: '.$material.' ('.($brief['material']['basis'] ?? 'unknown').')';
+        }
+        if (($brief['function_class'] ?? '') !== '') {
+            $lines[] = 'Type: '.$brief['function_class'];
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * The assumption gate: a confident, clean pick still needs a human when the
+     * classification turns on a material the text never stated. The brief reports
+     * both facts — decisive_axis 'material' means the section depends on the
+     * material, and basis ≠ 'stated' means the deciding material was assumed, not
+     * written. Only that combination forces review.
+     */
+    private function reviewForcedByBrief(): bool
+    {
+        if ($this->brief === null) {
+            return false;
+        }
+
+        return ($this->brief['decisive_axis'] ?? null) === 'material'
+            && ($this->brief['material']['basis'] ?? 'unknown') !== 'stated';
     }
 
     /**
@@ -218,7 +291,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
      * @param  array<int, mixed>  $candidates
      * @param  array<string, mixed>  $trace
      */
-    private function finalize(?string $code, array $path, array $usage, array $confidences, ?string $reason, array $candidates, string $model, bool $clean, string $query, array $trace): MechanismResult
+    private function finalize(?string $code, array $path, array $usage, array $confidences, ?string $reason, array $candidates, string $model, bool $clean, array $trace): MechanismResult
     {
         if ($code === null) {
             return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'No confident match.', $candidates, $model, $trace);
@@ -241,10 +314,20 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         $sim = null;
         $backed = false;
         if ($clean && $confidence !== null && $confidence >= $autoConfirm) {
-            $sim = $this->retriever->semanticSimilarity($query, $cat->code);
+            $sim = $this->retriever->semanticSimilarity($this->backingQuery, $cat->code);
             $backed = $sim !== null && $sim >= $minSemantic;
         }
         $status = $backed ? 'auto_confirmed' : 'needs_review';
+
+        // Assumption gate: when the classification hinges on a material the item text
+        // did NOT state (the brief marked decisive_axis=material with basis≠stated), an
+        // auto-confirm would be blind — the same article in another material sits in
+        // another chapter (a rubber grelka → ch40 vs an electric one → ch85). Send it
+        // to a human instead of auto-confirming a guessed material.
+        $reviewForced = $status === 'auto_confirmed' && $this->reviewForcedByBrief();
+        if ($reviewForced) {
+            $status = 'needs_review';
+        }
 
         $trace['gate'] = [
             'confidence' => $confidence,
@@ -252,6 +335,7 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             'semantic_sim' => $sim,
             'min_semantic' => $minSemantic,
             'clean' => $clean,
+            'review_forced' => $reviewForced ? 'decisive material not stated' : null,
             'status' => $status,
         ];
 
@@ -328,9 +412,14 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         }
 
         $factLine = $fact !== null ? "\nKNOWN FACT: {$fact}" : '';
+        // The BRANCHES block is IDENTICAL for every item at a given fork (deterministic
+        // sample leaves + static cards), so it goes FIRST — a stable prompt PREFIX the
+        // provider can cache (DeepSeek/OpenAI prefix caching). At the 97-chapter root
+        // this ~20k-token block is shared across all items, so each item's root fork
+        // reuses the cache. The varying ITEM comes LAST, after that cache boundary.
         $messages = [
             ['role' => 'system', 'content' => $this->decidePrompt()],
-            ['role' => 'user', 'content' => "ITEM: {$text}{$factLine}\n\nBRANCHES:\n".implode("\n", $branchLines)],
+            ['role' => 'user', 'content' => "BRANCHES:\n".implode("\n", $branchLines)."\n\nITEM: {$text}{$factLine}"],
         ];
 
         $response = $this->llm->jsonWithUsage($messages, ['model' => $model]);
@@ -520,8 +609,9 @@ final class BrokerDescentMechanism implements ClassifierMechanism
     {
         return <<<'PROMPT'
         You are a customs classification expert navigating Azerbaijan's XİF MN
-        (HS) tree top-down. You are at one fork. You receive an ITEM and the child
-        BRANCHES, each with its code, title and a few EXAMPLE member items.
+        (HS) tree top-down. You are at one fork. You receive the child BRANCHES —
+        each with its code, title and a few EXAMPLE member items — and then, at the
+        end, the ITEM to place under exactly one of them.
 
         Decide which single branch the item belongs under. Rules:
         - Some branches carry authoritative LEGAL RULES (COVERS / INCLUDES /

@@ -41,6 +41,7 @@ class LlmLog
                 'prompt_tokens' => $usage['prompt_tokens'] ?? 0,
                 'completion_tokens' => $usage['completion_tokens'] ?? 0,
                 'total_tokens' => $usage['total_tokens'] ?? 0,
+                'cached_tokens' => $usage['cached_tokens'] ?? 0,
                 'latency_ms' => $latencyMs,
                 'error' => $error,
                 'prompt' => $payloads ? json_encode($messages, JSON_UNESCAPED_UNICODE) : null,

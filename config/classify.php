@@ -48,6 +48,17 @@ return [
         // for the branch; it informs the fork (the auto-confirm gate still applies)
         // rather than hard-overriding the decision.
         'use_cards' => (bool) env('CLASSIFY_BROKER_USE_CARDS', true),
+        // Upfront "product brief": one strong-model call that UNDERSTANDS the item
+        // (identity, purpose, composition) BEFORE the descent, replacing the broker's
+        // noisy canonical essence with a clean description. It does NOT choose a
+        // category — routing stays the cards' job. Two of its fields drive the review
+        // gate below (decisive_axis + material.basis). Degrades to canonicalize()
+        // essence on error/disabled, so it never blocks a classification.
+        'use_brief' => (bool) env('CLASSIFY_BROKER_USE_BRIEF', true),
+        'brief_model' => (string) env('CLASSIFY_BROKER_BRIEF_MODEL', 'openai/gpt-4o'),
+        // Bump when the brief prompt changes materially — old cached briefs (keyed by
+        // this version) are then ignored and re-generated instead of served stale.
+        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b1'),
     ],
 
     // How many fused candidates to hand the LLM re-ranker.
