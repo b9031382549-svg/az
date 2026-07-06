@@ -21,6 +21,9 @@
         @endif
       </div>
     @endif
+    @if(!empty($g['review_forced']))
+      <div class="text-amber">↳ {{ __('Forced to review') }}: {{ $g['review_forced'] }}</div>
+    @endif
     <div>→ {{ __('Status') }}: <span class="font-medium">{{ str_replace('_', ' ', $g['status'] ?? '') }}</span></div>
   </div>
 </div>

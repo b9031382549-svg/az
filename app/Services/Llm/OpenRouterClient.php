@@ -71,6 +71,10 @@ class OpenRouterClient
                 'prompt_tokens' => (int) $response->json('usage.prompt_tokens', 0),
                 'completion_tokens' => (int) $response->json('usage.completion_tokens', 0),
                 'total_tokens' => (int) $response->json('usage.total_tokens', 0),
+                // Prompt tokens served from the provider's prefix cache (billed at a
+                // fraction). Reported as usage.prompt_tokens_details.cached_tokens by
+                // OpenAI/DeepSeek via OpenRouter; 0 when the provider doesn't report it.
+                'cached_tokens' => (int) $response->json('usage.prompt_tokens_details.cached_tokens', 0),
             ],
             'model' => (string) $response->json('model', $payload['model']),
         ];
