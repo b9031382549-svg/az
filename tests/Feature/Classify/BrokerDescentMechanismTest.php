@@ -73,30 +73,28 @@ class BrokerDescentMechanismTest extends TestCase
         $this->assertContains('decided', array_column($result->path, 'by'));
     }
 
-    public function test_undecided_fork_falls_back_to_constrained_retrieval(): void
+    public function test_undecided_root_fork_abstains(): void
     {
         $this->seedTree();
         config()->set('classify.expand_query', false);
 
         $llm = Mockery::mock(OpenRouterClient::class);
-        // Root fork is not decisive and gives no question -> fallback.
+        // Root fork is not decisive and gives no question -> no chapter established.
         $llm->shouldReceive('jsonWithUsage')->andReturn(
             $this->decideResponse('84', 0.4, decisive: false),
-            $this->leafResponse('8471300000', 0.7),   // fallback leaf-pick over retrieved candidates
         );
         $this->instance(OpenRouterClient::class, $llm);
 
-        // Fallback goes through the retriever — stub it.
+        // The retriever must NOT be consulted — a root-undecided broker abstains
+        // rather than fabricate an unconstrained retrieval pick.
         $retriever = Mockery::mock(CatalogRetriever::class);
-        $retriever->shouldReceive('candidates')->andReturn([
-            (object) ['id' => 1, 'code' => '8471300000', 'kind' => 'good', 'name' => 'noutbuk', 'score' => 0.5, 'semantic_sim' => 0.6],
-        ]);
+        $retriever->shouldReceive('candidates')->never();
         $this->instance(CatalogRetriever::class, $retriever);
 
         $result = app(BrokerDescentMechanism::class)->classify('ambiguous item');
 
-        $this->assertSame('8471300000', $result->matchedCode);
-        $this->assertSame('needs_review', $result->status);     // fallback is never a clean auto-confirm
-        $this->assertContains('fallback', array_column($result->path, 'by'));
+        $this->assertNull($result->matchedCode);
+        $this->assertSame('no_match', $result->status);
+        $this->assertContains('abstain', array_column($result->path, 'by'));
     }
 }

@@ -58,7 +58,10 @@ final class BrokerDescentMechanism implements ClassifierMechanism
 
         // Reason over the item's ESSENCE, not a bare noisy token — the same
         // canonical description that drives vector retrieval. A context-free word
-        // (e.g. "qrelka") otherwise makes the top fork a blind guess.
+        // (e.g. "qrelka") otherwise makes the top fork a blind guess. (Dropping it
+        // was tried and regressed syringe/kəpənək → the essence is net-positive;
+        // when it DOES mangle an input the root fork stays undecided and now
+        // abstains — see fallback() — instead of fabricating a code.)
         $q = $text;
 
         try {
@@ -170,6 +173,19 @@ final class BrokerDescentMechanism implements ClassifierMechanism
      */
     private function fallback(string $text, ?RubricatorNode $node, array $path, array $usage, array $confidences, string $model, ?string $reason, array $trace): MechanismResult
     {
+        // No chapter was ever established (undecided at the root, or an error there):
+        // the broker genuinely could not classify. ABSTAIN honestly instead of
+        // leaf-picking from an unconstrained retrieval on the raw text — that would
+        // fabricate an unrelated code that only looks like a broker decision. When a
+        // prefix WAS reached (descended part-way), the constrained fallback below is
+        // still the broker's own narrowed answer, so we keep it.
+        if ($node === null) {
+            $path[] = ['by' => 'abstain'];
+            $trace['steps'][] = ['type' => 'fallback', 'prefix' => null, 'reason' => $reason, 'options' => [], 'chosen' => null, 'abstained' => true];
+
+            return $this->result(null, $path, $usage, $confidences, 'no_match', $reason ?? 'Broker could not determine a chapter.', [], $model, $trace);
+        }
+
         $objects = $this->retriever->candidates([$text], (int) config('classify.candidates', 24));
 
         if ($node !== null) {
