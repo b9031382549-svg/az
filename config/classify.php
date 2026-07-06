@@ -58,7 +58,7 @@ return [
         'brief_model' => (string) env('CLASSIFY_BROKER_BRIEF_MODEL', 'openai/gpt-4o'),
         // Bump when the brief prompt changes materially — old cached briefs (keyed by
         // this version) are then ignored and re-generated instead of served stale.
-        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b2'),
+        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b3'),
     ],
 
     // How many fused candidates to hand the LLM re-ranker.
