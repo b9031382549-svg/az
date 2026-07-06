@@ -166,14 +166,20 @@
       @php
         $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
         $allowed = $item->allowedCodes();
-        $default = (string) ($item->final_code ?? ($allowed[0] ?? ''));
+        $adj = $item->adjudications->sortByDesc('id')->first();
+        $aiProposed = $adj && $adj->verdict === 'resolved' && in_array($item->resolution, ['conflict','review'], true);
+        // Pre-select the judge's answer when the item isn't final yet, so accepting it is one click.
+        $default = (string) ($item->final_code ?? ($aiProposed ? $adj->winning_code : ($allowed[0] ?? '')));
+        // Don't read "conflict" where the judge produced an answer — show it as an AI proposal to confirm.
+        $badgeLabel = $aiProposed ? __('AI proposed') : str_replace('_',' ',$item->resolution);
+        $badgeClass = $aiProposed ? 'bg-ink/10 text-ink' : $resBadge($item->resolution);
       @endphp
       <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
-            <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $resBadge($item->resolution) }}">{{ str_replace('_',' ',$item->resolution) }}</span>
+            <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
-            <span class="font-mono text-sm">{{ $item->final_code ?? __('—') }}</span>
+            <span class="font-mono text-sm">{{ $item->final_code ?? ($aiProposed ? $adj->winning_code : __('—')) }}</span>
             @if($batch === 'all' && $item->batch)
               <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
             @endif
@@ -195,6 +201,20 @@
                 @endif
               </div>
             @endforeach
+            @if($adj)
+              <div class="flex items-start gap-2 text-xs mt-1">
+                <span class="uppercase tracking-wide text-faint w-16 shrink-0">🤖 ai</span>
+                @if($adj->verdict === 'resolved')
+                  <span class="font-mono shrink-0 {{ $item->resolution === 'ai_resolved' ? 'text-ink font-medium' : 'text-muted' }}">{{ $adj->winning_code }}</span>
+                  <span class="text-faint flex-1 min-w-0 break-words">·
+                    @if($item->resolution === 'ai_resolved'){{ __('resolved by AI') }}@elseif(!$adj->stable){{ __('proposed — samples differed, your call') }}@elseif($adj->holdout){{ __('proposed — holdout, your call') }}@else{{ __('proposed') }}@endif
+                    @if($adj->reason)· {{ \Illuminate\Support\Str::limit($adj->reason, 80) }}@endif
+                  </span>
+                @else
+                  <span class="text-faint flex-1 min-w-0">· {{ __('could not decide — your call') }}</span>
+                @endif
+              </div>
+            @endif
           </div>
 
           <a href="{{ route('review.decision', $item->id) }}" target="_blank"
