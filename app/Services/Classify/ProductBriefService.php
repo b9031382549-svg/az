@@ -134,10 +134,10 @@ class ProductBriefService
         gram-weights, pack counts, colours and packaging words, with dropped
         diacritics and mixed scripts.
         - Find the HEAD-NOUN — the common noun naming the article (şpris, ton balığı,
-          salfet, qrelka, kateter). Base the understanding on it, never on the brand
-          or the modifiers. Ignore brand/manufacturer names, model/article codes,
-          barcodes, dimensions/quantities (5ml, 23G, 24X150GR, № 1, 1*24), colours and
-          packaging words.
+          salfet, qrelka, kateter). Base the understanding on it. Ignore model/article
+          codes, barcodes, dimensions/quantities (5ml, 23G, 24X150GR, № 1, 1*24),
+          colours and packaging words. Treat the brand per the BRANDS rule below — it
+          is usually noise, but a recognized maker can settle an ambiguous noun.
         - BUT keep IDENTITY-BEARING tokens that pin the KIND of article (a lamp cap
           code E27/E14/GU10 = a screw/pin bulb; a clinical needle-gauge in a medical
           context).
@@ -149,11 +149,23 @@ class ProductBriefService
         - Transliterated Russian is common: salfetki=napkins/wipes, losos=salmon,
           skumbriya=mackerel, grelka/qrelka=hot-water bottle, shprits=syringe,
           sprintsovka=enema bulb, v masle=in oil, v tomate=in tomato.
-        - NEVER infer identity from a brand alone. Local/private labels (Dardanel,
-          Dr.Para, Baysmed, XONCA…) are not products you must know — do not guess what
-          they sell, and never let a brand that resembles a word (Inci=pearl) pull the
-          meaning. If only a brand/code remains with no product noun, set identity to
-          the brand verbatim and confidence ≤ 0.3.
+        - BRANDS: the product noun always leads; the brand is EVIDENCE, used two ways.
+          (a) A globally RECOGNIZED manufacturer disambiguates a GENERIC or ambiguous
+          noun by its domain — B.Braun / BD / Fresenius / Braun (medical) → a medical
+          device; Bosch / Makita → tools; Nivea / L'Oréal → cosmetics — even when the
+          brand is transliterated or MISSPELLED (B&Braumann = B.Braun). Use it to
+          resolve WHAT the item is: a "system with filter" from B.Braun is an IV
+          infusion set, not a plumbing hose. (b) An UNKNOWN or local/private label
+          (Dardanel, Dr.Para, Baysmed, XONCA…) tells you nothing — do not guess what it
+          sells, and never let a brand that merely resembles a word (Inci=pearl)
+          override a clear product noun. If ONLY a brand/code remains with no product
+          noun, set identity to the brand verbatim and confidence ≤ 0.3.
+        - MEDICAL SUPPLIES are common and easily misread as industrial/plumbing. AZ
+          cues: "sistem" / система = an IV infusion/transfusion SET (not a generic
+          "system"); "şlanq" in this context = medical tubing; together with "venöz",
+          "kateter", "kanül", "filtir/filtirli", "steril", "birdəfəlik", or a medical
+          brand (B.Braun/BD) → a medical device, NOT a hose, valve or machine part.
+          Name it as such in identity (e.g. "IV infusion set with filter").
         - NON-GOODS: a service or labour (xidmət, quraşdırılması, təmir, daşınma), an
           air ticket, a fee or a document is not a good — set function_class "service"
           and confidence 0.0.
@@ -202,6 +214,8 @@ class ProductBriefService
         "Şpris 5ml 23GХ32 rezin porşenli (B.Braun)" → {"identity":"disposable hypodermic syringe","purpose":"inject or withdraw fluid","function_class":"instrument","material":{"value":null,"basis":"unknown"},"decisive_axis":"function","confidence":0.92}
         "Qrelka (isidici) 2000 ml (Dr.Para)" → {"identity":"rubber hot-water bottle for applying heat","purpose":"warm the body / heat therapy","function_class":"article","material":{"value":"rubber","basis":"typical"},"decisive_axis":"material","confidence":0.8}
         "Kəpənək iynə B.Braun" → {"identity":"winged (butterfly) infusion needle","purpose":"venous access for infusion","function_class":"instrument","material":{"value":null,"basis":"unknown"},"decisive_axis":"function","confidence":0.85}
+        "Sistem şlanq filtirli (B&Braumann) № 1" → {"identity":"IV infusion set with filter","purpose":"deliver fluids/medication intravenously","function_class":"instrument","material":{"value":null,"basis":"unknown"},"decisive_axis":"function","confidence":0.85}
+        "Inci salfet 100 əd" → {"identity":"paper napkins","purpose":"wiping","function_class":"consumable","material":{"value":"paper","basis":"typical"},"decisive_axis":"material","confidence":0.8}
         "DARDANEL TON 24X150GR TOMAT SOSLU" → {"identity":"tinned tuna in tomato sauce","purpose":"food","function_class":"foodstuff","material":{"value":null,"basis":"unknown"},"decisive_axis":"origin","confidence":0.93}
         "Yükdaşıma xidməti" → {"identity":"freight/delivery service","purpose":"transport","function_class":"service","material":{"value":null,"basis":"unknown"},"decisive_axis":"identity","confidence":0.0}
         PROMPT;
