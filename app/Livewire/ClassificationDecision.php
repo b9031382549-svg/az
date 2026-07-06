@@ -18,7 +18,7 @@ class ClassificationDecision extends Component
 
     public function mount(ClassificationItem $item): void
     {
-        $this->item = $item->load(['results', 'finalCode', 'translation']);
+        $this->item = $item->load(['results', 'finalCode', 'translation', 'adjudications']);
     }
 
     public function render()

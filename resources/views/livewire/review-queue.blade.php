@@ -5,6 +5,7 @@
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
     $resBadge = fn ($s) => match ($s) {
         'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
+        'ai_resolved' => 'bg-ink/10 text-ink',
         'review', 'blocked_on_fact' => 'bg-amber/15 text-amber',
         'conflict' => 'bg-stamp/12 text-stamp',
         default => 'bg-line/40 text-muted',
@@ -163,7 +164,7 @@
   <div class="space-y-3">
     @forelse($items as $item)
       @php
-        $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed'], true);
+        $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
         $allowed = $item->allowedCodes();
         $default = (string) ($item->final_code ?? ($allowed[0] ?? ''));
       @endphp
