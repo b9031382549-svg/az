@@ -153,7 +153,7 @@ class ReviewQueue extends Component
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
         $items = $scoped()
-            ->with(['finalCode', 'translation', 'results'])
+            ->with(['finalCode', 'translation', 'results', 'adjudications'])
             ->when($this->filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
             ->when(! in_array($this->filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $this->filter))
             ->latest()
@@ -168,7 +168,8 @@ class ReviewQueue extends Component
         $codes = $items->getCollection()
             ->flatMap(fn ($item) => $item->results
                 ->flatMap(fn ($r) => collect($r->candidates ?? [])->pluck('code')->push($r->matched_code))
-                ->push($item->final_code))
+                ->push($item->final_code)
+                ->push($item->adjudications->sortByDesc('id')->first()?->winning_code))
             ->filter()
             ->map(fn ($c) => (string) $c)
             ->unique()

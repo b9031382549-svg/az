@@ -216,8 +216,15 @@
         @if($adj->winning_code)<span class="font-mono ml-1">{{ $adj->winning_code }}</span> <span class="text-faint">({{ $adj->which_mechanism }}, {{ $pct($adj->confidence) }})</span>@endif
         @if(!$adj->stable)<span class="text-stamp text-xs ml-1">· {{ __('unstable → human') }}</span>@endif
         @if($adj->holdout)<span class="text-amber text-xs ml-1">· {{ __('holdout → human') }}</span>@endif
-        @if($adj->applied)<span class="text-ledger text-xs ml-1">· {{ __('applied') }}</span>@endif
+        @if($adj->applied)<span class="text-ledger text-xs ml-1">· {{ __('applied → ai_resolved') }}</span>@endif
       </p>
+      @if($adj->winning_code && $nm($adj->winning_code))<p class="text-muted text-xs mt-0.5">{{ $nm($adj->winning_code) }}</p>@endif
+      @if(!empty($adj->samples))
+        <p class="text-faint text-xs mt-1">{{ __('Stability samples') }}:
+          @foreach($adj->samples as $s)<span class="font-mono">{{ $s['code'] ?? ($s['verdict'] ?? '∅') }}</span>@if(!$loop->last), @endif @endforeach
+          @unless($adj->stable) → <span class="text-stamp">{{ __('differed → kept with a human') }}</span>@endunless
+        </p>
+      @endif
       @if($adj->rule_basis)<p class="text-muted text-xs mt-1">{{ __('Basis') }}: {{ $adj->rule_basis }}</p>@endif
       @if($adj->reason)<p class="text-faint text-xs mt-0.5">{{ $adj->reason }}</p>@endif
     </div>
