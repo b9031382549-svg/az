@@ -31,6 +31,11 @@ return [
         'leaf_direct_max' => (int) env('CLASSIFY_BROKER_LEAF_DIRECT_MAX', 20),
         'max_lookups' => (int) env('CLASSIFY_BROKER_MAX_LOOKUPS', 1),
         'fact_min' => (float) env('CLASSIFY_BROKER_FACT_MIN', 0.7),
+        // A fork with more children than this (the 97-chapter root) is "wide":
+        // branches carry a COMPACT card (scope + excludes) and fewer/shorter sample
+        // leaves, so the prompt stays within the model's context window.
+        'wide_fork' => (int) env('CLASSIFY_BROKER_WIDE_FORK', 20),
+        'wide_sample_leaves' => (int) env('CLASSIFY_BROKER_WIDE_SAMPLE_LEAVES', 4),
         // Attach a branch's distilled legal card (COVERS/INCLUDES/EXCLUDES/CLOSED
         // LIST from hs_cards) at each fork, so the broker decides by the rulebook
         // rather than by sample leaves alone. A card is used only where one exists

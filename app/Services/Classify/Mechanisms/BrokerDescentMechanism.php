@@ -279,23 +279,32 @@ final class BrokerDescentMechanism implements ClassifierMechanism
     /** One DECIDE-NODE call: name the criterion, judge branches by their leaves, pick a child. */
     private function decide(string $text, Collection $children, string $model, array &$usage, ?string $fact = null): array
     {
-        $sample = (int) config('classify.broker.sample_leaves', 12);
+        // A WIDE fork (the 97-chapter root) with a full card + full samples per
+        // branch blows past the model's context (~144k tokens). So at wide forks
+        // send a COMPACT card (scope + the reroute EXCLUDES that decide boundaries,
+        // e.g. ch30 excludes instruments → 90) and fewer, shorter samples. Narrow
+        // forks (positions/subpositions, where closed lists and fine boundaries
+        // live) keep the full card + full samples.
+        $wide = $children->count() > (int) config('classify.broker.wide_fork', 20);
+        $sample = $wide
+            ? (int) config('classify.broker.wide_sample_leaves', 4)
+            : (int) config('classify.broker.sample_leaves', 12);
         $cards = $this->cardsFor($children);
         $options = [];
         $branchLines = [];
         foreach ($children as $c) {
             // Sample leaves CHARACTERIZE a branch (deciding by function, not the
-            // bare title). Sent in full — the tail is what distinguishes them — and
-            // now drawn as an even cross-section of the branch (see sampleLeaves),
-            // so a broad chapter is represented by its whole range, not its start.
+            // bare title), drawn as an even cross-section of the branch. Shortened
+            // at wide forks to keep the prompt within the context window.
             $samples = $c->sampleLeaves($sample)->pluck('name')
-                ->map(fn ($n) => (string) $n)->implode('; ');
+                ->map(fn ($n) => $wide ? BreadcrumbName::fit((string) $n, 120) : (string) $n)
+                ->implode('; ');
             $title = $c->title ?: $c->code;
 
             // If a distilled legal card exists for this branch, lead with its rules
-            // (COVERS/INCLUDES/EXCLUDES/CLOSED LIST) so the fork is decided by the
-            // rulebook, not by the sample leaves alone.
-            $cardText = isset($cards[$c->code]) ? $cards[$c->code]->promptBlock() : '';
+            // so the fork is decided by the rulebook, not by the sample leaves
+            // alone (compact = scope + excludes at wide forks; full otherwise).
+            $cardText = isset($cards[$c->code]) ? $cards[$c->code]->promptBlock('    ', $wide) : '';
             $cardBlock = $cardText !== '' ? "\n".$cardText : '';
 
             $branchLines[] = "code={$c->code} | {$title}{$cardBlock}\n    e.g.: {$samples}";

@@ -37,4 +37,21 @@ class HsCardTest extends TestCase
     {
         $this->assertSame('', (new HsCard([]))->promptBlock());
     }
+
+    public function test_compact_mode_keeps_scope_and_excludes_but_drops_includes_and_closed_list(): void
+    {
+        $card = new HsCard([
+            'scope' => 'Pharmaceutical products',
+            'includes' => [['product' => 'Medicaments', 'syn' => ['dərman']]],
+            'excludes' => [['product_class' => 'syringes', 'reroute_code' => '9018']],
+            'closed_list' => ['exhaustive' => true, 'members' => ['catgut', 'dental cements']],
+        ]);
+
+        $block = $card->promptBlock('', true);
+
+        $this->assertStringContainsString('COVERS: Pharmaceutical products', $block);
+        $this->assertStringContainsString('EXCLUDES: syringes → see 9018', $block);
+        $this->assertStringNotContainsString('INCLUDES:', $block);
+        $this->assertStringNotContainsString('CLOSED LIST', $block);
+    }
 }

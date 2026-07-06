@@ -31,7 +31,7 @@ class HsCard extends Model
      * the sections that exist are emitted. Product synonyms are kept multilingual
      * so the rule matches the item whatever language it arrived in.
      */
-    public function promptBlock(string $indent = '    '): string
+    public function promptBlock(string $indent = '    ', bool $compact = false): string
     {
         $lines = [];
 
@@ -39,9 +39,14 @@ class HsCard extends Model
             $lines[] = 'COVERS: '.$this->scope;
         }
 
-        $inc = $this->renderProducts($this->includes ?? []);
-        if ($inc !== '') {
-            $lines[] = 'INCLUDES: '.$inc;
+        // Compact mode (wide forks, e.g. the 97-chapter root): scope + the reroute
+        // EXCLUDES that decide boundaries only — the full INCLUDES lexicon and
+        // CLOSED LIST are long and belong at the deeper, narrow forks.
+        if (! $compact) {
+            $inc = $this->renderProducts($this->includes ?? []);
+            if ($inc !== '') {
+                $lines[] = 'INCLUDES: '.$inc;
+            }
         }
 
         foreach ($this->excludes ?? [] as $e) {
@@ -55,7 +60,7 @@ class HsCard extends Model
         }
 
         $cl = $this->closed_list ?? [];
-        if (! empty($cl['exhaustive']) && ! empty($cl['members'])) {
+        if (! $compact && ! empty($cl['exhaustive']) && ! empty($cl['members'])) {
             $lines[] = 'CLOSED LIST (ONLY these belong here — anything else does NOT): '
                 .implode('; ', array_map('strval', $cl['members']));
         }
