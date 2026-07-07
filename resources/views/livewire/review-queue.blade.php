@@ -221,6 +221,7 @@
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
             <span class="font-mono text-sm">{{ $cd($item->final_code) ?? ($aiProposed ? $cd($adj->winning_code) : __('—')) }}</span>
+            @if(mb_strlen((string) $item->final_code) === 4)<span class="px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted" title="{{ __('resolved at the 4-digit heading; exact code left to a human') }}">{{ __('heading') }}</span>@endif
             @if($batch === 'all' && $item->batch)
               <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
             @endif
@@ -228,6 +229,8 @@
           <p class="font-medium">{{ $item->localizedSourceText() }}</p>
           @if($item->finalCode)
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->finalCode->localizedName(), 110) }}</p>
+          @elseif(mb_strlen((string) $item->final_code) === 4 && isset($headingNames[(string) $item->final_code]))
+            <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ __('heading only') }}</span></p>
           @endif
 
           {{-- Per-mechanism answers --}}

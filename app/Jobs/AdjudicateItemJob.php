@@ -64,21 +64,24 @@ class AdjudicateItemJob implements ShouldQueue
             return;
         }
 
-        $cat = CatalogCode::where('code', $adj->winning_code)->first();
-        if ($cat === null) {
-            return;
+        // A heading-level verdict is a bare 4-digit code: there is no exact catalog row,
+        // so store the heading itself (final_catalog_id stays null) with the judge's kind.
+        // A full 10-digit verdict must map to a real catalog code.
+        if (mb_strlen((string) $adj->winning_code) === 4) {
+            $update = ['final_code' => (string) $adj->winning_code, 'final_catalog_id' => null, 'kind' => $adj->winning_kind];
+        } else {
+            $cat = CatalogCode::where('code', $adj->winning_code)->first();
+            if ($cat === null) {
+                return;
+            }
+            $update = ['final_code' => $cat->code, 'final_catalog_id' => $cat->id, 'kind' => $cat->kind];
         }
 
         // Conditional update — never clobber a human/terminal decision that landed
         // while this job was queued. Only a still-divergent item flips.
         $changed = ClassificationItem::whereKey($item->id)
             ->whereIn('resolution', ['review', 'conflict'])
-            ->update([
-                'resolution' => 'ai_resolved',
-                'final_code' => $cat->code,
-                'final_catalog_id' => $cat->id,
-                'kind' => $cat->kind,
-            ]);
+            ->update(['resolution' => 'ai_resolved'] + $update);
 
         if ($changed === 1) {
             $adj->update(['applied' => true]);

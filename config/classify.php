@@ -170,7 +170,7 @@ return [
         'enabled' => (bool) env('CLASSIFY_ADJUDICATOR_ENABLED', false),
         'mode' => (string) env('CLASSIFY_ADJUDICATOR_MODE', 'shadow'), // shadow | active
         'model' => (string) env('CLASSIFY_ADJUDICATOR_MODEL', 'openai/gpt-oss-120b:online'),
-        'prompt_version' => (string) env('CLASSIFY_ADJUDICATOR_VERSION', 'j2'),
+        'prompt_version' => (string) env('CLASSIFY_ADJUDICATOR_VERSION', 'j3'),
         // Resolutions the judge acts on. Abstention (a mechanism found no code) is
         // included but flagged (had_abstention) so it can be measured separately.
         'scope' => array_values(array_filter(array_map('trim', explode(',',

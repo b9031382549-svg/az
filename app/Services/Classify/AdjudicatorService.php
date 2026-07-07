@@ -109,30 +109,51 @@ class AdjudicatorService
             return ['verdict' => 'error'] + $base;
         }
 
-        $code = $primary['winning_code'];
-        $resolved = $primary['verdict'] === 'resolved' && $code !== null && in_array($code, $allowed, true);
-
-        // Stability: every additional sample must also resolve to the same code.
-        $stable = true;
-        foreach (array_slice($samples, 1) as $s) {
-            if ($s === null || $s['verdict'] !== 'resolved' || $s['winning_code'] !== $code) {
-                $stable = false;
-                break;
-            }
-        }
-
-        $cat = $resolved ? CatalogCode::where('code', $code)->first() : null;
-
-        return [
-            'verdict' => $resolved && $cat !== null ? 'resolved' : 'uncertain',
-            'winning_code' => $cat?->code,
-            'winning_kind' => $cat?->kind ?? $primary['winning_kind'],
+        // The primary sample's metadata rides along on every outcome.
+        $meta = [
+            'winning_kind' => $primary['winning_kind'],
             'confidence' => $primary['confidence'],
             'which' => $primary['which'],
             'rule_basis' => $primary['rule_basis'],
             'reason' => $this->str(($primary['reason'] ?? '').$this->sourceNote($primary['sources'] ?? [])),
-            'stable' => $stable,
         ];
+        $out = fn (array $extra) => array_merge($base, $meta, $extra);
+
+        $primaryCode = $primary['verdict'] === 'resolved' ? ($primary['winning_code'] ?? null) : null;
+        if ($primaryCode === null) {
+            return $out([]); // uncertain
+        }
+
+        $codes = collect($samples)->map(fn ($s) => (string) ($s['winning_code'] ?? ''));
+        $allResolved = collect($samples)->every(fn ($s) => $s !== null && $s['verdict'] === 'resolved' && $s['winning_code'] !== null);
+        $heading = mb_substr((string) $primaryCode, 0, 4);
+        $candidateHeadings = collect($allowed)->map(fn ($c) => mb_substr((string) $c, 0, 4))->unique();
+
+        // FULL: an exact 10-digit catalog code, on the candidate list, agreed by every sample.
+        if (mb_strlen((string) $primaryCode) === 10 && in_array($primaryCode, $allowed, true)
+            && $allResolved && $codes->every(fn ($c) => $c === (string) $primaryCode)) {
+            $cat = CatalogCode::where('code', $primaryCode)->first();
+            if ($cat !== null) {
+                return $out(['verdict' => 'resolved', 'winning_code' => $cat->code, 'winning_kind' => $cat->kind, 'stable' => true]);
+            }
+        }
+
+        // HEADING: every sample agrees on a 4-digit heading the mechanisms actually reached
+        // — a good-enough answer when the exact subheading can't be pinned. Full is preferred
+        // above; this is the honest fallback (a bare 4-digit code as the result).
+        if ($allResolved && $candidateHeadings->contains($heading) && $codes->every(fn ($c) => mb_substr($c, 0, 4) === $heading)) {
+            return $out(['verdict' => 'resolved', 'winning_code' => $heading, 'stable' => true]);
+        }
+
+        // A pick exists but the samples don't agree even at the heading → record it, not
+        // stable, so it goes to a human.
+        $onList = mb_strlen((string) $primaryCode) === 10 && in_array($primaryCode, $allowed, true);
+
+        return $out([
+            'verdict' => $onList ? 'resolved' : 'uncertain',
+            'winning_code' => $onList ? $primaryCode : null,
+            'stable' => false,
+        ]);
     }
 
     /** One judge call → parsed verdict, or null on any failure. */
@@ -195,11 +216,16 @@ class AdjudicatorService
         }
 
         $verdict = in_array($d['verdict'] ?? null, ['resolved', 'uncertain'], true) ? $d['verdict'] : 'uncertain';
-        $code = trim((string) ($d['winning_code'] ?? ''));
+
+        // The judge may answer with a full 10-digit code OR, when the exact subheading
+        // is undetermined, just the 4-digit HS heading. Keep digits only; a 5–9 digit
+        // partial collapses to its 4-digit heading.
+        $digits = preg_replace('/\D/', '', (string) ($d['winning_code'] ?? ''));
+        $code = mb_strlen($digits) >= 10 ? mb_substr($digits, 0, 10) : (mb_strlen($digits) >= 4 ? mb_substr($digits, 0, 4) : null);
 
         return [
             'verdict' => $verdict,
-            'winning_code' => $code !== '' && $code !== 'null' ? $code : null,
+            'winning_code' => $code,
             'winning_kind' => in_array($d['winning_kind'] ?? null, ['good', 'service'], true) ? $d['winning_kind'] : null,
             'confidence' => round((float) ($d['confidence'] ?? 0), 3),
             'which' => in_array($d['which'] ?? null, ['broker', 'vector', 'both', 'neither'], true) ? $d['which'] : null,
@@ -254,8 +280,10 @@ class AdjudicatorService
         return <<<'PROMPT'
         You are a senior customs-classification ARBITER for the Azerbaijani XİF MN
         (HS) nomenclature. Two independent classifiers disagreed, or agreed but
-        without confidence, on ONE item. Decide whether EXACTLY ONE 10-digit code is
-        UNAMBIGUOUSLY correct.
+        without confidence, on ONE item. Decide the correct classification: ideally ONE
+        10-digit code from the candidates; but when the exact subheading cannot be
+        pinned and the 4-digit HS heading is nonetheless clear, resolve at that HEADING
+        (a bare 4-digit code) rather than giving up.
 
         You may USE WEB SEARCH: if the item is an unfamiliar brand, drug, or product,
         look up what it actually is (its category, active ingredient, material) before
@@ -270,21 +298,28 @@ class AdjudicatorService
         GOOD. Decide this axis before comparing codes.
 
         Hard rules:
-        - Choose ONLY from the CANDIDATES listed. NEVER invent a code.
-        - Answer verdict="uncertain" if the correct code is not among the candidates,
-          OR two candidates are both defensible, OR a deciding fact (material / exact
-          identity / function) is not established in the understanding. Abstaining is
-          correct and expected — never force a pick to be helpful.
+        - PREFER a full 10-digit code from the CANDIDATES. Never invent one.
+        - HEADING FALLBACK: if no single candidate's full code is clearly right but the
+          correct 4-digit HS heading IS clear — and that heading is the heading of one or
+          more candidates — resolve at the heading: set winning_code to just those 4
+          digits. This beats abstaining when the heading is certain and only the last
+          digits are in doubt. Never give a heading the candidates do not reach.
+        - Answer verdict="uncertain" only when even the 4-digit heading is unclear, OR two
+          different headings are both defensible, OR a deciding fact (material / exact
+          identity / function) is not established. Abstaining is right when the heading
+          itself is genuinely in doubt — never force a pick to be helpful.
         - Decide by ESSENTIAL CHARACTER / FUNCTION and the binding HS CARD rules
           (COVERS / INCLUDES / EXCLUDES / CLOSED LIST), NOT by word overlap with a
           code's name. Quote the deciding clause in "rule_basis".
         - If a mechanism ABSTAINED, that is a signal of difficulty, not a free win for
           the other — hold the surviving code to the same bar.
 
+        winning_code is a full 10-digit code, OR a 4-digit heading, OR null; confidence is
+        your certainty in the code you actually give (full or heading).
         Reason briefly (a few lines). Then output EXACTLY one line:
         ===VERDICT===
         followed by ONE JSON object and NOTHING after it:
-        {"verdict":"resolved|uncertain","winning_code":"<10-digit code or null>","winning_kind":"good|service|null","confidence":0.0,"which":"broker|vector|both|neither","rule_basis":"the deciding card clause / GIR rule","reason":"short"}
+        {"verdict":"resolved|uncertain","winning_code":"<10 digits | 4-digit heading | null>","winning_kind":"good|service|null","confidence":0.0,"which":"broker|vector|both|neither","rule_basis":"the deciding card clause / GIR rule","reason":"short"}
         PROMPT;
     }
 
