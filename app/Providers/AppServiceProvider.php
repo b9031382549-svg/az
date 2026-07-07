@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Classify\Mechanisms\BrokerDescentMechanism;
 use App\Services\Classify\Mechanisms\ClassifierMechanism;
+use App\Services\Classify\Mechanisms\DirectLlmMechanism;
 use App\Services\Classify\Mechanisms\MechanismRegistry;
 use App\Services\Classify\Mechanisms\VectorMechanism;
 use App\Services\Embeddings\OllamaEmbedder;
@@ -21,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
     private const MECHANISMS = [
         'vector' => VectorMechanism::class,
         'broker' => BrokerDescentMechanism::class,
+        'direct' => DirectLlmMechanism::class,
     ];
 
     /**

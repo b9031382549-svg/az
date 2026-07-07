@@ -16,8 +16,8 @@
         default => 'bg-line/40 text-muted',
     };
     $pct = fn ($v) => $v !== null ? number_format((float) $v * 100, 0).'%' : '—';
-    // vector first, then broker, then the rest
-    $order = ['vector' => 0, 'broker' => 1];
+    // vector first, then broker, then the direct (cold-recall) vote, then the rest
+    $order = ['vector' => 0, 'broker' => 1, 'direct' => 2];
     $results = $item->results->sortBy(fn ($r) => $order[$r->mechanism] ?? 9)->values();
   @endphp
 
