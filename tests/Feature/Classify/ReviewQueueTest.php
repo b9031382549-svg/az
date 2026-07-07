@@ -157,6 +157,24 @@ class ReviewQueueTest extends TestCase
             ->assertSee('disputed');
     }
 
+    public function test_agreed_ai_resolved_and_ai_proposed_merge_into_found(): void
+    {
+        $this->agreedItem(); // resolution = agreed
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'x1', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471300000', 'kind' => 'good']);
+        $proposed = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x2', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+        $proposed->adjudications()->create(['resolution_before' => 'conflict', 'model' => 'm', 'prompt_version' => 'j4', 'mode' => 'active', 'verdict' => 'resolved', 'winning_code' => '8471300000', 'winning_kind' => 'good', 'stable' => true, 'holdout' => true, 'applied' => false]);
+
+        $c = $this->actingComponent();
+        $counts = $c->viewData('counts');
+
+        $this->assertSame(3, (int) ($counts['found'] ?? 0));           // all three merged
+        $this->assertArrayNotHasKey('agreed', $counts->toArray());     // individual keys gone in full mode
+        $this->assertArrayNotHasKey('ai_resolved', $counts->toArray());
+
+        $c->call('setFilter', 'found');
+        $this->assertSame(3, $c->viewData('items')->total());          // the Found filter returns all three
+    }
+
     public function test_ai_proposed_conflict_is_carved_out_of_the_conflict_count(): void
     {
         // A conflict the adjudicator confidently RESOLVED (held out, not applied) —
@@ -170,11 +188,11 @@ class ReviewQueueTest extends TestCase
         $c = $this->actingComponent();
         $counts = $c->viewData('counts');
 
-        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));      // not 2
-        $this->assertSame(1, (int) ($counts['ai_proposed'] ?? 0));
-        $this->assertSame(1, $c->viewData('openCount'));            // "Needs attention" excludes the proposal
+        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));   // genuine conflict only, not 2
+        $this->assertSame(1, (int) ($counts['found'] ?? 0));      // the AI proposal counts as "found"
+        $this->assertSame(1, $c->viewData('openCount'));          // "Needs attention" excludes the proposal
 
-        $c->call('setFilter', 'ai_proposed')->assertSee('diamar')->assertDontSee('raunatin');
+        $c->call('setFilter', 'found')->assertSee('diamar')->assertDontSee('raunatin');
         $c->call('setFilter', 'open')->assertSee('raunatin')->assertDontSee('diamar');
     }
 

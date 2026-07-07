@@ -32,6 +32,9 @@ class ReviewQueue extends Component
 
     /** Resolution display metadata for the report donut + legend. */
     private const RESOLUTION_META = [
+        // "Found" = one bucket for agreed + ai_resolved + ai_proposed (the classifier
+        // produced an answer). The individual three still render in heading mode.
+        'found' => ['label' => 'Found', 'color' => '#3f6b4f'],
         'agreed' => ['label' => 'Agreed', 'color' => '#3f6b4f'],
         'ai_resolved' => ['label' => 'AI resolved', 'color' => '#3a6ea5'],
         'ai_proposed' => ['label' => 'AI proposed', 'color' => '#6b93c0'],
@@ -202,6 +205,10 @@ class ReviewQueue extends Component
 
             $q = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
             match ($this->filter) {
+                'found' => $q->where(function ($w) use ($resolved) {
+                    $w->whereIn('resolution', ['agreed', 'ai_resolved'])
+                        ->orWhere(fn ($o) => $o->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved));
+                }),
                 'ai_proposed' => $q->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved),
                 'open' => $q->whereIn('resolution', self::OPEN)->whereDoesntHave('adjudications', $resolved),
                 'conflict', 'review' => $q->where('resolution', $this->filter)->whereDoesntHave('adjudications', $resolved),
@@ -228,6 +235,14 @@ class ReviewQueue extends Component
                 $counts = $rawCounts->map(fn ($c, $res) => $c - (int) ($proposed[$res] ?? 0));
                 $counts['ai_proposed'] = (int) $proposed->sum();
                 $counts = $counts->filter(fn ($v) => $v !== 0);
+            }
+
+            // Collapse agreed + ai_resolved + ai_proposed into one "Found" bucket for the
+            // report + tabs; rawCounts keeps the split for the bulk-action math.
+            $found = (int) ($counts['agreed'] ?? 0) + (int) ($counts['ai_resolved'] ?? 0) + (int) ($counts['ai_proposed'] ?? 0);
+            $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved', 'ai_proposed'], true));
+            if ($found > 0) {
+                $counts = $counts->put('found', $found);
             }
         }
 
@@ -434,9 +449,9 @@ class ReviewQueue extends Component
             'good' => (int) ($kind['good'] ?? 0),
             'service' => (int) ($kind['service'] ?? 0),
             'consensus' => [
-                'agreed' => (int) ($counts['agreed'] ?? 0),
-                'ai_resolved' => (int) ($counts['ai_resolved'] ?? 0),
-                'ai_proposed' => (int) ($counts['ai_proposed'] ?? 0),
+                // "Found" = agreed + ai_resolved + ai_proposed (already merged in full
+                // mode); in heading mode the bucket is the converge count ('agreed').
+                'found' => (int) ($counts['found'] ?? 0) + (int) ($counts['agreed'] ?? 0),
                 'review' => (int) ($counts['review'] ?? 0),
                 'conflict' => (int) ($counts['conflict'] ?? 0),
             ],
