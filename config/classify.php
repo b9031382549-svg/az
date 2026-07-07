@@ -62,15 +62,17 @@ return [
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):
-    // a "cold" direct classification from a reasoning model's OWN knowledge — no
-    // retrieval over our catalog, no tree descent. A different METHOD, so its vote is a
-    // genuinely independent third opinion in the majority (2-of-3) consensus. Enable by
-    // adding 'direct' to CLASSIFY_MECHANISMS (off by default until validated).
+    // a reasoning model that IDENTIFIES the item — with web search for unfamiliar
+    // brands/drugs — then codes it. A different METHOD (it can reach knowledge neither
+    // retrieval nor descent has), so its vote is a genuinely independent third opinion
+    // in the majority (2-of-3) consensus. Enable via CLASSIFY_MECHANISMS.
     'direct' => [
-        // A DIFFERENT family from the DeepSeek mechanisms (decorrelates the vote); a
-        // reasoning model, but far faster than deepseek-r1 (which timed out at ~60-120s).
-        'model' => (string) env('CLASSIFY_DIRECT_MODEL', 'openai/gpt-oss-120b'),
-        // Reasoning models are slow — this call gets a long HTTP timeout of its own.
+        // A thinking DeepSeek WITH web search (the `:online` suffix = OpenRouter's web
+        // plugin, ~$0.005/search). Cracks real-but-obscure names (drugs, brands) that
+        // cold recall misses. Every item searches — set CLASSIFY_DIRECT_MODEL to a
+        // plain model (no `:online`) to disable search if latency/cost bites.
+        'model' => (string) env('CLASSIFY_DIRECT_MODEL', 'deepseek/deepseek-v4-flash:online'),
+        // Web search + reasoning is slow — this call gets a long HTTP timeout of its own.
         'timeout' => (int) env('CLASSIFY_DIRECT_TIMEOUT', 180),
     ],
 
@@ -162,11 +164,12 @@ return [
     //   mode=active  → a stable, confident, on-list verdict flips the item to
     //                  'ai_resolved' (a distinct, reversible, auditable state).
     // Disabled by default; the judge is gpt-oss-120b (a DIFFERENT model family from
-    // the DeepSeek mechanisms, to decorrelate errors).
+    // the DeepSeek mechanisms, to decorrelate errors) WITH web search (`:online`), so
+    // when the mechanisms diverge it can look the item up before ruling.
     'adjudicator' => [
         'enabled' => (bool) env('CLASSIFY_ADJUDICATOR_ENABLED', false),
         'mode' => (string) env('CLASSIFY_ADJUDICATOR_MODE', 'shadow'), // shadow | active
-        'model' => (string) env('CLASSIFY_ADJUDICATOR_MODEL', 'openai/gpt-oss-120b'),
+        'model' => (string) env('CLASSIFY_ADJUDICATOR_MODEL', 'openai/gpt-oss-120b:online'),
         'prompt_version' => (string) env('CLASSIFY_ADJUDICATOR_VERSION', 'j1'),
         // Resolutions the judge acts on. Abstention (a mechanism found no code) is
         // included but flagged (had_abstention) so it can be measured separately.

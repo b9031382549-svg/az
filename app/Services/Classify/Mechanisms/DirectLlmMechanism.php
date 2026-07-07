@@ -8,13 +8,13 @@ use App\Support\LlmLog;
 use Throwable;
 
 /**
- * A third, independent path: a "cold" classification straight from a reasoning
- * model's OWN knowledge — no retrieval over our catalog, no tree descent. Given the
- * raw Azerbaijani item it returns a single 10-digit XİF MN code + a short reason, or
- * abstains ("code": null) when it cannot understand the item. A genuinely different
- * METHOD from vector-retrieval and broker-descent, so its agreement/disagreement is
- * an independent vote in the consensus. A returned code is trusted only if it
- * actually exists in the catalog (the model recalls from memory and may cite a
+ * A third, independent path: a reasoning model that IDENTIFIES the item — using web
+ * search for unfamiliar brands/drugs/products (the model runs with OpenRouter's
+ * `:online` suffix) — then returns a single 10-digit XİF MN code + a short reason,
+ * or abstains ("code": null) when even a search cannot tell what it is. A genuinely
+ * different METHOD from vector-retrieval and broker-descent (it can reach knowledge
+ * neither has), so its vote is independent in the consensus. A returned code is
+ * trusted only if it actually exists in the catalog (the model may cite a
  * plausible-but-nonexistent code).
  */
 final class DirectLlmMechanism implements ClassifierMechanism
@@ -29,7 +29,7 @@ final class DirectLlmMechanism implements ClassifierMechanism
     public function classify(string $text): MechanismResult
     {
         $text = trim($text);
-        $model = (string) config('classify.direct.model', 'deepseek/deepseek-r1');
+        $model = (string) config('classify.direct.model', 'deepseek/deepseek-v4-flash:online');
         if ($text === '') {
             return new MechanismResult(null, null, null, null, 'error', explanation: 'Empty item.', model: $model);
         }
@@ -55,12 +55,16 @@ final class DirectLlmMechanism implements ClassifierMechanism
                 explanation: 'Direct model unavailable: '.mb_substr($e->getMessage(), 0, 120), model: $model);
         }
 
+        // Web sources the model cited (when it searched) — kept in the reason so the
+        // decision page can show where the identification came from.
+        $src = $this->sourceNote($resp['annotations'] ?? []);
+
         $cat = $d['code'] !== null ? $this->snapToCatalog($d['code']) : null;
         if ($cat === null) {
             return new MechanismResult(null, null, null, $d['confidence'], 'no_match',
-                explanation: $d['code'] !== null
+                explanation: ($d['code'] !== null
                     ? "Recalled {$d['code']} — no catalog code in that subheading, abstaining. ".(string) $d['reason']
-                    : ($d['reason'] ?? 'Model could not identify the item.'),
+                    : ($d['reason'] ?? 'Model could not identify the item.')).$src,
                 model: $model, usage: $usage);
         }
 
@@ -75,10 +79,28 @@ final class DirectLlmMechanism implements ClassifierMechanism
             kind: $cat->kind,
             confidence: $d['confidence'],
             status: $d['confidence'] !== null && $d['confidence'] >= $auto ? 'auto_confirmed' : 'needs_review',
-            explanation: $snap.(string) ($d['reason'] ?? ''),
+            explanation: $snap.(string) ($d['reason'] ?? '').$src,
             model: $model,
             usage: $usage,
         );
+    }
+
+    /**
+     * A compact " [web: host1, host2]" note from web-search citations, or ''.
+     *
+     * @param  array<int, array{url: string, title: string}>  $annotations
+     */
+    private function sourceNote(array $annotations): string
+    {
+        $hosts = collect($annotations)
+            ->map(fn ($s) => parse_url((string) ($s['url'] ?? ''), PHP_URL_HOST))
+            ->filter()
+            ->map(fn ($h) => preg_replace('/^www\./', '', (string) $h))
+            ->unique()
+            ->take(3)
+            ->implode(', ');
+
+        return $hosts !== '' ? " [web: {$hosts}]" : '';
     }
 
     /**
@@ -136,16 +158,19 @@ final class DirectLlmMechanism implements ClassifierMechanism
         return <<<'PROMPT'
         You are an expert in Azerbaijan's XİF MN customs nomenclature (aligned with the
         HS / ТН ВЭД code system). You receive ONE line item from an Azerbaijani
-        e-invoice. From your OWN knowledge — assume NO database — give the single most
-        likely 10-digit XİF MN code, with a one-line reason.
+        e-invoice. Identify WHAT the item actually is, then give the single most likely
+        10-digit XİF MN code with a one-line reason.
         - The text is Azerbaijani and often noisy (brands, sizes, transliteration,
-          dropped diacritics). Read the head-noun; ignore brand/size noise.
-        - If you genuinely CANNOT tell what the item is (a garbled token, or a bare
-          brand/code with no product noun), return "code": null. Do NOT guess a code
-          for an unintelligible item.
+          dropped diacritics). Read the head-noun; ignore size noise.
+        - If the item is an UNFAMILIAR brand, drug, or product name, USE WEB SEARCH to
+          find what it is (its category, active ingredient, material) before coding it.
+          Prefer the real identification over a guess.
+        - Only if even a web search cannot tell what it is (truly garbled token, or a
+          bare brand with no discoverable product), return "code": null. Do NOT invent
+          a code for an unintelligible item.
         - Give a FULL 10-digit code, digits only.
 
-        Respond with strict JSON only:
+        Respond with strict JSON only (no extra keys):
         {"code": "<10 digits or null>", "confidence": 0.0, "reason": "short"}
         PROMPT;
     }
