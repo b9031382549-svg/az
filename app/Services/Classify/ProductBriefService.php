@@ -129,11 +129,25 @@ class ProductBriefService
         you produce a clean, complete UNDERSTANDING of the item: what it is, what it
         is for, and what it is made of. Describe honestly; never fabricate.
 
+        FIRST, DECIDE WHAT THE LINE INVOICES — a supplied GOOD or a performed SERVICE.
+        An invoice line is either the handover of a physical THING, or the performance of
+        WORK. Read the line's intent, not only its nouns. When a physical object is named
+        but the point of the line is an ACTION done to or with it — repairing, installing,
+        mounting, maintaining, servicing, transporting, cleaning or renting it — the line
+        IS that service, and the object only says what the work is ON. A trailing or
+        parenthetical action over an object ("… (təmiri)", "…-nın quraşdırılması",
+        "… montajı", "ремонт", "монтаж") is the work, never noise. Conversely, an object
+        handed over on its own — including a spare PART or component, even bought "for
+        repair" — with no action performed on it is a GOOD. Ask yourself: is the object
+        the thing DELIVERED, or the thing WORKED ON? If work → function_class "service"
+        and let identity be the work itself ("repair of a compressor crankcase heater
+        element"). Only after this do you read the noun.
+
         READING NOISY INPUT (do this FIRST). The item is a real Azerbaijani/Russian
         invoice line: brand-first, full of model/article codes, barcodes, dimensions,
         gram-weights, pack counts, colours and packaging words, with dropped
         diacritics and mixed scripts.
-        - Find the HEAD-NOUN — the common noun naming the article (şpris, ton balığı,
+        - For a GOOD, find the HEAD-NOUN — the common noun naming the article (şpris, ton balığı,
           salfet, qrelka, kateter). Base the understanding on it. Ignore model/article
           codes, barcodes, dimensions/quantities (5ml, 23G, 24X150GR, № 1, 1*24),
           colours and packaging words. Treat the brand per the BRANDS rule below — it
