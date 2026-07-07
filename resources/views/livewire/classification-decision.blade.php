@@ -50,7 +50,23 @@
           </div>
         </div>
 
-        @if(!$t)
+        @if($res->mechanism === 'direct')
+          {{-- DIRECT: an independent cold LLM recall — one shot, no catalog search or
+               descent, so there is no step trace by design. Show its verdict + reason. --}}
+          <div class="space-y-2 text-sm">
+            <p class="text-muted">{{ __('Independent cold recall — the model named an HS code from memory, with no catalog search or descent. It only reinforces or dissents from the other two mechanisms.') }}</p>
+            <div>
+              <span class="text-faint">{{ __('Recalled') }}:</span>
+              @if($res->matched_code)
+                <span class="font-mono">{{ $res->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($nm($res->matched_code), 80) }}</span>
+              @else
+                <span class="text-muted">{{ __('abstained — returned no confident code') }}</span>
+              @endif
+            </div>
+            @if($res->explanation)<p><span class="text-faint">{{ __('Reason') }}:</span> {{ $res->explanation }}</p>@endif
+          </div>
+
+        @elseif(!$t)
           {{-- Pre-trace item: light view from stored data. --}}
           <p class="text-muted text-sm mb-2">{{ __('Detailed trace was not captured for this item (classified before the decision-flow feature). Showing what was stored:') }}</p>
           @if($res->explanation)<p class="text-sm mb-2"><span class="text-faint">{{ __('Reason') }}:</span> {{ $res->explanation }}</p>@endif
