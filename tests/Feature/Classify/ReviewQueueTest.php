@@ -157,6 +157,24 @@ class ReviewQueueTest extends TestCase
             ->assertSee('disputed');
     }
 
+    public function test_dispatched_but_unjudged_conflict_shows_as_waiting(): void
+    {
+        // Judge dispatched (adjudicated_at) but no verdict row yet → "waiting", not conflict.
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'pending judge', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'adjudicated_at' => now()]);
+        // A genuine conflict the judge is not coming for (never dispatched).
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'real conflict', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+
+        $c = $this->actingComponent();
+        $counts = $c->viewData('counts');
+
+        $this->assertSame(1, (int) ($counts['waiting'] ?? 0));
+        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));   // genuine only, not 2
+        $this->assertSame(1, $c->viewData('openCount'));          // "Needs attention" excludes waiting
+
+        $c->call('setFilter', 'waiting')->assertSee('pending judge')->assertSee('Waiting')->assertDontSee('real conflict');
+        $c->call('setFilter', 'open')->assertSee('real conflict')->assertDontSee('pending judge');
+    }
+
     public function test_agreed_ai_resolved_and_ai_proposed_merge_into_found(): void
     {
         $this->agreedItem(); // resolution = agreed

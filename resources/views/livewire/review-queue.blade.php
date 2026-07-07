@@ -4,7 +4,7 @@
     // codes: relabel the tabs (converge/diverge), truncate every displayed code.
     $tabs = $heading
         ? ['open' => __('Diverge'), 'agreed' => __('Converge'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')]
-        : ['open' => __('Needs attention'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
+        : ['open' => __('Needs attention'), 'waiting' => __('Waiting'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
     $cd = fn ($c) => $heading && $c !== null && $c !== '' ? mb_substr((string) $c, 0, $digits) : $c;
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
     $resBadge = fn ($s) => match ($s) {
@@ -135,7 +135,7 @@
         <div>
           <p class="kicker mb-2">{{ __('Mechanism consensus') }}</p>
           <div class="space-y-1.5">
-            @foreach([[__('Found'),$cs['found'] ?? 0,'bg-ledger'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
+            @foreach([[__('Found'),$cs['found'] ?? 0,'bg-ledger'],[__('Waiting'),$cs['waiting'] ?? 0,'bg-line/70'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
               <div class="flex items-center gap-2 text-sm">
                 <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
                 <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$csTotal*100 }}%"></span></span>
@@ -209,11 +209,14 @@
         // The AI-proposal framing belongs to the full-code view; the 4-digit view reads
         // the recomputed heading-level resolution (converge/diverge) instead.
         $aiProposed = ! $heading && $adj && $adj->verdict === 'resolved' && in_array($item->resolution, ['conflict','review'], true);
+        // The async AI judge was dispatched but hasn't returned a verdict yet — show
+        // "waiting", not "conflict" (it's still in progress, don't alarm the reviewer).
+        $waiting = ! $heading && ! $adj && $item->adjudicated_at !== null && in_array($item->resolution, ['conflict','review'], true);
         // Pre-select the judge's answer when the item isn't final yet, so accepting it is one click.
         $default = (string) ($item->final_code ?? ($aiProposed ? $adj->winning_code : ($allowed[0] ?? '')));
         $vres = $heading ? ($vmap[$item->id] ?? $item->resolution) : $item->resolution;
-        $badgeLabel = $aiProposed ? __('AI proposed') : str_replace('_',' ', $vres);
-        $badgeClass = $aiProposed ? 'bg-ink/10 text-ink' : $resBadge($vres);
+        $badgeLabel = $waiting ? __('Waiting') : ($aiProposed ? __('AI proposed') : str_replace('_',' ', $vres));
+        $badgeClass = $waiting ? 'bg-line/50 text-muted' : ($aiProposed ? 'bg-ink/10 text-ink' : $resBadge($vres));
       @endphp
       <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
         <div class="flex-1 min-w-0">
@@ -231,6 +234,9 @@
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->finalCode->localizedName(), 110) }}</p>
           @elseif(mb_strlen((string) $item->final_code) === 4 && isset($headingNames[(string) $item->final_code]))
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ __('heading only') }}</span></p>
+          @endif
+          @if($waiting)
+            <p class="text-muted text-sm mt-0.5">⏳ {{ __('AI judge is deciding — refresh in a moment') }}</p>
           @endif
 
           {{-- Per-mechanism answers --}}
