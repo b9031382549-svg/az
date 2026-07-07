@@ -116,4 +116,48 @@ class ReviewQueueTest extends TestCase
 
         $this->actingComponent()->assertOk();
     }
+
+    public function test_heading_mode_reprojects_a_full_code_conflict_as_converged(): void
+    {
+        // Two mechanisms diverge on the full 10-digit code but share the 4-digit
+        // heading 8471 — a "conflict" at full detail, a convergence at the heading.
+        CatalogCode::create(['code' => '8471490000', 'name' => 'kompüter', 'kind' => 'good', 'chapter' => '84', 'position' => '8471', 'subposition' => '847149', 'is_active' => true]);
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => 'device', 'source_hash' => bin2hex(random_bytes(32)),
+            'resolution' => 'conflict',
+        ]);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471490000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        $c = $this->actingComponent();
+
+        // Full code (default): the item reads as a conflict.
+        $this->assertSame(1, (int) ($c->viewData('counts')['conflict'] ?? 0));
+        $this->assertSame(0, (int) ($c->viewData('counts')['agreed'] ?? 0));
+
+        // 4-digit heading: the SAME stored data now converges → agreed.
+        $c->call('setCodeMode', 'heading');
+        $this->assertSame('agreed', $c->viewData('vmap')[$item->id]);
+        $this->assertSame(1, (int) ($c->viewData('counts')['agreed'] ?? 0));
+        $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
+        $this->assertSame(4, $c->viewData('agreement')['n']);
+        $this->assertSame(1, $c->viewData('agreement')['converge']);
+    }
+
+    public function test_heading_mode_keeps_a_cross_heading_conflict_divergent(): void
+    {
+        // Different headings (8471 vs 8528) → still a conflict even at 4 digits.
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => 'device', 'source_hash' => bin2hex(random_bytes(32)),
+            'resolution' => 'conflict',
+        ]);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8528720000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        $c = $this->actingComponent();
+        $c->call('setCodeMode', 'heading');
+
+        $this->assertSame('conflict', $c->viewData('vmap')[$item->id]);
+        $this->assertSame(1, (int) ($c->viewData('counts')['conflict'] ?? 0));
+    }
 }

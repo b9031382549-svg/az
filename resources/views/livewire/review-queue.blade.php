@@ -1,7 +1,11 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
-    $tabs = ['open' => __('Needs attention'), 'ai_resolved' => __('AI resolved'), 'agreed' => __('Agreed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match')];
-    $tabs['all'] = __('All');
+    // In 4-digit ("heading") mode the whole view reads as if we had collected 4-digit
+    // codes: relabel the tabs (converge/diverge), truncate every displayed code.
+    $tabs = $heading
+        ? ['open' => __('Diverge'), 'agreed' => __('Converge'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')]
+        : ['open' => __('Needs attention'), 'ai_resolved' => __('AI resolved'), 'agreed' => __('Agreed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
+    $cd = fn ($c) => $heading && $c !== null && $c !== '' ? mb_substr((string) $c, 0, $digits) : $c;
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
     $resBadge = fn ($s) => match ($s) {
         'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
@@ -34,6 +38,28 @@
       <a href="{{ route('review.export', ['batch' => $batch, 'filter' => $filter]) }}"
          class="btn btn-ghost btn-sm" title="{{ __('Export the current view (upload + status filter) to Excel') }}">⬇ {{ __('Export Excel') }}</a>
     </div>
+  </div>
+
+  {{-- Global code-detail mode: switches the WHOLE view (diagram, counts, tabs and
+       every code) between the full 10-digit code and the 4-digit HS heading. Pure
+       re-projection of the stored data — no re-classification, no LLM. --}}
+  <div class="mb-5 flex items-center gap-3 flex-wrap">
+    <span class="kicker">{{ __('Code detail') }}</span>
+    <div class="inline-flex rounded-lg border hair overflow-hidden text-sm shadow-sm">
+      <button wire:click="setCodeMode('full')"
+              class="px-3.5 py-1.5 flex items-center gap-1.5 transition {{ ! $heading ? 'bg-ink text-paper' : 'bg-surface text-muted hover:text-ink' }}">
+        {{ __('Full code') }} <span class="opacity-60 tnum text-xs">10</span>
+      </button>
+      <button wire:click="setCodeMode('heading')"
+              class="px-3.5 py-1.5 flex items-center gap-1.5 transition border-l hair {{ $heading ? 'bg-ink text-paper' : 'bg-surface text-muted hover:text-ink' }}">
+        {{ __('Heading') }} <span class="opacity-60 tnum text-xs">4</span>
+      </button>
+    </div>
+    <span class="text-sm text-muted">
+      {{ $heading
+          ? __('Reading everything at the 4-digit HS heading — as if the codes were collected 4-digit.')
+          : __('Reading the full 10-digit code.') }}
+    </span>
   </div>
 
   {{-- Distribution report --}}
@@ -118,18 +144,11 @@
             @endforeach
           </div>
 
-          {{-- Code agreement at a chosen granularity — recomputed from the stored
-               per-mechanism codes, no LLM. Shows how many "conflicts" are just
-               last-digit disagreements inside one heading. --}}
+          {{-- Mechanism convergence at the CURRENT granularity — recomputed from the
+               stored per-mechanism codes (no LLM). At 4 digits it shows how many
+               "conflicts" are just last-digit disagreements inside one heading. --}}
           <div class="mt-4 pt-3 border-t hair">
-            <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
-              <span class="kicker">{{ __('Code agreement') }}</span>
-              <div class="inline-flex rounded-lg border hair overflow-hidden text-xs">
-                <button wire:click="setCodeMode('heading')" class="px-2.5 py-1 {{ $codeMode === 'heading' ? 'bg-ink/10 text-ink font-medium' : 'text-muted hover:text-ink' }}">{{ __('4-digit') }}</button>
-                <button wire:click="setCodeMode('full')" class="px-2.5 py-1 {{ $codeMode === 'full' ? 'bg-ink/10 text-ink font-medium' : 'text-muted hover:text-ink' }}">{{ __('Full code') }}</button>
-              </div>
-            </div>
-            <p class="text-sm text-muted mb-1.5">{{ $codeMode === 'heading' ? __('Mechanisms agree at the 4-digit HS heading') : __('Mechanisms agree at the full 10-digit code') }}:</p>
+            <p class="kicker mb-1.5">{{ $heading ? __('Convergence at 4-digit heading') : __('Convergence at full code') }}</p>
             <div class="flex items-center gap-4 text-sm">
               <span class="text-ledger">✓ {{ __('converge') }} <span class="tnum font-medium">{{ $agreement['converge'] }}</span></span>
               <span class="text-stamp">✕ {{ __('diverge') }} <span class="tnum font-medium">{{ $agreement['diverge'] }}</span></span>
@@ -187,19 +206,21 @@
         $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
         $allowed = $item->allowedCodes();
         $adj = $item->adjudications->sortByDesc('id')->first();
-        $aiProposed = $adj && $adj->verdict === 'resolved' && in_array($item->resolution, ['conflict','review'], true);
+        // The AI-proposal framing belongs to the full-code view; the 4-digit view reads
+        // the recomputed heading-level resolution (converge/diverge) instead.
+        $aiProposed = ! $heading && $adj && $adj->verdict === 'resolved' && in_array($item->resolution, ['conflict','review'], true);
         // Pre-select the judge's answer when the item isn't final yet, so accepting it is one click.
         $default = (string) ($item->final_code ?? ($aiProposed ? $adj->winning_code : ($allowed[0] ?? '')));
-        // Don't read "conflict" where the judge produced an answer — show it as an AI proposal to confirm.
-        $badgeLabel = $aiProposed ? __('AI proposed') : str_replace('_',' ',$item->resolution);
-        $badgeClass = $aiProposed ? 'bg-ink/10 text-ink' : $resBadge($item->resolution);
+        $vres = $heading ? ($vmap[$item->id] ?? $item->resolution) : $item->resolution;
+        $badgeLabel = $aiProposed ? __('AI proposed') : str_replace('_',' ', $vres);
+        $badgeClass = $aiProposed ? 'bg-ink/10 text-ink' : $resBadge($vres);
       @endphp
       <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
-            <span class="font-mono text-sm">{{ $item->final_code ?? ($aiProposed ? $adj->winning_code : __('—')) }}</span>
+            <span class="font-mono text-sm">{{ $cd($item->final_code) ?? ($aiProposed ? $cd($adj->winning_code) : __('—')) }}</span>
             @if($batch === 'all' && $item->batch)
               <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
             @endif
@@ -215,7 +236,7 @@
               @php $isFinal = $item->final_code && (string) $res->matched_code === (string) $item->final_code; @endphp
               <div class="flex items-start gap-2 text-xs">
                 <span class="uppercase tracking-wide text-faint w-16 shrink-0">{{ $res->mechanism }}</span>
-                <span class="font-mono shrink-0 {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $res->matched_code ?? __('no match') }}</span>
+                <span class="font-mono shrink-0 {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $cd($res->matched_code) ?? __('no match') }}</span>
                 @if($res->matched_code && isset($catalogNames[(string) $res->matched_code]))
                   <span class="text-faint flex-1 min-w-0 break-words">· {{ \Illuminate\Support\Str::limit($catalogNames[(string) $res->matched_code], 140) }}</span>
                 @endif
@@ -225,7 +246,7 @@
               <div class="flex items-start gap-2 text-xs mt-1">
                 <span class="uppercase tracking-wide text-faint w-16 shrink-0">🤖 ai</span>
                 @if($adj->verdict === 'resolved')
-                  <span class="font-mono shrink-0 {{ $item->resolution === 'ai_resolved' ? 'text-ink font-medium' : 'text-muted' }}">{{ $adj->winning_code }}</span>
+                  <span class="font-mono shrink-0 {{ $item->resolution === 'ai_resolved' ? 'text-ink font-medium' : 'text-muted' }}">{{ $cd($adj->winning_code) }}</span>
                   <span class="text-faint flex-1 min-w-0 break-words">·
                     @if($item->resolution === 'ai_resolved'){{ __('resolved by AI') }}@elseif(!$adj->stable){{ __('proposed — samples differed, your call') }}@elseif($adj->holdout){{ __('proposed — holdout, your call') }}@else{{ __('proposed') }}@endif
                     @if($adj->reason)· {{ \Illuminate\Support\Str::limit($adj->reason, 80) }}@endif
