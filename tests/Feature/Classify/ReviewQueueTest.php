@@ -5,6 +5,7 @@ namespace Tests\Feature\Classify;
 use App\Livewire\ReviewQueue;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Models\GoldLabel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -142,6 +143,18 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
         $this->assertSame(4, $c->viewData('agreement')['n']);
         $this->assertSame(1, $c->viewData('agreement')['converge']);
+    }
+
+    public function test_review_card_shows_the_gold_reference_hint(): void
+    {
+        GoldLabel::create(['source' => 'fedor', 'name' => 'diamar', 'name_key' => GoldLabel::keyFor('diamar'), 'heading' => '3304', 'is_service' => false, 'tier' => 'claude', 'category' => 'cosmetic guess', 'meta' => ['crosscheck' => 'disagree', 'gpt_heading' => '2106']]);
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'diamar', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+
+        $this->actingComponent()
+            ->call('setFilter', 'all')
+            ->assertSee('📋')
+            ->assertSee('3304')
+            ->assertSee('disputed');
     }
 
     public function test_ai_proposed_conflict_is_carved_out_of_the_conflict_count(): void

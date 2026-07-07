@@ -256,6 +256,28 @@
                 @endif
               </div>
             @endif
+
+            {{-- Reference ("gold") labels — a hint for the reviewer only. NEVER shown
+                 to the classifier/adjudicator. --}}
+            @foreach($goldByItem[$item->id] ?? [] as $gl)
+              @php
+                $gShow = $gl->is_service ? __('service') : $cd($gl->code ?? $gl->heading);
+                $gMatch = $gl->is_service
+                    ? ($item->kind !== null ? (($item->kind === 'service') === (bool) $gl->is_service) : null)
+                    : ($item->final_code ? (($gl->code && (string) $item->final_code === (string) $gl->code) || (! $gl->code && $gl->heading && mb_substr((string) $item->final_code, 0, 4) === $gl->heading)) : null);
+                $disputed = data_get($gl->meta, 'crosscheck') === 'disagree';
+              @endphp
+              <div class="flex items-start gap-2 text-xs mt-1" title="{{ __('Reference label — never shown to the AI') }}">
+                <span class="uppercase tracking-wide text-faint w-16 shrink-0">📋 {{ $gl->source }}</span>
+                <span class="font-mono shrink-0 text-muted">{{ $gShow }}</span>
+                @if($gMatch === true)<span class="text-ledger shrink-0">✓</span>@elseif($gMatch === false)<span class="text-stamp shrink-0">✕</span>@endif
+                <span class="text-faint flex-1 min-w-0 break-words">
+                  @if($gl->source === 'fedor' && $gl->tier)· {{ $gl->tier }}@endif
+                  @if($disputed) · {{ __('disputed') }}@if(data_get($gl->meta, 'gpt_heading')) (gpt {{ data_get($gl->meta, 'gpt_heading') }})@endif @endif
+                  @if($gl->category) · {{ \Illuminate\Support\Str::limit($gl->category, 54) }}@endif
+                </span>
+              </div>
+            @endforeach
           </div>
 
           <a href="{{ route('review.decision', $item->id) }}" target="_blank"

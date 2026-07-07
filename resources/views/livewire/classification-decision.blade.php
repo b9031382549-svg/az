@@ -229,4 +229,34 @@
       @if($adj->reason)<p class="text-faint text-xs mt-0.5">{{ $adj->reason }}</p>@endif
     </div>
   @endif
+
+  {{-- Reference ("gold") labels — a benchmark hint for the reviewer. This is NEVER
+       part of how the item was classified and is NEVER shown to the AI. --}}
+  @if($gold->isNotEmpty())
+    <div class="card-flat p-4 mt-3 text-sm">
+      <span class="kicker">{{ __('Reference (gold)') }} <span class="text-faint">· {{ __('benchmark only — never shown to the AI') }}</span></span>
+      <div class="mt-1.5 space-y-1.5">
+        @foreach($gold as $gl)
+          @php
+            $gShow = $gl->is_service ? __('service') : ($gl->code ?? $gl->heading);
+            $gMatch = $gl->is_service
+                ? ($item->kind !== null ? (($item->kind === 'service') === (bool) $gl->is_service) : null)
+                : ($item->final_code ? (($gl->code && (string) $item->final_code === (string) $gl->code) || (! $gl->code && $gl->heading && mb_substr((string) $item->final_code, 0, 4) === $gl->heading)) : null);
+            $disputed = data_get($gl->meta, 'crosscheck') === 'disagree';
+          @endphp
+          <div class="flex items-start gap-2">
+            <span class="uppercase tracking-wide text-faint w-14 shrink-0">{{ $gl->source }}</span>
+            <span class="font-mono shrink-0">{{ $gShow }}</span>
+            @if($gMatch === true)<span class="text-ledger">✓</span>@elseif($gMatch === false)<span class="text-stamp">✕</span>@endif
+            <span class="text-muted flex-1 min-w-0 break-words">
+              @if($gl->source === 'fedor' && $gl->tier){{ $gl->tier }}@endif
+              @if($disputed) · {{ __('models disputed') }}@if(data_get($gl->meta, 'gpt_heading')) (gpt {{ data_get($gl->meta, 'gpt_heading') }})@endif @endif
+              @if($gl->category) · {{ $gl->category }}@endif
+              @if(data_get($gl->meta, 'note'))<span class="text-faint block mt-0.5">{{ \Illuminate\Support\Str::limit(data_get($gl->meta, 'note'), 160) }}</span>@endif
+            </span>
+          </div>
+        @endforeach
+      </div>
+    </div>
+  @endif
 </section>

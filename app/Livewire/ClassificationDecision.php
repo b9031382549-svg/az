@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Models\GoldLabel;
 use App\Models\RubricatorNode;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -52,9 +53,14 @@ class ClassificationDecision extends Component
             ->get(['code', 'title', 'title_en', 'title_ru'])
             ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);
 
+        // Reference ("gold") labels for this item — DISPLAY ONLY. A benchmark hint
+        // for the reviewer; never part of how the item was (or will be) classified.
+        $gold = GoldLabel::where('name_key', GoldLabel::keyFor((string) $this->item->source_text))->get();
+
         return view('livewire.classification-decision', [
             'names' => $names,
             'rubricTitles' => $rubricTitles,
+            'gold' => $gold,
         ]);
     }
 }

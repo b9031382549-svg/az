@@ -4,6 +4,7 @@ namespace Tests\Feature\Classify;
 
 use App\Livewire\ClassificationDecision;
 use App\Models\ClassificationItem;
+use App\Models\GoldLabel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -49,6 +50,20 @@ class ClassificationDecisionTest extends TestCase
             ->assertSee('broker')
             ->assertSee('function')          // broker criterion
             ->assertSee('noutbuk kompüter');  // vector query
+    }
+
+    public function test_shows_the_gold_reference_when_the_name_matches(): void
+    {
+        GoldLabel::create(['source' => 'fedor', 'name' => 'RAUNATİN No10', 'name_key' => GoldLabel::keyFor('RAUNATİN No10'), 'heading' => '3004', 'is_service' => false, 'tier' => 'validated', 'category' => 'antihypertensive tablets']);
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'RAUNATİN No10', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '3004900000', 'status' => 'needs_review']);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('Reference (gold)')
+            ->assertSee('3004')
+            ->assertSee('validated');
     }
 
     public function test_renders_light_fallback_without_trace(): void
