@@ -45,9 +45,9 @@ class ClassificationDecision extends Component
         $codes = $codes->filter()->map(fn ($c) => (string) $c)->unique()->values();
         $rubricCodes = $rubricCodes->filter()->map(fn ($c) => (string) $c)->unique()->values();
 
-        // A heading-level result (4-digit final_code) has no catalog leaf — resolve its
-        // name from the rubricator instead.
-        if (mb_strlen((string) $this->item->final_code) === 4) {
+        // A partial result (4-digit heading or the "99" service level) has no catalog
+        // leaf — resolve its name from the rubricator instead.
+        if (($n = mb_strlen((string) $this->item->final_code)) > 0 && $n < 10) {
             $rubricCodes = $rubricCodes->push((string) $this->item->final_code)->unique()->values();
         }
 

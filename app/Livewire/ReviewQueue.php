@@ -264,8 +264,10 @@ class ReviewQueue extends Component
         $goldRows = GoldLabel::whereIn('name_key', $goldKeys->values()->unique()->values())->get()->groupBy('name_key');
         $goldByItem = $goldKeys->map(fn ($key) => $goldRows->get($key, collect()))->all();
 
-        // Names for heading-level results (a 4-digit final_code has no exact catalog row).
-        $headingCodes = $items->getCollection()->pluck('final_code')->filter(fn ($c) => mb_strlen((string) $c) === 4)->unique()->values();
+        // Names for partial results (a 4-digit heading or the "99" service level has no
+        // exact catalog row) — resolved from the rubricator.
+        $headingCodes = $items->getCollection()->pluck('final_code')
+            ->filter(fn ($c) => ($n = mb_strlen((string) $c)) > 0 && $n < 10)->unique()->values();
         $headingNames = RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
             ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);
 

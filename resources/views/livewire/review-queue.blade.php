@@ -232,8 +232,8 @@
           <p class="font-medium">{{ $item->localizedSourceText() }}</p>
           @if($item->finalCode)
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->finalCode->localizedName(), 110) }}</p>
-          @elseif(mb_strlen((string) $item->final_code) === 4 && isset($headingNames[(string) $item->final_code]))
-            <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ __('heading only') }}</span></p>
+          @elseif(($nlen = mb_strlen((string) $item->final_code)) > 0 && $nlen < 10 && isset($headingNames[(string) $item->final_code]))
+            <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span></p>
           @endif
           @if($waiting)
             <p class="text-muted text-sm mt-0.5">⏳ {{ __('AI judge is deciding — refresh in a moment') }}</p>
