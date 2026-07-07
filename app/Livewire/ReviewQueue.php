@@ -22,6 +22,9 @@ class ReviewQueue extends Component
     /** Resolutions that still need a human ("open"). */
     private const OPEN = ['review', 'conflict', 'blocked_on_fact'];
 
+    /** Terminal decisions that hold at any code granularity (kept in the 4-digit view). */
+    private const HUMAN_DECIDED = ['confirmed', 'rejected', 'blocked_on_fact'];
+
     /** Resolutions a bulk reject may target (not yet human-decided, not no_match). */
     private const ACTIONABLE = ['agreed', 'review', 'conflict', 'blocked_on_fact'];
 
@@ -57,6 +60,7 @@ class ReviewQueue extends Component
     public function setCodeMode(string $mode): void
     {
         $this->codeMode = $mode === 'heading' ? 'heading' : 'full';
+        $this->resetPage(); // heading mode filters a different item set
     }
 
     public function updatedBatch(): void
@@ -160,20 +164,45 @@ class ReviewQueue extends Component
 
     public function render()
     {
+        $heading = $this->codeMode === 'heading';
+        $n = $heading ? 4 : 10;
+
         $scoped = fn () => ClassificationItem::query()
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
-        $items = $scoped()
-            ->with(['finalCode', 'translation', 'results', 'adjudications'])
-            ->when($this->filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
-            ->when(! in_array($this->filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $this->filter))
-            ->latest()
-            ->paginate(15);
+        // In 4-digit ("heading") mode the WHOLE view is recomputed at the HS heading
+        // from the stored per-mechanism codes — no LLM: resolutions, counts, the donut
+        // and the codes all read "as if we had collected 4-digit codes". Human/terminal
+        // decisions are kept; everything else becomes agreed (converge) / conflict
+        // (diverge) / no_match at 4 digits.
+        $vmap = $heading ? $this->virtualResolutions($n) : [];
 
-        $counts = $scoped()
-            ->selectRaw('resolution, count(*) as c')
-            ->groupBy('resolution')
-            ->pluck('c', 'resolution');
+        if ($heading) {
+            $counts = collect($vmap)->countBy();
+            $itemsQuery = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
+            if ($this->filter === 'open') {
+                $ids = array_keys(array_filter($vmap, fn ($r) => in_array($r, self::OPEN, true)));
+                $itemsQuery->whereIn('id', $ids ?: [0]);
+            } elseif (! in_array($this->filter, ['all', 'open'], true)) {
+                $ids = array_keys(array_filter($vmap, fn ($r) => $r === $this->filter));
+                $itemsQuery->whereIn('id', $ids ?: [0]);
+            } else {
+                $itemsQuery->whereIn('id', array_keys($vmap) ?: [0]);
+            }
+            $items = $itemsQuery->latest()->paginate(15);
+        } else {
+            $items = $scoped()
+                ->with(['finalCode', 'translation', 'results', 'adjudications'])
+                ->when($this->filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
+                ->when(! in_array($this->filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $this->filter))
+                ->latest()
+                ->paginate(15);
+
+            $counts = $scoped()
+                ->selectRaw('resolution, count(*) as c')
+                ->groupBy('resolution')
+                ->pluck('c', 'resolution');
+        }
 
         // Localized catalog names for the candidate dropdowns.
         $codes = $items->getCollection()
@@ -199,9 +228,12 @@ class ReviewQueue extends Component
             'openCount' => $openCount,
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
-            'agreement' => $this->agreement($this->codeMode === 'heading' ? 4 : 10),
+            'agreement' => $this->agreement($n),
             'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($counts[$r] ?? 0)),
             'catalogNames' => $catalogNames,
+            'heading' => $heading,
+            'digits' => $n,
+            'vmap' => $vmap,
         ]);
     }
 
@@ -241,6 +273,48 @@ class ReviewQueue extends Component
         }
 
         return ['n' => $n, 'converge' => $converge, 'diverge' => $diverge, 'no_code' => $noCode, 'total' => $rows->groupBy('item')->count()];
+    }
+
+    /**
+     * Per-item resolution recomputed at a code granularity (4-digit heading). Drives
+     * the whole "as if we collected 4-digit codes" view: counts, tabs, the donut and
+     * which items each tab shows. Human/terminal decisions are kept verbatim;
+     * everything else becomes agreed (majority converges), conflict (diverges) or
+     * no_match at N digits. Stored data only — no LLM.
+     *
+     * @return array<int, string> itemId => resolution
+     */
+    private function virtualResolutions(int $n): array
+    {
+        $rows = ClassificationResult::query()
+            ->join('classification_items as i', 'i.id', '=', 'classification_results.classification_item_id')
+            ->when($this->batch !== 'all', fn ($q) => $q->where('i.batch', $this->batch))
+            ->where('i.resolution', '!=', 'pending')
+            ->get([
+                'classification_results.classification_item_id as item',
+                'classification_results.matched_code as code',
+                'i.resolution as res',
+            ]);
+
+        $map = [];
+        foreach ($rows->groupBy('item') as $item => $rs) {
+            $stored = $rs->first()->res;
+            if (in_array($stored, self::HUMAN_DECIDED, true)) {
+                $map[(int) $item] = $stored; // human/terminal decision stands at any granularity
+
+                continue;
+            }
+            $coded = $rs->filter(fn ($r) => $r->code !== null && $r->code !== '');
+            if ($coded->isEmpty()) {
+                $map[(int) $item] = 'no_match';
+
+                continue;
+            }
+            $top = $coded->map(fn ($r) => mb_substr((string) $r->code, 0, $n))->countBy()->max();
+            $map[(int) $item] = ($top >= 2 && $top >= intdiv($rs->count(), 2) + 1) ? 'agreed' : 'conflict';
+        }
+
+        return $map;
     }
 
     /**
