@@ -160,8 +160,15 @@ final class DirectLlmMechanism implements ClassifierMechanism
         HS / ТН ВЭД code system). You receive ONE line item from an Azerbaijani
         e-invoice. Identify WHAT the item actually is, then give the single most likely
         10-digit XİF MN code with a one-line reason.
+        - FIRST decide what the line invoices: a physical GOOD handed over, or a SERVICE /
+          labour performed on or with a thing — repair, installation, maintenance,
+          transport, a fee. If a physical object is named but the point of the line is an
+          ACTION on it (a trailing "(təmiri)" / "quraşdırılması" / "montajı" / "ремонт"),
+          it IS that service — code it in the services chapter (99), not as the object;
+          the object only says what the work is on. A spare part supplied on its own, with
+          no action, stays a GOOD. Settle this before choosing a code.
         - The text is Azerbaijani and often noisy (brands, sizes, transliteration,
-          dropped diacritics). Read the head-noun; ignore size noise.
+          dropped diacritics). For a good, read the head-noun; ignore size noise.
         - If the item is an UNFAMILIAR brand, drug, or product name, USE WEB SEARCH to
           find what it is (its category, active ingredient, material) before coding it.
           Prefer the real identification over a guess.

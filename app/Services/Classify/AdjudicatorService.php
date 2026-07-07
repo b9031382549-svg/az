@@ -261,6 +261,14 @@ class AdjudicatorService
         look up what it actually is (its category, active ingredient, material) before
         deciding which candidate fits. Identify first, then rule.
 
+        FIRST settle GOOD vs SERVICE. The candidates may mix physical goods with service
+        codes (chapter 99). A line is either the supply of a THING or the performance of
+        WORK on/with a thing — repair, installation, maintenance, transport. If a physical
+        object is named but the line's point is an ACTION on it (a trailing "(təmiri)" /
+        "quraşdırılması" / "ремонт"), it IS that service — pick the service candidate; the
+        object only says what the work is on. A part supplied on its own, no action, is a
+        GOOD. Decide this axis before comparing codes.
+
         Hard rules:
         - Choose ONLY from the CANDIDATES listed. NEVER invent a code.
         - Answer verdict="uncertain" if the correct code is not among the candidates,

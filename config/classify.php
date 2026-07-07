@@ -58,7 +58,7 @@ return [
         'brief_model' => (string) env('CLASSIFY_BROKER_BRIEF_MODEL', 'openai/gpt-4o'),
         // Bump when the brief prompt changes materially — old cached briefs (keyed by
         // this version) are then ignored and re-generated instead of served stale.
-        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b3'),
+        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b4'),
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):
@@ -170,7 +170,7 @@ return [
         'enabled' => (bool) env('CLASSIFY_ADJUDICATOR_ENABLED', false),
         'mode' => (string) env('CLASSIFY_ADJUDICATOR_MODE', 'shadow'), // shadow | active
         'model' => (string) env('CLASSIFY_ADJUDICATOR_MODEL', 'openai/gpt-oss-120b:online'),
-        'prompt_version' => (string) env('CLASSIFY_ADJUDICATOR_VERSION', 'j1'),
+        'prompt_version' => (string) env('CLASSIFY_ADJUDICATOR_VERSION', 'j2'),
         // Resolutions the judge acts on. Abstention (a mechanism found no code) is
         // included but flagged (had_abstention) so it can be measured separately.
         'scope' => array_values(array_filter(array_map('trim', explode(',',
