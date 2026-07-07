@@ -32,6 +32,7 @@ class ReviewQueue extends Component
     private const RESOLUTION_META = [
         'agreed' => ['label' => 'Agreed', 'color' => '#3f6b4f'],
         'ai_resolved' => ['label' => 'AI resolved', 'color' => '#3a6ea5'],
+        'ai_proposed' => ['label' => 'AI proposed', 'color' => '#6b93c0'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
         'review' => ['label' => 'Review', 'color' => '#c2872b'],
         'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
@@ -179,6 +180,7 @@ class ReviewQueue extends Component
 
         if ($heading) {
             $counts = collect($vmap)->countBy();
+            $rawCounts = $counts;
             $itemsQuery = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
             if ($this->filter === 'open') {
                 $ids = array_keys(array_filter($vmap, fn ($r) => in_array($r, self::OPEN, true)));
@@ -191,17 +193,40 @@ class ReviewQueue extends Component
             }
             $items = $itemsQuery->latest()->paginate(15);
         } else {
-            $items = $scoped()
-                ->with(['finalCode', 'translation', 'results', 'adjudications'])
-                ->when($this->filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
-                ->when(! in_array($this->filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $this->filter))
-                ->latest()
-                ->paginate(15);
+            // A conflict/review item the adjudicator confidently RESOLVED — even a
+            // deterministic holdout it deliberately did not auto-apply — is surfaced as
+            // "AI proposed" (its own tab/segment), not lumped in with genuine conflicts.
+            $resolved = fn ($a) => $a->where('verdict', 'resolved');
 
-            $counts = $scoped()
+            $q = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
+            match ($this->filter) {
+                'ai_proposed' => $q->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved),
+                'open' => $q->whereIn('resolution', self::OPEN)->whereDoesntHave('adjudications', $resolved),
+                'conflict', 'review' => $q->where('resolution', $this->filter)->whereDoesntHave('adjudications', $resolved),
+                'all' => $q,
+                default => $q->where('resolution', $this->filter),
+            };
+            $items = $q->latest()->paginate(15);
+
+            $rawCounts = $scoped()
                 ->selectRaw('resolution, count(*) as c')
                 ->groupBy('resolution')
                 ->pluck('c', 'resolution');
+
+            // Carve the AI-proposed items out of conflict/review into their own bucket.
+            $proposed = $scoped()
+                ->whereIn('resolution', ['conflict', 'review'])
+                ->whereHas('adjudications', $resolved)
+                ->selectRaw('resolution, count(*) as c')
+                ->groupBy('resolution')
+                ->pluck('c', 'resolution');
+
+            $counts = $rawCounts;
+            if ($proposed->sum() > 0) {
+                $counts = $rawCounts->map(fn ($c, $res) => $c - (int) ($proposed[$res] ?? 0));
+                $counts['ai_proposed'] = (int) $proposed->sum();
+                $counts = $counts->filter(fn ($v) => $v !== 0);
+            }
         }
 
         // Localized catalog names for the candidate dropdowns.
@@ -229,7 +254,7 @@ class ReviewQueue extends Component
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
             'agreement' => $this->agreement($n),
-            'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($counts[$r] ?? 0)),
+            'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($rawCounts[$r] ?? 0)),
             'catalogNames' => $catalogNames,
             'heading' => $heading,
             'digits' => $n,
@@ -396,6 +421,7 @@ class ReviewQueue extends Component
             'consensus' => [
                 'agreed' => (int) ($counts['agreed'] ?? 0),
                 'ai_resolved' => (int) ($counts['ai_resolved'] ?? 0),
+                'ai_proposed' => (int) ($counts['ai_proposed'] ?? 0),
                 'review' => (int) ($counts['review'] ?? 0),
                 'conflict' => (int) ($counts['conflict'] ?? 0),
             ],

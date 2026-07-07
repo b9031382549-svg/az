@@ -4,7 +4,7 @@
     // codes: relabel the tabs (converge/diverge), truncate every displayed code.
     $tabs = $heading
         ? ['open' => __('Diverge'), 'agreed' => __('Converge'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')]
-        : ['open' => __('Needs attention'), 'ai_resolved' => __('AI resolved'), 'agreed' => __('Agreed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
+        : ['open' => __('Needs attention'), 'ai_resolved' => __('AI resolved'), 'ai_proposed' => __('AI proposed'), 'agreed' => __('Agreed'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
     $cd = fn ($c) => $heading && $c !== null && $c !== '' ? mb_substr((string) $c, 0, $digits) : $c;
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
     $resBadge = fn ($s) => match ($s) {
@@ -135,7 +135,7 @@
         <div>
           <p class="kicker mb-2">{{ __('Mechanism consensus') }}</p>
           <div class="space-y-1.5">
-            @foreach([[__('Agreed'),$cs['agreed'],'bg-ledger'],[__('AI resolved'),$cs['ai_resolved'] ?? 0,'bg-ink/60'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
+            @foreach([[__('Agreed'),$cs['agreed'],'bg-ledger'],[__('AI resolved'),$cs['ai_resolved'] ?? 0,'bg-ink/60'],[__('AI proposed'),$cs['ai_proposed'] ?? 0,'bg-ink/40'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
               <div class="flex items-center gap-2 text-sm">
                 <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
                 <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$csTotal*100 }}%"></span></span>
