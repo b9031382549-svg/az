@@ -45,6 +45,12 @@ class ClassificationDecision extends Component
         $codes = $codes->filter()->map(fn ($c) => (string) $c)->unique()->values();
         $rubricCodes = $rubricCodes->filter()->map(fn ($c) => (string) $c)->unique()->values();
 
+        // A heading-level result (4-digit final_code) has no catalog leaf — resolve its
+        // name from the rubricator instead.
+        if (mb_strlen((string) $this->item->final_code) === 4) {
+            $rubricCodes = $rubricCodes->push((string) $this->item->final_code)->unique()->values();
+        }
+
         $names = CatalogCode::whereIn('code', $codes)
             ->get(['code', 'name', 'name_en', 'name_ru'])
             ->mapWithKeys(fn ($c) => [(string) $c->code => $c->localizedName()]);

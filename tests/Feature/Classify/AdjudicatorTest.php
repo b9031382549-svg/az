@@ -73,6 +73,70 @@ class AdjudicatorTest extends TestCase
         $this->assertFalse($adj->stable);
     }
 
+    /** Two candidates in the same heading (1104) but different subheadings. */
+    private function sameHeadingItem(): ClassificationItem
+    {
+        $item = ClassificationItem::create(['batch' => 't', 'source_text' => 'pearl barley', 'source_hash' => 'hb', 'resolution' => 'conflict']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '1104196900', 'kind' => 'good', 'status' => 'auto_confirmed', 'candidates' => [['code' => '1104196900']]]);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '1104290700', 'kind' => 'good', 'status' => 'auto_confirmed', 'candidates' => [['code' => '1104290700']]]);
+
+        return $item;
+    }
+
+    public function test_samples_agreeing_only_on_the_heading_resolve_at_4_digits(): void
+    {
+        $item = $this->sameHeadingItem();
+        // Samples pick DIFFERENT subheadings of the SAME heading 1104 → resolve at 1104.
+        $this->mockJudge([$this->verdict('resolved', '1104196900'), $this->verdict('resolved', '1104290700')]);
+
+        $adj = app(AdjudicatorService::class)->run($item);
+
+        $this->assertSame('resolved', $adj->verdict);
+        $this->assertSame('1104', $adj->winning_code); // 4-digit heading
+        $this->assertTrue($adj->stable);
+    }
+
+    public function test_explicit_4_digit_heading_grounded_in_candidates_resolves(): void
+    {
+        $item = $this->sameHeadingItem();
+        $this->mockJudge([$this->verdict('resolved', '1104'), $this->verdict('resolved', '1104')]);
+
+        $adj = app(AdjudicatorService::class)->run($item);
+
+        $this->assertSame('1104', $adj->winning_code);
+        $this->assertTrue($adj->stable);
+    }
+
+    public function test_heading_not_reached_by_candidates_is_uncertain(): void
+    {
+        config()->set('classify.adjudicator.samples', 1);
+        $item = $this->sameHeadingItem();
+        // 2202 is not the heading of any candidate (they are 1104) → must not resolve.
+        $this->mockJudge([$this->verdict('resolved', '2202')]);
+
+        $adj = app(AdjudicatorService::class)->run($item);
+
+        $this->assertSame('uncertain', $adj->verdict);
+        $this->assertNull($adj->winning_code);
+    }
+
+    public function test_active_mode_applies_a_heading_level_verdict(): void
+    {
+        config()->set('classify.adjudicator.enabled', true);
+        config()->set('classify.adjudicator.mode', 'active');
+        config()->set('classify.adjudicator.holdout_pct', 0);
+        $item = $this->sameHeadingItem();
+        $this->mockJudge([$this->verdict('resolved', '1104196900'), $this->verdict('resolved', '1104290700')]);
+
+        (new AdjudicateItemJob($item->id))->handle(app(AdjudicatorService::class));
+
+        $item->refresh();
+        $this->assertSame('ai_resolved', $item->resolution);
+        $this->assertSame('1104', $item->final_code);      // stored as the 4-digit heading
+        $this->assertNull($item->final_catalog_id);        // no exact catalog leaf
+        $this->assertSame('good', $item->kind);
+    }
+
     public function test_off_list_code_is_forced_uncertain(): void
     {
         config()->set('classify.adjudicator.samples', 1);

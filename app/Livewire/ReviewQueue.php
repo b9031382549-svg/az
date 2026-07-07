@@ -7,6 +7,7 @@ use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
 use App\Models\GoldLabel;
 use App\Models\ImportBatch;
+use App\Models\RubricatorNode;
 use App\Support\Audit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -252,6 +253,11 @@ class ReviewQueue extends Component
         $goldRows = GoldLabel::whereIn('name_key', $goldKeys->values()->unique()->values())->get()->groupBy('name_key');
         $goldByItem = $goldKeys->map(fn ($key) => $goldRows->get($key, collect()))->all();
 
+        // Names for heading-level results (a 4-digit final_code has no exact catalog row).
+        $headingCodes = $items->getCollection()->pluck('final_code')->filter(fn ($c) => mb_strlen((string) $c) === 4)->unique()->values();
+        $headingNames = RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
+            ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);
+
         $openCount = collect(self::OPEN)->sum(fn ($r) => (int) ($counts[$r] ?? 0));
 
         return view('livewire.review-queue', [
@@ -267,6 +273,7 @@ class ReviewQueue extends Component
             'digits' => $n,
             'vmap' => $vmap,
             'goldByItem' => $goldByItem,
+            'headingNames' => $headingNames,
         ]);
     }
 

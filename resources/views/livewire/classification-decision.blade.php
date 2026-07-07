@@ -29,7 +29,8 @@
       <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $statusBadge($item->resolution) }}">{{ str_replace('_', ' ', $item->resolution) }}</span>
       @if($item->final_code)
         <span class="font-mono text-sm">{{ $item->final_code }}</span>
-        <span class="text-muted text-sm">{{ \Illuminate\Support\Str::limit($item->finalCode?->localizedName() ?? '', 80) }}</span>
+        <span class="text-muted text-sm">{{ \Illuminate\Support\Str::limit($item->finalCode?->localizedName() ?: $rt($item->final_code), 80) }}</span>
+        @if(mb_strlen((string) $item->final_code) === 4)<span class="px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted">{{ __('heading only') }}</span>@endif
       @endif
     </div>
   </div>
@@ -229,7 +230,7 @@
       <span class="kicker">{{ __('AI adjudicator') }} <span class="text-faint">({{ $adj->model }} · {{ $adj->mode }})</span></span>
       <p class="mt-1">
         <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $adj->verdict === 'resolved' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted' }}">{{ $adj->verdict }}</span>
-        @if($adj->winning_code)<span class="font-mono ml-1">{{ $adj->winning_code }}</span> <span class="text-faint">({{ $adj->which_mechanism }}, {{ $pct($adj->confidence) }})</span>@endif
+        @if($adj->winning_code)<span class="font-mono ml-1">{{ $adj->winning_code }}</span>@if(mb_strlen((string) $adj->winning_code) === 4) <span class="text-muted text-xs">{{ __('(heading level)') }}</span>@endif <span class="text-faint">({{ $adj->which_mechanism }}, {{ $pct($adj->confidence) }})</span>@endif
         @if(!$adj->stable)<span class="text-stamp text-xs ml-1">· {{ __('unstable → human') }}</span>@endif
         @if($adj->holdout)<span class="text-amber text-xs ml-1">· {{ __('holdout → human') }}</span>@endif
         @if($adj->applied)<span class="text-ledger text-xs ml-1">· {{ __('applied → ai_resolved') }}</span>@endif
