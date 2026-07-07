@@ -47,37 +47,70 @@ class ProductBriefService
             return $cached->ok ? $cached->data : null;
         }
 
+        // Fast base pass (no web search).
+        $result = $this->callBrief($text, (string) config('classify.broker.brief_model', 'openai/gpt-4o'), false);
+
+        // Escalate to a search-capable model ONLY when the base pass is unsure — an
+        // unfamiliar brand or garbled term it could not confidently identify. Confident
+        // briefs (the bulk) never pay for search.
+        $searchModel = (string) config('classify.broker.brief_search_model', '');
+        $below = (float) config('classify.broker.brief_search_below', 0.55);
+        if ($searchModel !== '' && ($result === null || ($result['brief']['confidence'] ?? 1.0) < $below)) {
+            $searched = $this->callBrief($text, $searchModel, true);
+            if ($searched !== null) {
+                $result = $searched;
+            }
+        }
+
+        if ($result === null) {
+            return null; // graceful — the broker falls back to its canonical essence
+        }
+
+        $brief = $result['brief'];
+        $ok = $brief['identity'] !== '';
+
+        ProductBrief::create([
+            'source_hash' => $sourceHash,
+            'prompt_version' => $version,
+            'identity' => $brief['identity'] !== '' ? $brief['identity'] : null,
+            'purpose' => $brief['purpose'] !== '' ? $brief['purpose'] : null,
+            'function_class' => $brief['function_class'],
+            'material_value' => $brief['material']['value'],
+            'material_basis' => $brief['material']['basis'],
+            'decisive_axis' => $brief['decisive_axis'],
+            'confidence' => $brief['confidence'],
+            'ok' => $ok,
+            'data' => $brief,
+            'model' => $result['model'],
+            'usage' => $result['usage'],
+        ]);
+
+        return $ok ? $brief : null;
+    }
+
+    /**
+     * One brief LLM call. With $search, the model is told it has web search and should
+     * look up an item it can't identify from the text alone (the model must carry the
+     * `:online` capability for the search to actually run).
+     *
+     * @return array{brief: array<string, mixed>, model: string, usage: array<string, int>}|null
+     */
+    private function callBrief(string $text, string $model, bool $search): ?array
+    {
         try {
-            $messages = [
-                ['role' => 'system', 'content' => $this->prompt()],
-                ['role' => 'user', 'content' => "ITEM: {$text}"],
-            ];
-            $response = $this->llm->jsonWithUsage($messages, ['model' => (string) config('classify.broker.brief_model', 'openai/gpt-4o')]);
+            $messages = [['role' => 'system', 'content' => $this->prompt()]];
+            if ($search) {
+                $messages[] = ['role' => 'system', 'content' => 'You have WEB SEARCH. If you cannot confidently identify this item from its text alone — an unfamiliar brand, product name, or garbled/transliterated term — search the web to find what it ACTUALLY is (its category, active ingredient, material), then describe it. Prefer the real identification over a guess.'];
+            }
+            $messages[] = ['role' => 'user', 'content' => "ITEM: {$text}"];
+
+            $response = $this->llm->jsonWithUsage($messages, ['model' => $model]);
             LlmLog::record('broker_brief', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
                 'ok', $response['raw'] ?? null, $messages, 'broker', null, ['item' => mb_substr($text, 0, 80)]);
 
-            $brief = $this->normalize($response['data']);
-            $ok = $brief['identity'] !== '';
-
-            ProductBrief::create([
-                'source_hash' => $sourceHash,
-                'prompt_version' => $version,
-                'identity' => $brief['identity'] !== '' ? $brief['identity'] : null,
-                'purpose' => $brief['purpose'] !== '' ? $brief['purpose'] : null,
-                'function_class' => $brief['function_class'],
-                'material_value' => $brief['material']['value'],
-                'material_basis' => $brief['material']['basis'],
-                'decisive_axis' => $brief['decisive_axis'],
-                'confidence' => $brief['confidence'],
-                'ok' => $ok,
-                'data' => $brief,
-                'model' => $response['model'],
-                'usage' => $response['usage'],
-            ]);
-
-            return $ok ? $brief : null;
+            return ['brief' => $this->normalize($response['data']), 'model' => $response['model'], 'usage' => $response['usage']];
         } catch (Throwable) {
-            return null; // graceful — the broker falls back to its canonical essence
+            return null;
         }
     }
 

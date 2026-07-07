@@ -3,14 +3,18 @@
 namespace App\Services\Classify\Mechanisms;
 
 use App\Services\Classify\ClassifierService;
+use App\Services\Classify\ProductBriefService;
 
-// The existing hybrid-retrieval + two-tier LLM re-rank pipeline, wrapped as a
-// mechanism. Pure adapter: ClassifierService::classify() already returns the
-// full result array (code/candidates/semantic_sim/tier/usage); this only maps
-// it onto a MechanismResult. Behaviour is unchanged from the original path.
+// The hybrid-retrieval + two-tier LLM re-rank pipeline, wrapped as a mechanism.
+// Seeds retrieval with the shared product brief's clean IDENTITY (when enabled) so
+// it keys off what the item IS, not its surface tokens; then maps the result array
+// onto a MechanismResult.
 final class VectorMechanism implements ClassifierMechanism
 {
-    public function __construct(private readonly ClassifierService $classifier) {}
+    public function __construct(
+        private readonly ClassifierService $classifier,
+        private readonly ProductBriefService $briefs,
+    ) {}
 
     public function key(): string
     {
@@ -19,7 +23,15 @@ final class VectorMechanism implements ClassifierMechanism
 
     public function classify(string $text): MechanismResult
     {
-        return self::mapResult($this->classifier->classify($text));
+        // The brief is cached/shared with the broker — no extra call. It only steers
+        // retrieval + re-rank; vector still runs its own hybrid search independently.
+        $identity = null;
+        if (config('classify.vector.use_brief_query', true)) {
+            $brief = $this->briefs->brief($text);
+            $identity = is_array($brief) ? ($brief['identity'] ?? null) : null;
+        }
+
+        return self::mapResult($this->classifier->classify($text, $identity));
     }
 
     /**

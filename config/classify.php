@@ -56,9 +56,24 @@ return [
         // essence on error/disabled, so it never blocks a classification.
         'use_brief' => (bool) env('CLASSIFY_BROKER_USE_BRIEF', true),
         'brief_model' => (string) env('CLASSIFY_BROKER_BRIEF_MODEL', 'openai/gpt-4o'),
+        // When the fast base brief is UNSURE (an unfamiliar brand / garbled term:
+        // confidence < brief_search_below) it escalates to a search-capable model that
+        // looks the item up on the web before describing it. Only the uncertain items
+        // pay for search; a blank model disables the escalation.
+        'brief_search_model' => (string) env('CLASSIFY_BROKER_BRIEF_SEARCH_MODEL', 'deepseek/deepseek-v4-flash:online'),
+        'brief_search_below' => (float) env('CLASSIFY_BROKER_BRIEF_SEARCH_BELOW', 0.55),
         // Bump when the brief prompt changes materially — old cached briefs (keyed by
         // this version) are then ignored and re-generated instead of served stale.
-        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b4'),
+        'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b5'),
+    ],
+
+    // Vector (retrieval) mechanism. use_brief_query: seed retrieval with the shared
+    // product brief's clean IDENTITY (e.g. "sweetened condensed milk") instead of only
+    // the raw noisy text — so retrieval stops matching surface tokens ("с сахаром" →
+    // sugar) and the right candidate reaches the shortlist. The brief is cached/shared
+    // with the broker, so this costs no extra call.
+    'vector' => [
+        'use_brief_query' => (bool) env('CLASSIFY_VECTOR_USE_BRIEF_QUERY', true),
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):

@@ -4,6 +4,7 @@ namespace Tests\Feature\Classify;
 
 use App\Services\Classify\ClassifierService;
 use App\Services\Classify\Mechanisms\VectorMechanism;
+use App\Services\Classify\ProductBriefService;
 use Mockery;
 use Tests\TestCase;
 
@@ -14,14 +15,16 @@ class VectorMechanismTest extends TestCase
     public function test_maps_classifier_result_to_mechanism_result(): void
     {
         $svc = Mockery::mock(ClassifierService::class);
-        $svc->shouldReceive('classify')->once()->with('Şpris')->andReturn([
+        $svc->shouldReceive('classify')->once()->with('Şpris', 'disposable syringe')->andReturn([
             'code' => '9018311000', 'catalog_id' => 42, 'kind' => 'good',
             'confidence' => 0.9, 'status' => 'auto_confirmed',
             'candidates' => [['code' => '9018311000']], 'reason' => 'match',
             'usage' => ['total_tokens' => 100], 'tier' => 2, 'escalated' => true,
         ]);
+        $briefs = Mockery::mock(ProductBriefService::class);
+        $briefs->shouldReceive('brief')->with('Şpris')->andReturn(['identity' => 'disposable syringe']);
 
-        $m = new VectorMechanism($svc);
+        $m = new VectorMechanism($svc, $briefs);
         $r = $m->classify('Şpris');
 
         $this->assertSame('vector', $m->key());
@@ -44,8 +47,10 @@ class VectorMechanismTest extends TestCase
             'confidence' => null, 'status' => 'no_match', 'candidates' => [],
             'reason' => 'No confident match', 'usage' => [], 'tier' => 1,
         ]);
+        $briefs = Mockery::mock(ProductBriefService::class);
+        $briefs->shouldReceive('brief')->andReturn(null); // no brief → identity null
 
-        $r = (new VectorMechanism($svc))->classify('xyz');
+        $r = (new VectorMechanism($svc, $briefs))->classify('xyz');
 
         $this->assertNull($r->matchedCode);
         $this->assertNull($r->model);
