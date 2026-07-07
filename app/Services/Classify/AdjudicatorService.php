@@ -145,6 +145,15 @@ class AdjudicatorService
             return $out(['verdict' => 'resolved', 'winning_code' => $heading, 'stable' => true]);
         }
 
+        // SERVICE: every sample is a chapter-99 service (a 99xx code or the bare "99"
+        // marker) and a candidate is a service — resolve at the SERVICE level even when
+        // the exact 99 heading differs across samples. The reference only needs "it is a
+        // service", and a generic service fee genuinely has no single sub-heading.
+        $candidateHasService = collect($allowed)->contains(fn ($c) => str_starts_with((string) $c, '99'));
+        if ($allResolved && $candidateHasService && $codes->every(fn ($c) => str_starts_with($c, '99'))) {
+            return $out(['verdict' => 'resolved', 'winning_code' => '99', 'winning_kind' => 'service', 'stable' => true]);
+        }
+
         // A pick exists but the samples don't agree even at the heading → record it, not
         // stable, so it goes to a human.
         $onList = mb_strlen((string) $primaryCode) === 10 && in_array($primaryCode, $allowed, true);
@@ -221,7 +230,12 @@ class AdjudicatorService
         // is undetermined, just the 4-digit HS heading. Keep digits only; a 5–9 digit
         // partial collapses to its 4-digit heading.
         $digits = preg_replace('/\D/', '', (string) ($d['winning_code'] ?? ''));
-        $code = mb_strlen($digits) >= 10 ? mb_substr($digits, 0, 10) : (mb_strlen($digits) >= 4 ? mb_substr($digits, 0, 4) : null);
+        $code = match (true) {
+            mb_strlen($digits) >= 10 => mb_substr($digits, 0, 10),
+            mb_strlen($digits) >= 4 => mb_substr($digits, 0, 4),
+            $digits === '99' => '99',   // service level (chapter 99) — see the service fallback
+            default => null,
+        };
 
         return [
             'verdict' => $verdict,
@@ -311,17 +325,24 @@ class AdjudicatorService
           listed — but candidate 2202901000 IS in heading 2202, so return winning_code
           "2202". Do NOT answer "uncertain" and do NOT say the heading is absent here.
         - NEVER invent a heading that no candidate reaches.
+        - SERVICE FALLBACK: if the item is clearly a SERVICE (chapter 99 — repair,
+          installation, transport, a generic service fee) but you cannot pin even a
+          4-digit service heading (the candidates offer different 99 headings, or none
+          fits precisely), resolve at the SERVICE level: winning_code "99", winning_kind
+          "service". This requires at least one chapter-99 candidate. It beats "uncertain"
+          for a plain "service fee / works" line whose exact service code is undetermined.
         - Answer verdict="uncertain" ONLY when even the 4-digit heading is genuinely
-          unclear, OR two DIFFERENT headings are equally defensible. Not knowing the exact
-          subheading is NOT a reason to be uncertain — give the heading.
+          unclear, OR two DIFFERENT headings are equally defensible, OR good-vs-service
+          itself is undecided. Not knowing the exact subheading is NOT a reason to be
+          uncertain — give the heading (or "99" for an unpinnable service).
         - Decide by ESSENTIAL CHARACTER / FUNCTION and the binding HS CARD rules
           (COVERS / INCLUDES / EXCLUDES / CLOSED LIST), NOT by word overlap with a
           code's name. Quote the deciding clause in "rule_basis".
         - If a mechanism ABSTAINED, that is a signal of difficulty, not a free win for
           the other — hold the surviving code to the same bar.
 
-        winning_code is a full 10-digit code, OR a 4-digit heading, OR null; confidence is
-        your certainty in the code you actually give (full or heading).
+        winning_code is a full 10-digit code, OR a 4-digit heading, OR "99" for an
+        unpinnable service, OR null; confidence is your certainty in what you give.
         Reason briefly (a few lines). Then output EXACTLY one line:
         ===VERDICT===
         followed by ONE JSON object and NOTHING after it:

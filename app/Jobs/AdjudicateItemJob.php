@@ -64,10 +64,10 @@ class AdjudicateItemJob implements ShouldQueue
             return;
         }
 
-        // A heading-level verdict is a bare 4-digit code: there is no exact catalog row,
-        // so store the heading itself (final_catalog_id stays null) with the judge's kind.
-        // A full 10-digit verdict must map to a real catalog code.
-        if (mb_strlen((string) $adj->winning_code) === 4) {
+        // A partial verdict — a 4-digit heading or the bare "99" service level — has no
+        // exact catalog row, so store the code itself (final_catalog_id null) with the
+        // judge's kind. A full 10-digit verdict must map to a real catalog code.
+        if (mb_strlen((string) $adj->winning_code) < 10) {
             $update = ['final_code' => (string) $adj->winning_code, 'final_catalog_id' => null, 'kind' => $adj->winning_kind];
         } else {
             $cat = CatalogCode::where('code', $adj->winning_code)->first();

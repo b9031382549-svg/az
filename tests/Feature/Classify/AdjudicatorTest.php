@@ -137,6 +137,54 @@ class AdjudicatorTest extends TestCase
         $this->assertSame('good', $item->kind);
     }
 
+    /** Two service candidates in DIFFERENT chapter-99 headings. */
+    private function serviceItem(): ClassificationItem
+    {
+        $item = ClassificationItem::create(['batch' => 't', 'source_text' => 'radiator cap replacement', 'source_hash' => 'sv', 'resolution' => 'conflict']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9986101100', 'kind' => 'service', 'status' => 'auto_confirmed', 'candidates' => [['code' => '9986101100']]]);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '9933121300', 'kind' => 'service', 'status' => 'auto_confirmed', 'candidates' => [['code' => '9933121300']]]);
+
+        return $item;
+    }
+
+    public function test_samples_agreeing_only_that_it_is_a_service_resolve_at_99(): void
+    {
+        $item = $this->serviceItem();
+        // Samples pick DIFFERENT service headings (9986 vs 9933) → resolve at "99".
+        $this->mockJudge([$this->verdict('resolved', '9986101100'), $this->verdict('resolved', '9933121300')]);
+
+        $adj = app(AdjudicatorService::class)->run($item);
+
+        $this->assertSame('99', $adj->winning_code);
+        $this->assertSame('service', $adj->winning_kind);
+        $this->assertTrue($adj->stable);
+    }
+
+    public function test_explicit_99_service_marker_resolves_when_grounded(): void
+    {
+        $item = $this->serviceItem();
+        $this->mockJudge([$this->verdict('resolved', '99'), $this->verdict('resolved', '99')]);
+
+        $this->assertSame('99', app(AdjudicatorService::class)->run($item)->winning_code);
+    }
+
+    public function test_active_mode_applies_a_service_level_verdict(): void
+    {
+        config()->set('classify.adjudicator.enabled', true);
+        config()->set('classify.adjudicator.mode', 'active');
+        config()->set('classify.adjudicator.holdout_pct', 0);
+        $item = $this->serviceItem();
+        $this->mockJudge([$this->verdict('resolved', '9986101100'), $this->verdict('resolved', '9933121300')]);
+
+        (new AdjudicateItemJob($item->id))->handle(app(AdjudicatorService::class));
+
+        $item->refresh();
+        $this->assertSame('ai_resolved', $item->resolution);
+        $this->assertSame('99', $item->final_code);
+        $this->assertNull($item->final_catalog_id);
+        $this->assertSame('service', $item->kind);
+    }
+
     public function test_off_list_code_is_forced_uncertain(): void
     {
         config()->set('classify.adjudicator.samples', 1);
