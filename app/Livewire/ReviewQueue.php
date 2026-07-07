@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Models\ClassificationResult;
 use App\Models\ImportBatch;
 use App\Support\Audit;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,10 +44,19 @@ class ReviewQueue extends Component
     #[Url]
     public string $batch = 'all';
 
+    /** Code granularity for the agreement report: 'full' (10-digit) or 'heading' (4-digit). */
+    #[Url]
+    public string $codeMode = 'full';
+
     public function setFilter(string $filter): void
     {
         $this->filter = $filter;
         $this->resetPage();
+    }
+
+    public function setCodeMode(string $mode): void
+    {
+        $this->codeMode = $mode === 'heading' ? 'heading' : 'full';
     }
 
     public function updatedBatch(): void
@@ -189,9 +199,48 @@ class ReviewQueue extends Component
             'openCount' => $openCount,
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
+            'agreement' => $this->agreement($this->codeMode === 'heading' ? 4 : 10),
             'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($counts[$r] ?? 0)),
             'catalogNames' => $catalogNames,
         ]);
+    }
+
+    /**
+     * How many items would AGREE (a majority of the mechanisms that ran share the
+     * same code) at a given code granularity — 4 digits (HS heading) vs the full
+     * 10-digit code. Recomputed from the stored per-mechanism results only; no LLM.
+     * Shows how many "conflicts" are just last-digit disagreements within one heading.
+     *
+     * @return array{n:int, converge:int, diverge:int, no_code:int, total:int}
+     */
+    private function agreement(int $n): array
+    {
+        $rows = ClassificationResult::query()
+            ->join('classification_items as i', 'i.id', '=', 'classification_results.classification_item_id')
+            ->when($this->batch !== 'all', fn ($q) => $q->where('i.batch', $this->batch))
+            ->where('i.resolution', '!=', 'pending')
+            ->get(['classification_results.classification_item_id as item', 'classification_results.matched_code as code']);
+
+        $converge = 0;
+        $diverge = 0;
+        $noCode = 0;
+        foreach ($rows->groupBy('item') as $rs) {
+            $coded = $rs->filter(fn ($r) => $r->code !== null && $r->code !== '');
+            if ($coded->isEmpty()) {
+                $noCode++;
+
+                continue;
+            }
+            // Majority of ALL mechanisms that ran (abstentions count in the denominator).
+            $top = $coded->map(fn ($r) => mb_substr((string) $r->code, 0, $n))->countBy()->max();
+            if ($top >= 2 && $top >= intdiv($rs->count(), 2) + 1) {
+                $converge++;
+            } else {
+                $diverge++;
+            }
+        }
+
+        return ['n' => $n, 'converge' => $converge, 'diverge' => $diverge, 'no_code' => $noCode, 'total' => $rows->groupBy('item')->count()];
     }
 
     /**
