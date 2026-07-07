@@ -298,16 +298,22 @@ class AdjudicatorService
         GOOD. Decide this axis before comparing codes.
 
         Hard rules:
-        - PREFER a full 10-digit code from the CANDIDATES. Never invent one.
-        - HEADING FALLBACK: if no single candidate's full code is clearly right but the
-          correct 4-digit HS heading IS clear — and that heading is the heading of one or
-          more candidates — resolve at the heading: set winning_code to just those 4
-          digits. This beats abstaining when the heading is certain and only the last
-          digits are in doubt. Never give a heading the candidates do not reach.
-        - Answer verdict="uncertain" only when even the 4-digit heading is unclear, OR two
-          different headings are both defensible, OR a deciding fact (material / exact
-          identity / function) is not established. Abstaining is right when the heading
-          itself is genuinely in doubt — never force a pick to be helpful.
+        - PREFER a full 10-digit code when ONE candidate is clearly right.
+        - HEADING FALLBACK — use this instead of abstaining whenever the heading is clear.
+          If you know the correct 4-digit HS heading and AT LEAST ONE candidate is in that
+          heading, but no candidate's exact subheading is clearly right, then RESOLVE AT
+          THE HEADING: set winning_code to just those 4 digits. The subheading you would
+          prefer does NOT need to be in the list — only the 4-digit heading must match a
+          candidate's heading. A candidate "is in heading NNNN" when its code starts with
+          NNNN, regardless of its last six digits or its printed name.
+          WORKED EXAMPLE: candidates are 2202901000 and 2203000100; you determine the item
+          is non-alcoholic beer, which is heading 2202; the exact 2202.29 subheading is not
+          listed — but candidate 2202901000 IS in heading 2202, so return winning_code
+          "2202". Do NOT answer "uncertain" and do NOT say the heading is absent here.
+        - NEVER invent a heading that no candidate reaches.
+        - Answer verdict="uncertain" ONLY when even the 4-digit heading is genuinely
+          unclear, OR two DIFFERENT headings are equally defensible. Not knowing the exact
+          subheading is NOT a reason to be uncertain — give the heading.
         - Decide by ESSENTIAL CHARACTER / FUNCTION and the binding HS CARD rules
           (COVERS / INCLUDES / EXCLUDES / CLOSED LIST), NOT by word overlap with a
           code's name. Quote the deciding clause in "rule_basis".
