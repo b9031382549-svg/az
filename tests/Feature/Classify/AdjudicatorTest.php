@@ -184,23 +184,42 @@ class AdjudicatorTest extends TestCase
         $this->assertNull($item->refresh()->adjudicated_at);
     }
 
-    public function test_underdetermined_conflict_skips_the_adjudicator_for_a_human(): void
+    /** @return ClassificationItem an abstention + cross-chapter (85 vs 94) conflict */
+    private function underdeterminedItem(): ClassificationItem
     {
-        Bus::fake();
-        config()->set('classify.adjudicator.enabled', true);
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
-
-        // A mechanism abstained AND the coded ones span different chapters (85 vs 94)
-        // → genuinely underdetermined → straight to a human, no adjudicator.
         $item = ClassificationItem::create(['batch' => 't', 'source_text' => 'Elektirov 4lük', 'source_hash' => 'u1', 'resolution' => 'pending']);
         $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8539299200', 'kind' => 'good', 'status' => 'auto_confirmed']);
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9405401000', 'kind' => 'good', 'status' => 'auto_confirmed']);
         $item->results()->create(['mechanism' => 'direct', 'matched_code' => null, 'status' => 'no_match']);
 
+        return $item;
+    }
+
+    public function test_underdetermined_conflict_skips_a_non_searching_adjudicator(): void
+    {
+        Bus::fake();
+        config()->set('classify.adjudicator.enabled', true);
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
+        config()->set('classify.adjudicator.model', 'openai/gpt-oss-120b'); // no web search
+
+        // Abstention + cross-chapter (85 vs 94) and no web search → straight to a human.
+        app(Consensus::class)->finalize($this->underdeterminedItem());
+
+        Bus::assertNotDispatched(AdjudicateItemJob::class);
+    }
+
+    public function test_web_search_adjudicator_still_tries_an_underdetermined_conflict(): void
+    {
+        Bus::fake();
+        config()->set('classify.adjudicator.enabled', true);
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
+        config()->set('classify.adjudicator.model', 'openai/gpt-oss-120b:online'); // web search
+
+        // With web search the arbiter has an independent premise, so it gets to try.
+        $item = $this->underdeterminedItem();
         app(Consensus::class)->finalize($item);
 
-        $this->assertSame('conflict', $item->refresh()->resolution);
-        $this->assertNull($item->refresh()->adjudicated_at);
-        Bus::assertNotDispatched(AdjudicateItemJob::class);
+        $this->assertNotNull($item->refresh()->adjudicated_at);
+        Bus::assertDispatched(AdjudicateItemJob::class);
     }
 }

@@ -79,11 +79,15 @@ class Consensus
             return;
         }
 
-        // Genuinely underdetermined: if a mechanism ABSTAINED and the ones that DID
-        // place a code disagree across CHAPTERS, three independent methods could not
-        // even converge on a section. Don't let the adjudicator pick a least-wrong
-        // code from a shared premise — send it straight to a human.
-        if ($item->resolution === 'conflict' && $this->tooUncertainToAdjudicate($item)) {
+        // Genuinely underdetermined: a mechanism ABSTAINED and the ones that DID place
+        // a code disagree across CHAPTERS — three methods could not converge on a
+        // section. WITHOUT web search the arbiter could only pick a least-wrong code
+        // from that shared premise, so it goes straight to a human. WITH web search
+        // (a `:online` model) the arbiter has an INDEPENDENT premise — it looks the
+        // item up — so let it try; it still returns "uncertain" when the search
+        // doesn't settle it, and stability/holdout guards remain.
+        $arbiterCanSearch = str_contains((string) ($cfg['model'] ?? ''), ':online');
+        if ($item->resolution === 'conflict' && ! $arbiterCanSearch && $this->tooUncertainToAdjudicate($item)) {
             return;
         }
 
