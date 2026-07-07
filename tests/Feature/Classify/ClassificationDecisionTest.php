@@ -66,6 +66,22 @@ class ClassificationDecisionTest extends TestCase
             ->assertSee('validated');
     }
 
+    public function test_direct_mechanism_shows_its_recall_not_a_legacy_notice(): void
+    {
+        // The direct mechanism is a single cold LLM call with no step trace by design;
+        // it must show its verdict/reason, not the "classified before the feature" notice.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'RAUNATİN No10', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => null, 'status' => 'no_match', 'confidence' => 0.9, 'explanation' => 'lacks a clear product noun; looks like a brand identifier']);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('cold recall')
+            ->assertSee('abstained')
+            ->assertSee('lacks a clear product noun')
+            ->assertDontSee('classified before the decision-flow feature');
+    }
+
     public function test_renders_light_fallback_without_trace(): void
     {
         $item = ClassificationItem::create([
