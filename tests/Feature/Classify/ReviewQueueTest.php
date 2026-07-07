@@ -144,6 +144,27 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $c->viewData('agreement')['converge']);
     }
 
+    public function test_ai_proposed_conflict_is_carved_out_of_the_conflict_count(): void
+    {
+        // A conflict the adjudicator confidently RESOLVED (held out, not applied) —
+        // reads as "AI proposed", not a raw conflict.
+        $proposed = ClassificationItem::create(['batch' => 'b', 'source_text' => 'diamar', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+        $proposed->adjudications()->create(['resolution_before' => 'conflict', 'model' => 'openai/gpt-oss-120b', 'prompt_version' => 'j1', 'mode' => 'active', 'verdict' => 'resolved', 'winning_code' => '3105300000', 'winning_kind' => 'good', 'stable' => true, 'holdout' => true, 'applied' => false]);
+
+        // A genuine conflict the adjudicator could not resolve.
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'raunatin', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+
+        $c = $this->actingComponent();
+        $counts = $c->viewData('counts');
+
+        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));      // not 2
+        $this->assertSame(1, (int) ($counts['ai_proposed'] ?? 0));
+        $this->assertSame(1, $c->viewData('openCount'));            // "Needs attention" excludes the proposal
+
+        $c->call('setFilter', 'ai_proposed')->assertSee('diamar')->assertDontSee('raunatin');
+        $c->call('setFilter', 'open')->assertSee('raunatin')->assertDontSee('diamar');
+    }
+
     public function test_heading_mode_keeps_a_cross_heading_conflict_divergent(): void
     {
         // Different headings (8471 vs 8528) → still a conflict even at 4 digits.
