@@ -27,6 +27,7 @@ class ReviewQueue extends Component
     /** Resolution display metadata for the report donut + legend. */
     private const RESOLUTION_META = [
         'agreed' => ['label' => 'Agreed', 'color' => '#3f6b4f'],
+        'ai_resolved' => ['label' => 'AI resolved', 'color' => '#3a6ea5'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
         'review' => ['label' => 'Review', 'color' => '#c2872b'],
         'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
@@ -271,6 +272,7 @@ class ReviewQueue extends Component
             'service' => (int) ($kind['service'] ?? 0),
             'consensus' => [
                 'agreed' => (int) ($counts['agreed'] ?? 0),
+                'ai_resolved' => (int) ($counts['ai_resolved'] ?? 0),
                 'review' => (int) ($counts['review'] ?? 0),
                 'conflict' => (int) ($counts['conflict'] ?? 0),
             ],
