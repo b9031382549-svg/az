@@ -82,7 +82,31 @@ class OpenRouterClient
                 'cached_tokens' => (int) $response->json('usage.prompt_tokens_details.cached_tokens', 0),
             ],
             'model' => (string) $response->json('model', $payload['model']),
+            // Web-search citations (present when the model ran with the `:online`
+            // suffix / web plugin); empty otherwise.
+            'annotations' => $this->webSources($response->json('choices.0.message.annotations')),
         ];
+    }
+
+    /**
+     * Flatten OpenRouter web-search annotations to [{url, title}].
+     *
+     * @return array<int, array{url: string, title: string}>
+     */
+    private function webSources(mixed $annotations): array
+    {
+        if (! is_array($annotations)) {
+            return [];
+        }
+        $out = [];
+        foreach ($annotations as $a) {
+            $u = is_array($a) ? ($a['url_citation'] ?? null) : null;
+            if (is_array($u) && ! empty($u['url'])) {
+                $out[] = ['url' => (string) $u['url'], 'title' => (string) ($u['title'] ?? '')];
+            }
+        }
+
+        return $out;
     }
 
     /**

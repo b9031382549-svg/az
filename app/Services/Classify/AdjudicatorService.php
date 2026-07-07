@@ -130,7 +130,7 @@ class AdjudicatorService
             'confidence' => $primary['confidence'],
             'which' => $primary['which'],
             'rule_basis' => $primary['rule_basis'],
-            'reason' => $primary['reason'],
+            'reason' => $this->str(($primary['reason'] ?? '').$this->sourceNote($primary['sources'] ?? [])),
             'stable' => $stable,
         ];
     }
@@ -144,10 +144,33 @@ class AdjudicatorService
                 $resp['content'] ?? null, $messages, 'adjudicator');
             $this->addUsage($usage, $resp['usage'] ?? []);
 
-            return $this->parseVerdict((string) ($resp['content'] ?? ''));
+            $parsed = $this->parseVerdict((string) ($resp['content'] ?? ''));
+            if ($parsed !== null) {
+                $parsed['sources'] = $resp['annotations'] ?? []; // web citations, if it searched
+            }
+
+            return $parsed;
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * A compact " [web: host1, host2]" note from web-search citations, or ''.
+     *
+     * @param  array<int, array{url: string, title: string}>  $annotations
+     */
+    private function sourceNote(array $annotations): string
+    {
+        $hosts = collect($annotations)
+            ->map(fn ($s) => parse_url((string) ($s['url'] ?? ''), PHP_URL_HOST))
+            ->filter()
+            ->map(fn ($h) => preg_replace('/^www\./', '', (string) $h))
+            ->unique()
+            ->take(3)
+            ->implode(', ');
+
+        return $hosts !== '' ? " [web: {$hosts}]" : '';
     }
 
     /**
@@ -233,6 +256,10 @@ class AdjudicatorService
         (HS) nomenclature. Two independent classifiers disagreed, or agreed but
         without confidence, on ONE item. Decide whether EXACTLY ONE 10-digit code is
         UNAMBIGUOUSLY correct.
+
+        You may USE WEB SEARCH: if the item is an unfamiliar brand, drug, or product,
+        look up what it actually is (its category, active ingredient, material) before
+        deciding which candidate fits. Identify first, then rule.
 
         Hard rules:
         - Choose ONLY from the CANDIDATES listed. NEVER invent a code.

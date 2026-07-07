@@ -40,7 +40,27 @@ class DirectLlmMechanismTest extends TestCase
         $this->assertSame('9018390000', $r->matchedCode);
         $this->assertSame('good', $r->kind);
         $this->assertSame('auto_confirmed', $r->status);
-        $this->assertSame('openai/gpt-oss-120b', $r->model);
+        $this->assertSame('deepseek/deepseek-v4-flash:online', $r->model);
+    }
+
+    public function test_captures_web_search_sources_into_the_reason(): void
+    {
+        $this->seedCode();
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('complete')->andReturn([
+            'content' => '{"code":"9018390000","confidence":0.9,"reason":"medical needle"}',
+            'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            'model' => 'deepseek/deepseek-v4-flash',
+            'annotations' => [
+                ['url' => 'https://apteka-germes.com.ua/x', 'title' => 't1'],
+                ['url' => 'https://www.liki.ua/y', 'title' => 't2'],
+            ],
+        ]);
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $r = app(DirectLlmMechanism::class)->classify('kəpənək iynə');
+
+        $this->assertStringContainsString('[web: apteka-germes.com.ua, liki.ua]', (string) $r->explanation);
     }
 
     public function test_low_confidence_code_needs_review(): void
