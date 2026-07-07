@@ -12,6 +12,13 @@ class ProductBriefServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Test the base pass in isolation; the search escalation has its own test.
+        config()->set('classify.broker.brief_search_model', '');
+    }
+
     /** @param array<string, mixed> $data */
     private function mockLlmOnce(array $data): void
     {
@@ -67,6 +74,32 @@ class ProductBriefServiceTest extends TestCase
         $this->assertNull(app(ProductBriefService::class)->brief('garbled ###'));
         // Cached as ok=false so the dud is not re-fetched next time.
         $this->assertDatabaseHas('product_briefs', ['ok' => false]);
+    }
+
+    public function test_low_confidence_base_brief_escalates_to_the_search_model(): void
+    {
+        config()->set('classify.broker.brief_model', 'base');
+        config()->set('classify.broker.brief_search_model', 'searcher:online');
+        config()->set('classify.broker.brief_search_below', 0.55);
+
+        $models = [];
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->twice()->andReturnUsing(function ($messages, $opts) use (&$models) {
+            $models[] = $opts['model'];
+            // base pass: an unfamiliar brand, low confidence → search pass identifies it.
+            $searched = $opts['model'] !== 'base';
+
+            return [
+                'model' => $opts['model'], 'usage' => ['total_tokens' => 2], 'latency_ms' => 1, 'raw' => '{}',
+                'data' => ['identity' => $searched ? 'tobacco heating device' : 'GLO HAYPER', 'confidence' => $searched ? 0.9 : 0.3, 'function_class' => 'appliance'],
+            ];
+        });
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $brief = app(ProductBriefService::class)->brief('GLO HAYPER UNIQ');
+
+        $this->assertSame('tobacco heating device', $brief['identity']); // the searched result wins
+        $this->assertContains('searcher:online', $models);
     }
 
     public function test_disabled_returns_null_without_calling_the_model(): void

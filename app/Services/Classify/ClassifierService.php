@@ -21,9 +21,11 @@ class ClassifierService
      *
      * @return array<string, mixed>
      */
-    public function classify(string $text): array
+    public function classify(string $text, ?string $identity = null): array
     {
         $text = trim($text);
+        $identity = $identity !== null ? trim($identity) : null;
+        $identity = ($identity ?? '') !== '' ? $identity : null;
         $result = [
             'text' => $text,
             'kind' => null,
@@ -50,7 +52,7 @@ class ClassifierService
         }
 
         try {
-            [$queries, $expandUsage] = $this->expandForRetrieval($text);
+            [$queries, $expandUsage] = $this->expandForRetrieval($text, $identity);
 
             $candidates = $this->retriever->candidates($queries, (int) config('classify.candidates'));
             if (empty($candidates)) {
@@ -69,7 +71,7 @@ class ClassifierService
                 'score' => $c->score, 'semantic_sim' => $c->semantic_sim ?? null,
             ], $candidates);
 
-            $picked = $this->rerank($text, $candidates);
+            $picked = $this->rerank($text, $candidates, $identity);
             // (rerank logs llm_usage per tier itself.)
             $result['tier'] = $picked['tier'];
             $result['escalated'] = $picked['escalated'];
@@ -162,9 +164,12 @@ class ClassifierService
      * @param  array<int, object>  $candidates
      * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string, tier:int, escalated:bool}
      */
-    private function rerank(string $text, array $candidates): array
+    private function rerank(string $text, array $candidates, ?string $identity = null): array
     {
         $list = $this->candidateList($candidates);
+        // Give the re-rank model the shared brief's identity, so it picks the code for
+        // what the item IS rather than being re-fooled by the raw tokens.
+        $text = ($identity ?? '') !== '' ? $text."\n[understood as: {$identity}]" : $text;
         $tier2Model = (string) config('services.openrouter.classify_model');
         $tier1Model = (string) config('services.openrouter.classify_model_tier1');
         $twoTier = (bool) config('classify.two_tier', true) && $tier1Model !== '';
@@ -303,14 +308,14 @@ class ClassifierService
      *
      * @return array{0: array<int, string>, 1: array<string, int>}
      */
-    private function expandForRetrieval(string $text): array
+    private function expandForRetrieval(string $text, ?string $identity = null): array
     {
         $zero = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
         $hints = config('classify.use_traps', false) ? $this->trapHints($text) : '';
         $clean = $this->cleanNoise($text);
 
         if (! config('classify.expand_query', true)) {
-            return [$this->buildQueries('', $hints, $clean, $text), $zero];
+            return [$this->buildQueries('', $hints, $clean, $text, $identity), $zero];
         }
 
         try {
@@ -330,9 +335,9 @@ class ClassifierService
 
             $description = trim((string) ($response['data']['description'] ?? ''));
 
-            return [$this->buildQueries($description, $hints, $clean, $text), $response['usage']];
+            return [$this->buildQueries($description, $hints, $clean, $text, $identity), $response['usage']];
         } catch (Throwable) {
-            return [$this->buildQueries('', $hints, $clean, $text), $zero]; // graceful
+            return [$this->buildQueries('', $hints, $clean, $text, $identity), $zero]; // graceful
         }
     }
 
@@ -342,10 +347,15 @@ class ClassifierService
      *
      * @return array<int, string>
      */
-    private function buildQueries(string $description, string $hints, string $clean, string $raw): array
+    private function buildQueries(string $description, string $hints, string $clean, string $raw, ?string $identity = null): array
     {
+        // The shared brief's clean identity (e.g. "sweetened condensed milk") LEADS the
+        // primary query so retrieval keys off what the item IS, not its surface tokens;
+        // the raw text stays as a secondary query so nothing is lost.
+        $lead = ($identity ?? '') !== '' ? $identity.'. ' : '';
+
         if (config('classify.multi_query', true)) {
-            $primary = trim($description.' '.$hints);
+            $primary = trim($lead.$description.' '.$hints);
 
             return array_values(array_filter([
                 $primary !== '' ? $primary : null,
@@ -353,7 +363,7 @@ class ClassifierService
             ]));
         }
 
-        return [trim($description.' '.$hints.' '.$raw)];
+        return [trim($lead.$description.' '.$hints.' '.$raw)];
     }
 
     /**
