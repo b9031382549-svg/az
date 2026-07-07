@@ -95,16 +95,46 @@ class ImportGold extends Command
         return $this->store($out, 'ivan');
     }
 
-    /** Fedor: the validated-gold sheet — 4-digit heading + good/service, no full code. */
+    /**
+     * Fedor: the FULL Claude_Opus (1200) sheet is the reference — 4-digit heading +
+     * good/service, no full code. Rows where a second model (GPT) also agreed at the
+     * heading (the "Validated Gold" sheet) are marked tier=validated; the rest are
+     * tier=claude (single model / the two disagreed). GPT's own pick is carried in
+     * meta for display. Reference only — never fed to the classifier.
+     */
     private function importFedor(string $path): int
     {
-        [$rows, $col] = $this->sheet($path, 'Validated Gold (both agree)');
+        // Name-keys that two models validated.
+        [$vrows, $vcol] = $this->sheet($path, 'Validated Gold (both agree)');
+        $vName = $this->find($vcol, ['name']);
+        $validated = [];
+        foreach ($vrows as $r) {
+            $k = GoldLabel::keyFor(trim((string) ($r[$vName] ?? '')));
+            if ($k !== '') {
+                $validated[$k] = true;
+            }
+        }
+
+        // GPT's cross-check pick + agreement, keyed by name.
+        [$ccrows, $cccol] = $this->sheet($path, 'CrossCheck Claude×GPT');
+        [$ccName, $ccGpt, $ccAgree, $ccStatus] = [$this->find($cccol, ['name']), $this->find($cccol, ['gpt_heading']), $this->find($cccol, ['agree_4digit']), $this->find($cccol, ['status'])];
+        $cross = [];
+        foreach ($ccrows as $r) {
+            $k = GoldLabel::keyFor(trim((string) ($r[$ccName] ?? '')));
+            if ($k !== '') {
+                $cross[$k] = ['gpt_heading' => $this->str($r[$ccGpt] ?? null), 'agree_4digit' => $this->str($r[$ccAgree] ?? null), 'crosscheck' => $this->str($r[$ccStatus] ?? null)];
+            }
+        }
+
+        [$rows, $col] = $this->sheet($path, 'Claude_Opus (1200)');
         $name = $this->find($col, ['name']);
         $svc = $this->find($col, ['service']);
         $chap = $this->find($col, ['chapter']);
         $head = $this->find($col, ['heading']);
         $group = $this->find($col, ['group']);
         $conf = $this->find($col, ['confidence']);
+        $note = $this->find($col, ['note']);
+        $usedWeb = $this->find($col, ['used_web']);
 
         $out = [];
         foreach ($rows as $r) {
@@ -112,14 +142,15 @@ class ImportGold extends Command
             if ($raw === '') {
                 continue;
             }
+            $key = GoldLabel::keyFor($raw);
             $isService = $this->bool($r[$svc] ?? null);
             $heading = $this->str($r[$head] ?? null);
             $heading = $heading ? mb_substr(preg_replace('/\D/', '', $heading), 0, 4) : null;
             $out[] = [
                 'source' => 'fedor',
-                'tier' => 'validated',
+                'tier' => isset($validated[$key]) ? 'validated' : 'claude',
                 'name' => $raw,
-                'name_key' => GoldLabel::keyFor($raw),
+                'name_key' => $key,
                 'code' => null, // Fedor is heading-level only
                 'heading' => $isService ? null : ($heading ?: null),
                 'chapter' => $this->str($r[$chap] ?? null) ?: ($heading ? mb_substr($heading, 0, 2) : null),
@@ -127,7 +158,10 @@ class ImportGold extends Command
                 'confidence' => is_numeric($r[$conf] ?? null) ? (float) $r[$conf] : null,
                 'unit' => null,
                 'category' => $this->str($r[$group] ?? null),
-                'meta' => [],
+                'meta' => array_filter([
+                    'note' => $this->str($r[$note] ?? null),
+                    'used_web' => $this->str($r[$usedWeb] ?? null),
+                ] + ($cross[$key] ?? [])),
             ];
         }
 

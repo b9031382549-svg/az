@@ -29,7 +29,13 @@ class BenchmarkService
      */
     public function score(): array
     {
-        $gold = GoldLabel::query()->get();
+        // Score against the TRUSTWORTHY reference only: Ivan (full code) + Fedor's
+        // validated tier (two models agreed). Fedor's single-model "claude" labels are
+        // explicitly unreliable, so they'd only add noise to the accuracy — they still
+        // exist in gold_labels and surface as a review hint, just not in the score.
+        $gold = GoldLabel::query()
+            ->where(fn ($q) => $q->where('source', '!=', 'fedor')->orWhere('tier', 'validated'))
+            ->get();
 
         // Best classified item per name_key — prefer one that produced a final code,
         // newest first so the pick is deterministic when a name was classified more

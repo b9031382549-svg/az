@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
+use App\Models\GoldLabel;
 use App\Models\ImportBatch;
 use App\Support\Audit;
 use Illuminate\Database\Eloquent\Builder;
@@ -245,6 +246,12 @@ class ReviewQueue extends Component
             ->get(['code', 'name', 'name_en', 'name_ru'])
             ->mapWithKeys(fn ($c) => [(string) $c->code => $c->localizedName()]);
 
+        // Reference ("gold") labels for the items on this page — DISPLAY ONLY, a hint
+        // for the human reviewer. NEVER passed to the classifier/adjudicator.
+        $goldKeys = $items->getCollection()->mapWithKeys(fn ($it) => [$it->id => GoldLabel::keyFor((string) $it->source_text)]);
+        $goldRows = GoldLabel::whereIn('name_key', $goldKeys->values()->unique()->values())->get()->groupBy('name_key');
+        $goldByItem = $goldKeys->map(fn ($key) => $goldRows->get($key, collect()))->all();
+
         $openCount = collect(self::OPEN)->sum(fn ($r) => (int) ($counts[$r] ?? 0));
 
         return view('livewire.review-queue', [
@@ -259,6 +266,7 @@ class ReviewQueue extends Component
             'heading' => $heading,
             'digits' => $n,
             'vmap' => $vmap,
+            'goldByItem' => $goldByItem,
         ]);
     }
 
