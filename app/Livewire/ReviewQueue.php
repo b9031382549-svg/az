@@ -39,6 +39,7 @@ class ReviewQueue extends Component
         'ai_resolved' => ['label' => 'AI resolved', 'color' => '#3a6ea5'],
         'ai_proposed' => ['label' => 'AI proposed', 'color' => '#6b93c0'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
+        'waiting' => ['label' => 'Waiting', 'color' => '#8a94a6'],
         'review' => ['label' => 'Review', 'color' => '#c2872b'],
         'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
         'blocked_on_fact' => ['label' => 'Blocked (fact)', 'color' => '#7c5cbf'],
@@ -198,10 +199,18 @@ class ReviewQueue extends Component
             }
             $items = $itemsQuery->latest()->paginate(15);
         } else {
-            // A conflict/review item the adjudicator confidently RESOLVED — even a
-            // deterministic holdout it deliberately did not auto-apply — is surfaced as
-            // "AI proposed" (its own tab/segment), not lumped in with genuine conflicts.
+            // Divergent (conflict/review) items split three ways so the page isn't a
+            // wall of "conflict" while the ASYNC judge is still catching up:
+            //   waiting     — the judge was dispatched (adjudicated_at) but has not
+            //                 returned a verdict yet — in progress, NOT a real conflict
+            //   ai_proposed — the judge resolved it → surfaced under "Found"
+            //   (remainder) — a genuine conflict/review for a human
             $resolved = fn ($a) => $a->where('verdict', 'resolved');
+            $awaitingJudge = fn ($q) => $q->whereIn('resolution', ['conflict', 'review'])
+                ->whereNotNull('adjudicated_at')->whereDoesntHave('adjudications');
+            // Genuine = neither proposed (has a resolved verdict) nor waiting (dispatched, no verdict yet).
+            $genuine = fn ($q) => $q->whereDoesntHave('adjudications', $resolved)
+                ->where(fn ($w) => $w->whereNull('adjudicated_at')->orWhereHas('adjudications'));
 
             $q = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
             match ($this->filter) {
@@ -209,41 +218,28 @@ class ReviewQueue extends Component
                     $w->whereIn('resolution', ['agreed', 'ai_resolved'])
                         ->orWhere(fn ($o) => $o->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved));
                 }),
+                'waiting' => $awaitingJudge($q),
                 'ai_proposed' => $q->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved),
-                'open' => $q->whereIn('resolution', self::OPEN)->whereDoesntHave('adjudications', $resolved),
-                'conflict', 'review' => $q->where('resolution', $this->filter)->whereDoesntHave('adjudications', $resolved),
+                'open' => $genuine($q->whereIn('resolution', self::OPEN)),
+                'conflict', 'review' => $genuine($q->where('resolution', $this->filter)),
                 'all' => $q,
                 default => $q->where('resolution', $this->filter),
             };
             $items = $q->latest()->paginate(15);
 
-            $rawCounts = $scoped()
-                ->selectRaw('resolution, count(*) as c')
-                ->groupBy('resolution')
-                ->pluck('c', 'resolution');
+            $rawCounts = $scoped()->selectRaw('resolution, count(*) as c')->groupBy('resolution')->pluck('c', 'resolution');
+            $bucket = fn (callable $where) => $scoped()->tap($where)->selectRaw('resolution, count(*) as c')->groupBy('resolution')->pluck('c', 'resolution');
+            $waiting = $bucket($awaitingJudge);
+            $proposed = $bucket(fn ($q) => $q->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved));
 
-            // Carve the AI-proposed items out of conflict/review into their own bucket.
-            $proposed = $scoped()
-                ->whereIn('resolution', ['conflict', 'review'])
-                ->whereHas('adjudications', $resolved)
-                ->selectRaw('resolution, count(*) as c')
-                ->groupBy('resolution')
-                ->pluck('c', 'resolution');
-
-            $counts = $rawCounts;
-            if ($proposed->sum() > 0) {
-                $counts = $rawCounts->map(fn ($c, $res) => $c - (int) ($proposed[$res] ?? 0));
-                $counts['ai_proposed'] = (int) $proposed->sum();
-                $counts = $counts->filter(fn ($v) => $v !== 0);
-            }
-
-            // Collapse agreed + ai_resolved + ai_proposed into one "Found" bucket for the
-            // report + tabs; rawCounts keeps the split for the bulk-action math.
-            $found = (int) ($counts['agreed'] ?? 0) + (int) ($counts['ai_resolved'] ?? 0) + (int) ($counts['ai_proposed'] ?? 0);
-            $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved', 'ai_proposed'], true));
-            if ($found > 0) {
-                $counts = $counts->put('found', $found);
-            }
+            // Carve waiting + ai_proposed out of conflict/review; collapse agreed +
+            // ai_resolved + ai_proposed into "Found". rawCounts keeps the split for
+            // the bulk-action math.
+            $counts = $rawCounts->map(fn ($c, $res) => $c - (int) ($waiting[$res] ?? 0) - (int) ($proposed[$res] ?? 0));
+            $counts['waiting'] = (int) $waiting->sum();
+            $counts['ai_proposed'] = (int) $proposed->sum();
+            $counts['found'] = (int) ($counts['agreed'] ?? 0) + (int) ($counts['ai_resolved'] ?? 0) + (int) ($counts['ai_proposed'] ?? 0);
+            $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved', 'ai_proposed'], true))->filter(fn ($v) => $v !== 0);
         }
 
         // Localized catalog names for the candidate dropdowns.
@@ -452,6 +448,7 @@ class ReviewQueue extends Component
                 // "Found" = agreed + ai_resolved + ai_proposed (already merged in full
                 // mode); in heading mode the bucket is the converge count ('agreed').
                 'found' => (int) ($counts['found'] ?? 0) + (int) ($counts['agreed'] ?? 0),
+                'waiting' => (int) ($counts['waiting'] ?? 0),
                 'review' => (int) ($counts['review'] ?? 0),
                 'conflict' => (int) ($counts['conflict'] ?? 0),
             ],
