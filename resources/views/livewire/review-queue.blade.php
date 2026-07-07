@@ -117,6 +117,26 @@
               </div>
             @endforeach
           </div>
+
+          {{-- Code agreement at a chosen granularity — recomputed from the stored
+               per-mechanism codes, no LLM. Shows how many "conflicts" are just
+               last-digit disagreements inside one heading. --}}
+          <div class="mt-4 pt-3 border-t hair">
+            <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <span class="kicker">{{ __('Code agreement') }}</span>
+              <div class="inline-flex rounded-lg border hair overflow-hidden text-xs">
+                <button wire:click="setCodeMode('heading')" class="px-2.5 py-1 {{ $codeMode === 'heading' ? 'bg-ink/10 text-ink font-medium' : 'text-muted hover:text-ink' }}">{{ __('4-digit') }}</button>
+                <button wire:click="setCodeMode('full')" class="px-2.5 py-1 {{ $codeMode === 'full' ? 'bg-ink/10 text-ink font-medium' : 'text-muted hover:text-ink' }}">{{ __('Full code') }}</button>
+              </div>
+            </div>
+            <p class="text-sm text-muted mb-1.5">{{ $codeMode === 'heading' ? __('Mechanisms agree at the 4-digit HS heading') : __('Mechanisms agree at the full 10-digit code') }}:</p>
+            <div class="flex items-center gap-4 text-sm">
+              <span class="text-ledger">✓ {{ __('converge') }} <span class="tnum font-medium">{{ $agreement['converge'] }}</span></span>
+              <span class="text-stamp">✕ {{ __('diverge') }} <span class="tnum font-medium">{{ $agreement['diverge'] }}</span></span>
+              @if($agreement['no_code'])<span class="text-faint">— {{ __('no code') }} <span class="tnum">{{ $agreement['no_code'] }}</span></span>@endif
+              <span class="text-faint ml-auto">{{ __('of') }} {{ $agreement['total'] }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
