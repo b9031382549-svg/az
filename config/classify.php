@@ -61,6 +61,19 @@ return [
         'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b3'),
     ],
 
+    // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):
+    // a "cold" direct classification from a reasoning model's OWN knowledge — no
+    // retrieval over our catalog, no tree descent. A different METHOD, so its vote is a
+    // genuinely independent third opinion in the majority (2-of-3) consensus. Enable by
+    // adding 'direct' to CLASSIFY_MECHANISMS (off by default until validated).
+    'direct' => [
+        // A DIFFERENT family from the DeepSeek mechanisms (decorrelates the vote); a
+        // reasoning model, but far faster than deepseek-r1 (which timed out at ~60-120s).
+        'model' => (string) env('CLASSIFY_DIRECT_MODEL', 'openai/gpt-oss-120b'),
+        // Reasoning models are slow — this call gets a long HTTP timeout of its own.
+        'timeout' => (int) env('CLASSIFY_DIRECT_TIMEOUT', 180),
+    ],
+
     // How many fused candidates to hand the LLM re-ranker.
     'candidates' => (int) env('CLASSIFY_CANDIDATES', 24),
 

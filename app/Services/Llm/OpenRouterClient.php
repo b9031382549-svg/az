@@ -38,6 +38,11 @@ class OpenRouterClient
             throw new RuntimeException('OPENROUTER_API_KEY is not configured.');
         }
 
+        // A per-call HTTP timeout (e.g. for a slow reasoning model) — not an API
+        // parameter, so pull it out of $options before it reaches the payload.
+        $timeout = (int) ($options['timeout'] ?? $this->timeout);
+        unset($options['timeout']);
+
         $payload = array_merge([
             'model' => $this->defaultModel,
             'temperature' => 0,
@@ -50,7 +55,7 @@ class OpenRouterClient
                 'HTTP-Referer' => config('app.url'),
                 'X-Title' => config('app.name'),
             ])
-            ->timeout($this->timeout)
+            ->timeout($timeout)
             ->acceptJson()
             ->post($this->baseUrl.'/chat/completions', $payload);
 

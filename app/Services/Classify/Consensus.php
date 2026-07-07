@@ -10,14 +10,15 @@ use Illuminate\Support\Collection;
 /**
  * Reconciles the per-mechanism results of one item into a parent resolution.
  *
- * Policy (max accuracy — chosen by the product): mechanisms auto-resolve only
- * when they FULLY agree; any divergence goes to a human.
+ * Policy: MAJORITY vote — a code auto-resolves when at least 2 independent
+ * mechanisms agree on it (2-of-3, or unanimity when only 2 run); it tolerates one
+ * dissenter/hallucination. Without a 2-vote majority the item goes to a human.
  *
  * resolution vocabulary:
  *   pending          — not every enabled mechanism has reported yet
- *   agreed           — all mechanisms returned the same code AND all are confident (auto)
- *   review           — all mechanisms agreed on a code but at least one is not confident
- *   conflict         — mechanisms returned different codes, or one found a code while another abstained
+ *   agreed           — a MAJORITY (>=2) returned the same code AND those are confident (auto)
+ *   review           — a majority agreed on a code but at least one of them is not confident
+ *   conflict         — no code reached a 2-mechanism majority (all divergent, or a lone code among abstentions)
  *   no_match         — no mechanism produced a code
  *   confirmed/rejected — set by a human in the review queue (never overwritten here)
  *   blocked_on_fact  — set by the broker mechanism (Phase 7)
@@ -78,6 +79,14 @@ class Consensus
             return;
         }
 
+        // Genuinely underdetermined: if a mechanism ABSTAINED and the ones that DID
+        // place a code disagree across CHAPTERS, three independent methods could not
+        // even converge on a section. Don't let the adjudicator pick a least-wrong
+        // code from a shared premise — send it straight to a human.
+        if ($item->resolution === 'conflict' && $this->tooUncertainToAdjudicate($item)) {
+            return;
+        }
+
         $claimed = ClassificationItem::whereKey($item->id)
             ->whereNull('adjudicated_at')
             ->update(['adjudicated_at' => now()]);
@@ -85,6 +94,23 @@ class Consensus
         if ($claimed === 1) {
             AdjudicateItemJob::dispatch($item->id);
         }
+    }
+
+    /**
+     * A conflict is too uncertain for the adjudicator when at least one mechanism
+     * abstained AND the mechanisms that produced a code span more than one HS chapter
+     * — no independent method could confirm even the section, so a human decides.
+     */
+    private function tooUncertainToAdjudicate(ClassificationItem $item): bool
+    {
+        $results = $item->results()->get();
+        $abstained = $results->contains(fn ($r) => $r->matched_code === null || $r->matched_code === '');
+        $chapters = $results
+            ->filter(fn ($r) => $r->matched_code !== null && $r->matched_code !== '')
+            ->map(fn ($r) => mb_substr((string) $r->matched_code, 0, 2))
+            ->unique();
+
+        return $abstained && $chapters->count() > 1;
     }
 
     /**
@@ -103,17 +129,21 @@ class Consensus
             return ['resolution' => 'no_match'] + $none;
         }
 
-        $distinctCodes = $coded->pluck('matched_code')->unique();
-        $abstained = $results->count() - $coded->count();
+        // MAJORITY vote by exact code: the winning code needs a strict majority of the
+        // mechanisms that RAN — 1-of-1, 2-of-2, 2-of-3. Abstentions still count toward
+        // the denominator (a lone code among abstentions is NOT a majority). Anything
+        // short of a majority — all divergent, or too few agreeing — is a genuine
+        // disagreement and goes to a human. A 3-way majority tolerates ONE dissenter
+        // (e.g. a single mechanism's hallucination).
+        $threshold = intdiv($results->count(), 2) + 1;
+        $winner = $coded->groupBy('matched_code')->sortByDesc(fn ($g) => $g->count())->first();
 
-        // Any divergence — differing codes, or one mechanism found a code while
-        // another abstained — is sent to a human.
-        if ($distinctCodes->count() > 1 || $abstained > 0) {
+        if ($winner->count() < $threshold) {
             return ['resolution' => 'conflict'] + $none;
         }
 
-        $rep = $coded->first();
-        $allConfident = $coded->every(fn ($r) => $r->status === 'auto_confirmed');
+        $rep = $winner->first();
+        $allConfident = $winner->every(fn ($r) => $r->status === 'auto_confirmed');
 
         return [
             'resolution' => $allConfident ? 'agreed' : 'review',
