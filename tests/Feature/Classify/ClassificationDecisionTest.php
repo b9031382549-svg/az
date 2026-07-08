@@ -46,10 +46,11 @@ class ClassificationDecisionTest extends TestCase
             ->test(ClassificationDecision::class, ['item' => $item])
             ->assertOk()
             ->assertSee('Dell Latitude noutbuk')
-            ->assertSee('vector')
-            ->assertSee('broker')
+            ->assertSee('AI search')         // the consensus stage
+            ->assertSee('Vector')            // mechanism labels (nested in the stage details)
+            ->assertSee('Broker')
             ->assertSee('function')          // broker criterion
-            ->assertSee('noutbuk kompüter');  // vector query
+            ->assertSee('noutbuk kompüter'); // vector query
     }
 
     public function test_shows_the_gold_reference_when_the_name_matches(): void
@@ -97,10 +98,43 @@ class ClassificationDecisionTest extends TestCase
         Livewire::actingAs(User::factory()->create())
             ->test(ClassificationDecision::class, ['item' => $item])
             ->assertOk()
-            ->assertSee('web-search resolver')
+            ->assertSee('Web search')        // the web-search stage
             ->assertSee('3004')
             ->assertSee('[web: rlsnet.ru]')
             ->assertDontSee('classified before the decision-flow feature');
+    }
+
+    public function test_cache_hit_shows_the_cache_stage_and_no_ai_stage(): void
+    {
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Barley', 'source_hash' => bin2hex(random_bytes(32)), 'kind' => 'good', 'resolution' => 'agreed', 'final_code' => '1104']);
+        $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'confidence' => 1.0, 'kind' => 'good', 'explanation' => 'Verified answer from the cache (fedor).']);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('Cache')
+            ->assertSee('hit')
+            ->assertSee('1104')
+            ->assertSee('Human')       // human stage always present
+            ->assertDontSee('AI search'); // no mechanisms ran → AI stage hidden
+    }
+
+    public function test_full_flow_shows_cache_miss_ai_web_and_human_stages(): void
+    {
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Şpris 20 ml', 'source_hash' => bin2hex(random_bytes(32)), 'kind' => 'good', 'resolution' => 'ai_resolved', 'final_code' => '9018']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '9018390000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '2106909200', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => null, 'status' => 'no_match']);
+        $item->results()->create(['mechanism' => 'search', 'matched_code' => '9018', 'status' => 'auto_confirmed', 'confidence' => 0.95, 'kind' => 'good', 'explanation' => 'medical device [web: who.int]', 'trace' => ['heading_name' => 'Instruments']]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('Cache')->assertSee('miss')       // stage 1: miss
+            ->assertSee('AI search')->assertSee('diverged') // stage 2: 3 mechanisms diverged
+            ->assertSee('Web search')->assertSee('resolved') // stage 3: resolved by search
+            ->assertSee('9018')
+            ->assertSee('Human');                          // stage 4
     }
 
     public function test_renders_light_fallback_without_trace(): void

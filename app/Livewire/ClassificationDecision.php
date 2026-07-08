@@ -9,9 +9,9 @@ use App\Models\RubricatorNode;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-// Read-only "how was this decided" screen for one item: per-mechanism flow
-// (input -> essence -> candidates/forks -> pick -> gate) plus the consensus, so
-// a reviewer can see exactly where a classification went right or wrong.
+// Read-only "how was this decided" screen for one item, laid out as the STAGES of the
+// current flow — cache → AI consensus (3 mechanisms) → web-search resolver → human —
+// each showing its input → output up front, with the deep trace collapsible.
 #[Layout('components.app-layout', ['title' => 'Decision'])]
 class ClassificationDecision extends Component
 {
@@ -19,7 +19,7 @@ class ClassificationDecision extends Component
 
     public function mount(ClassificationItem $item): void
     {
-        $this->item = $item->load(['results', 'finalCode', 'translation', 'adjudications']);
+        $this->item = $item->load(['results', 'finalCode', 'translation', 'adjudications', 'confirmedBy']);
     }
 
     public function render()
@@ -63,10 +63,37 @@ class ClassificationDecision extends Component
         // for the reviewer; never part of how the item was (or will be) classified.
         $gold = GoldLabel::where('name_key', GoldLabel::keyFor((string) $this->item->source_text))->get();
 
+        // Split the result rows into the stages of the flow.
+        $results = $this->item->results;
+        $order = ['vector' => 0, 'broker' => 1, 'direct' => 2];
+        $mechResults = $results->whereIn('mechanism', ['vector', 'broker', 'direct'])
+            ->sortBy(fn ($r) => $order[$r->mechanism] ?? 9)->values();
+        $cache = $results->firstWhere('mechanism', 'cache');
+        $search = $results->firstWhere('mechanism', 'search');
+        $adj = $this->item->adjudications->sortByDesc('id')->first();
+
+        // Recompute the 2-of-3 heading consensus for the AI-stage output line.
+        $coded = $mechResults->filter(fn ($r) => $r->matched_code !== null && $r->matched_code !== '');
+        $tally = $coded->groupBy(fn ($r) => mb_substr((string) $r->matched_code, 0, 4))->map->count();
+        $topHeading = $tally->sortDesc()->keys()->first();
+        $topCount = $topHeading !== null ? (int) $tally[$topHeading] : 0;
+        $consensus = [
+            'ran' => $mechResults->isNotEmpty(),
+            'heading' => $topHeading,
+            'agreed' => $topCount >= 2 && $topCount >= intdiv($mechResults->count(), 2) + 1,
+            'top_count' => $topCount,
+            'total' => $mechResults->count(),
+        ];
+
         return view('livewire.classification-decision', [
             'names' => $names,
             'rubricTitles' => $rubricTitles,
             'gold' => $gold,
+            'mechResults' => $mechResults,
+            'cache' => $cache,
+            'search' => $search,
+            'adj' => $adj,
+            'consensus' => $consensus,
         ]);
     }
 }
