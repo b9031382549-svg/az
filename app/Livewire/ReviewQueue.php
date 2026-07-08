@@ -51,6 +51,9 @@ class ReviewQueue extends Component
     #[Url]
     public string $batch = 'all';
 
+    /** Page of the uploads table (5 per page). */
+    public int $uploadPage = 1;
+
     public function setFilter(string $filter): void
     {
         $this->filter = $filter;
@@ -60,6 +63,18 @@ class ReviewQueue extends Component
     public function updatedBatch(): void
     {
         $this->resetPage();
+    }
+
+    /** Pick an upload to review (a batch key, or "all") from the uploads table. */
+    public function selectBatch(string $key): void
+    {
+        $this->batch = $key;
+        $this->resetPage();
+    }
+
+    public function setUploadPage(int $page): void
+    {
+        $this->uploadPage = max(1, $page);
     }
 
     /**
@@ -216,11 +231,23 @@ class ReviewQueue extends Component
 
         $openCount = collect(self::OPEN)->sum(fn ($r) => (int) ($counts[$r] ?? 0));
 
+        // Uploads table — the recent imports, paginated 5 per page (client picks one).
+        $allUploads = $this->batchOptions();
+        $uploadTotal = $allUploads->count();
+        $uploadPages = max(1, (int) ceil($uploadTotal / 5));
+        $this->uploadPage = min(max(1, $this->uploadPage), $uploadPages);
+        $uploads = $allUploads->forPage($this->uploadPage, 5)->values();
+
         return view('livewire.review-queue', [
             'items' => $items,
             'counts' => $counts,
             'openCount' => $openCount,
-            'batches' => $this->batchOptions(),
+            'batches' => $allUploads,
+            'uploads' => $uploads,
+            'uploadPage' => $this->uploadPage,
+            'uploadPages' => $uploadPages,
+            'uploadTotal' => $uploadTotal,
+            'uploadStart' => ($this->uploadPage - 1) * 5,
             'report' => $this->report($scoped, $counts),
             // Convergence at the 4-digit heading — same resolution-aware buckets as the
             // counts, so the widget agrees with the conflict number.
@@ -354,12 +381,33 @@ class ReviewQueue extends Component
             ? collect()
             : ImportBatch::whereIn('key', $uuidKeys)->pluck('label', 'key');
 
-        return $rows->map(fn ($r) => (object) [
-            'key' => $r->batch,
-            'label' => $labels[$r->batch] ?? 'Earlier import',
-            'total' => (int) $r->total,
-            'last_at' => $r->last_at,
-        ]);
+        // Per-batch resolution breakdown for the result bar (resolved / review / conflict).
+        $break = ClassificationItem::query()
+            ->whereIn('batch', $rows->pluck('batch'))
+            ->selectRaw('batch, resolution, count(*) as c')
+            ->groupBy('batch', 'resolution')
+            ->get()
+            ->groupBy('batch');
+
+        return $rows->map(function ($r) use ($labels, $break) {
+            $b = $break->get($r->batch, collect());
+            $cnt = fn ($res) => (int) ($b->firstWhere('resolution', $res)->c ?? 0);
+            $resolved = $cnt('agreed') + $cnt('ai_resolved') + $cnt('confirmed');
+            $review = $cnt('review');
+            $conflict = $cnt('conflict') + $cnt('blocked_on_fact');
+            $total = (int) $r->total;
+
+            return (object) [
+                'key' => $r->batch,
+                'label' => $labels[$r->batch] ?? 'Earlier import',
+                'total' => $total,
+                'last_at' => $r->last_at,
+                'resolved' => $resolved,
+                'review' => $review,
+                'conflict' => $conflict,
+                'done' => $total > 0 ? (int) round($resolved / $total * 100) : 0,
+            ];
+        });
     }
 
     /**

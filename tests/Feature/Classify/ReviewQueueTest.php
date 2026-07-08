@@ -129,6 +129,29 @@ class ReviewQueueTest extends TestCase
         $this->assertContains('gold-ivan', collect($c->viewData('batches'))->pluck('key')->all());
     }
 
+    public function test_uploads_table_lists_batches_and_selecting_one_filters_the_items(): void
+    {
+        ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+        ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha 2', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+        ClassificationItem::create(['batch' => 'up-beta', 'source_text' => 'beta item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'confirmed', 'final_code' => '1104']);
+
+        $c = $this->actingComponent()->call('setFilter', 'all')->assertOk()
+            ->assertSee('up-alpha')->assertSee('up-beta')  // both uploads listed in the table
+            ->assertSee('resolved');                        // the result bar label
+
+        // A batch carries its resolution breakdown for the result bar.
+        $alpha = collect($c->viewData('uploads'))->firstWhere('key', 'up-alpha');
+        $this->assertSame(2, $alpha->total);
+        $this->assertSame(1, $alpha->resolved);
+        $this->assertSame(1, $alpha->conflict);
+        $this->assertSame(50, $alpha->done);
+
+        // Selecting an upload scopes the item list to that batch.
+        $c->call('selectBatch', 'up-beta');
+        $this->assertSame('up-beta', $c->get('batch'));
+        $this->assertSame(1, $c->viewData('items')->total());
+    }
+
     public function test_review_card_shows_the_gold_reference_hint(): void
     {
         GoldLabel::create(['source' => 'fedor', 'name' => 'diamar', 'name_key' => GoldLabel::keyFor('diamar'), 'heading' => '3304', 'is_service' => false, 'tier' => 'claude', 'category' => 'cosmetic guess', 'meta' => ['crosscheck' => 'disagree', 'gpt_heading' => '2106']]);

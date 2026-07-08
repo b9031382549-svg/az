@@ -24,19 +24,85 @@
       <h1 class="font-display text-4xl">{{ __('Review queue') }}</h1>
     </div>
     <div class="flex items-center gap-3 flex-wrap">
-      <label class="flex items-center gap-2 text-sm">
-        <span class="text-muted">{{ __('Upload:') }}</span>
-        <select wire:model.live="batch"
-                class="px-3 py-1.5 rounded-lg text-sm border hair bg-surface focus:border-ink outline-none max-w-[280px]">
-          <option value="all">{{ __('All uploads') }}</option>
-          @foreach($batches as $b)
-            <option value="{{ $b->key }}">{{ \Illuminate\Support\Str::limit($b->label, 32) }} · {{ $b->total }} items</option>
-          @endforeach
-        </select>
-      </label>
       <a href="{{ route('review.export', ['batch' => $batch, 'filter' => $filter]) }}"
          class="btn btn-ghost btn-sm" title="{{ __('Export the current view (upload + status filter) to Excel') }}">⬇ {{ __('Export Excel') }}</a>
     </div>
+  </div>
+
+  {{-- Uploads — pick which import to review (replaces the old dropdown). --}}
+  <div class="card mb-5 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b hair">
+            <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Upload') }}</th>
+            <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Date') }}</th>
+            <th class="kicker font-medium text-right px-5 py-2.5">{{ __('Items') }}</th>
+            <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Result') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{-- All uploads --}}
+          <tr wire:click="selectBatch('all')" class="cursor-pointer border-b hair transition {{ $batch === 'all' ? 'bg-paper/70' : 'hover:bg-paper/40' }}">
+            <td class="px-5 py-3">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-faint shrink-0">🗂</span>
+                <span class="{{ $batch === 'all' ? 'font-semibold' : 'font-medium' }}">{{ __('All uploads') }}</span>
+                @if($batch === 'all')<span class="text-[10px] px-1.5 py-0.5 rounded bg-ink text-paper shrink-0">{{ __('viewing') }}</span>@endif
+              </div>
+            </td>
+            <td class="px-5 py-3 text-muted">—</td>
+            <td class="px-5 py-3 text-right tnum">{{ $batches->sum('total') }}</td>
+            <td class="px-5 py-3 text-faint text-xs">{{ __('everything') }}</td>
+          </tr>
+          {{-- One row per upload --}}
+          @foreach($uploads as $u)
+            @php
+              $wc = $u->total ? $u->resolved / $u->total * 100 : 0;
+              $wr = $u->total ? $u->review / $u->total * 100 : 0;
+              $wk = $u->total ? $u->conflict / $u->total * 100 : 0;
+            @endphp
+            <tr wire:click="selectBatch('{{ $u->key }}')" wire:key="up-{{ $u->key }}"
+                class="cursor-pointer border-b hair last:border-0 transition {{ $batch === (string) $u->key ? 'bg-paper/70' : 'hover:bg-paper/40' }}">
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-faint shrink-0">📄</span>
+                  <span class="truncate {{ $batch === (string) $u->key ? 'font-semibold' : 'font-medium' }}">{{ \Illuminate\Support\Str::limit($u->label, 42) }}</span>
+                  @if($batch === (string) $u->key)<span class="text-[10px] px-1.5 py-0.5 rounded bg-ink text-paper shrink-0">{{ __('viewing') }}</span>@endif
+                </div>
+              </td>
+              <td class="px-5 py-3 text-muted tnum whitespace-nowrap">{{ $u->last_at ? \Illuminate\Support\Carbon::parse($u->last_at)->format('Y-m-d') : '—' }}</td>
+              <td class="px-5 py-3 text-right tnum">{{ $u->total }}</td>
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-24 h-2 rounded-full bg-line/40 overflow-hidden flex shrink-0">
+                    <span class="bg-ledger block h-full" style="width:{{ $wc }}%"></span>
+                    <span class="bg-amber block h-full" style="width:{{ $wr }}%"></span>
+                    <span class="bg-stamp block h-full" style="width:{{ $wk }}%"></span>
+                  </span>
+                  <span class="text-faint tnum text-xs whitespace-nowrap">{{ $u->done }}% {{ __('resolved') }}</span>
+                </div>
+              </td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+    @if($uploadPages > 1)
+      <div class="flex items-center justify-between px-5 py-3 border-t hair">
+        <span class="text-xs text-faint tnum">{{ $uploadStart + 1 }}–{{ min($uploadStart + 5, $uploadTotal) }} {{ __('of') }} {{ $uploadTotal }}</span>
+        <div class="flex items-center gap-1 text-sm">
+          <button wire:click="setUploadPage({{ max(1, $uploadPage - 1) }})"
+                  class="px-2.5 py-1 rounded-lg border hair bg-surface {{ $uploadPage === 1 ? 'text-faint opacity-50 pointer-events-none' : 'hover:border-ink' }}">‹</button>
+          @for($p = 1; $p <= $uploadPages; $p++)
+            <button wire:click="setUploadPage({{ $p }})"
+                    class="px-3 py-1 rounded-lg border {{ $p === $uploadPage ? 'border-ink bg-ink text-paper' : 'hair bg-surface hover:border-ink' }}">{{ $p }}</button>
+          @endfor
+          <button wire:click="setUploadPage({{ min($uploadPages, $uploadPage + 1) }})"
+                  class="px-2.5 py-1 rounded-lg border hair bg-surface {{ $uploadPage === $uploadPages ? 'text-faint opacity-50 pointer-events-none' : 'hover:border-ink' }}">›</button>
+        </div>
+      </div>
+    @endif
   </div>
 
   {{-- Distribution report --}}
