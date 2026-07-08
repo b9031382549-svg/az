@@ -340,32 +340,51 @@ class ReviewQueue extends Component
      */
     private function virtualResolutions(int $n): array
     {
-        $rows = ClassificationResult::query()
-            ->join('classification_items as i', 'i.id', '=', 'classification_results.classification_item_id')
-            ->when($this->batch !== 'all', fn ($q) => $q->where('i.batch', $this->batch))
-            ->where('i.resolution', '!=', 'pending')
-            ->get([
-                'classification_results.classification_item_id as item',
-                'classification_results.matched_code as code',
-                'i.resolution as res',
-            ]);
+        $resolved = fn ($a) => $a->where('verdict', 'resolved');
+        $items = ClassificationItem::query()
+            ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch))
+            ->where('resolution', '!=', 'pending')
+            ->withCount(['adjudications', 'adjudications as resolved_adj_count' => $resolved])
+            ->get(['id', 'resolution', 'final_code', 'adjudicated_at']);
+
+        // Mechanism codes, to test 4-digit convergence for the still-open items.
+        $codes = ClassificationResult::query()
+            ->whereIn('classification_item_id', $items->pluck('id'))
+            ->get(['classification_item_id as item', 'matched_code as code'])
+            ->groupBy('item');
 
         $map = [];
-        foreach ($rows->groupBy('item') as $item => $rs) {
-            $stored = $rs->first()->res;
-            if (in_array($stored, self::HUMAN_DECIDED, true)) {
-                $map[(int) $item] = $stored; // human/terminal decision stands at any granularity
+        foreach ($items as $it) {
+            if (in_array($it->resolution, self::HUMAN_DECIDED, true)) {
+                $map[$it->id] = $it->resolution; // human/terminal decision stands at any granularity
 
                 continue;
             }
+            // Already RESOLVED (consensus/judge produced a code — including a heading or
+            // "99" service level) or the judge PROPOSED one: it stays found at any
+            // granularity. Heading mode must NOT re-open it as a conflict from the raw
+            // mechanism spread — that was the "42 conflicts" bug.
+            if (($it->final_code !== null && $it->final_code !== '') || $it->resolved_adj_count > 0) {
+                $map[$it->id] = 'agreed';
+
+                continue;
+            }
+            // Judge dispatched but no verdict yet → waiting (mirrors full mode).
+            if ($it->adjudicated_at !== null && (int) $it->adjudications_count === 0) {
+                $map[$it->id] = 'waiting';
+
+                continue;
+            }
+            // Genuinely open: would a majority of mechanisms converge at the 4-digit heading?
+            $rs = $codes->get($it->id, collect());
             $coded = $rs->filter(fn ($r) => $r->code !== null && $r->code !== '');
             if ($coded->isEmpty()) {
-                $map[(int) $item] = 'no_match';
+                $map[$it->id] = 'no_match';
 
                 continue;
             }
             $top = $coded->map(fn ($r) => mb_substr((string) $r->code, 0, $n))->countBy()->max();
-            $map[(int) $item] = ($top >= 2 && $top >= intdiv($rs->count(), 2) + 1) ? 'agreed' : 'conflict';
+            $map[$it->id] = ($top >= 2 && $top >= intdiv($rs->count(), 2) + 1) ? 'agreed' : 'conflict';
         }
 
         return $map;

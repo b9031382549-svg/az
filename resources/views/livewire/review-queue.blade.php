@@ -3,7 +3,7 @@
     // In 4-digit ("heading") mode the whole view reads as if we had collected 4-digit
     // codes: relabel the tabs (converge/diverge), truncate every displayed code.
     $tabs = $heading
-        ? ['open' => __('Diverge'), 'agreed' => __('Converge'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')]
+        ? ['open' => __('Diverge'), 'agreed' => __('Converge'), 'waiting' => __('Waiting'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')]
         : ['open' => __('Needs attention'), 'waiting' => __('Waiting'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
     $cd = fn ($c) => $heading && $c !== null && $c !== '' ? mb_substr((string) $c, 0, $digits) : $c;
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
@@ -110,7 +110,7 @@
             <button type="button" wire:click="setFilter('{{ $s['key'] }}')"
                     class="w-full flex items-center gap-2 text-left rounded px-1 -mx-1 hover:bg-paper/60 transition {{ $filter === $s['key'] ? 'font-medium' : '' }}">
               <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:{{ $s['color'] }}"></span>
-              <span class="truncate">{{ $s['label'] }}</span>
+              <span class="truncate">{{ __($s['label']) }}</span>
               <span class="text-faint tnum ml-auto whitespace-nowrap">{{ $s['count'] }} · {{ $s['pct'] }}%</span>
             </button>
           @empty
@@ -215,7 +215,7 @@
         // Pre-select the judge's answer when the item isn't final yet, so accepting it is one click.
         $default = (string) ($item->final_code ?? ($aiProposed ? $adj->winning_code : ($allowed[0] ?? '')));
         $vres = $heading ? ($vmap[$item->id] ?? $item->resolution) : $item->resolution;
-        $badgeLabel = $waiting ? __('Waiting') : ($aiProposed ? __('AI proposed') : str_replace('_',' ', $vres));
+        $badgeLabel = $waiting ? __('Waiting') : ($aiProposed ? __('AI proposed') : __(str_replace('_',' ', $vres)));
         $badgeClass = $waiting ? 'bg-line/50 text-muted' : ($aiProposed ? 'bg-ink/10 text-ink' : $resBadge($vres));
       @endphp
       <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
@@ -310,7 +310,7 @@
               </div>
             </div>
           @else
-            <span class="text-xs text-faint">{{ str_replace('_',' ',$item->resolution) }}</span>
+            <span class="text-xs text-faint">{{ __(str_replace('_',' ',$item->resolution)) }}</span>
           @endif
         </div>
       </div>
