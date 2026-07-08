@@ -237,6 +237,9 @@ class ReviewQueueTest extends TestCase
 
         $this->assertSame('agreed', $c->viewData('vmap')[$item->id]); // stays "found", not a conflict
         $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
+        // The convergence widget must agree with the conflict count (no 42-vs-3 split).
+        $this->assertSame(0, $c->viewData('agreement')['diverge']);
+        $this->assertSame(1, $c->viewData('agreement')['converge']);
     }
 
     public function test_heading_mode_keeps_a_cross_heading_conflict_divergent(): void

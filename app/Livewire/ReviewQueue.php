@@ -280,7 +280,10 @@ class ReviewQueue extends Component
             'openCount' => $openCount,
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
-            'agreement' => $this->agreement($n),
+            // Same resolution-aware buckets as the counts, so the convergence widget
+            // agrees with the conflict number (reuse the heading vmap; compute at 10
+            // digits for full mode).
+            'agreement' => $this->agreement($n, $heading ? $vmap : $this->virtualResolutions($n)),
             'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($rawCounts[$r] ?? 0)),
             'catalogNames' => $catalogNames,
             'heading' => $heading,
@@ -299,34 +302,25 @@ class ReviewQueue extends Component
      *
      * @return array{n:int, converge:int, diverge:int, no_code:int, total:int}
      */
-    private function agreement(int $n): array
+    private function agreement(int $n, array $buckets): array
     {
-        $rows = ClassificationResult::query()
-            ->join('classification_items as i', 'i.id', '=', 'classification_results.classification_item_id')
-            ->when($this->batch !== 'all', fn ($q) => $q->where('i.batch', $this->batch))
-            ->where('i.resolution', '!=', 'pending')
-            ->get(['classification_results.classification_item_id as item', 'classification_results.matched_code as code']);
-
+        // Tally the SAME resolution-aware buckets the rest of the page uses, so
+        // "diverge" equals the genuine conflict count instead of contradicting it
+        // (a resolved item is converged; only a still-open, code-diverging item counts).
         $converge = 0;
         $diverge = 0;
         $noCode = 0;
-        foreach ($rows->groupBy('item') as $rs) {
-            $coded = $rs->filter(fn ($r) => $r->code !== null && $r->code !== '');
-            if ($coded->isEmpty()) {
-                $noCode++;
-
-                continue;
-            }
-            // Majority of ALL mechanisms that ran (abstentions count in the denominator).
-            $top = $coded->map(fn ($r) => mb_substr((string) $r->code, 0, $n))->countBy()->max();
-            if ($top >= 2 && $top >= intdiv($rs->count(), 2) + 1) {
-                $converge++;
-            } else {
+        foreach ($buckets as $b) {
+            if ($b === 'conflict') {
                 $diverge++;
+            } elseif ($b === 'no_match' || $b === 'waiting') {
+                $noCode++;
+            } else {
+                $converge++; // agreed / found / human-decided → settled at this granularity
             }
         }
 
-        return ['n' => $n, 'converge' => $converge, 'diverge' => $diverge, 'no_code' => $noCode, 'total' => $rows->groupBy('item')->count()];
+        return ['n' => $n, 'converge' => $converge, 'diverge' => $diverge, 'no_code' => $noCode, 'total' => count($buckets)];
     }
 
     /**
