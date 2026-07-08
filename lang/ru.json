@@ -349,5 +349,9 @@
     "How well our classifier matches two external reference sets, joined by product name. Each reference is AI-labelled and can itself be wrong — a disagreement is a candidate to check, not proof we erred. Both are compared at the 4-digit HS heading (our classifier resolves at the heading now): Ivan's source is a 10-digit code we trim to its heading; Fedor gives the heading + good/service (two models agreed).": "Насколько наш классификатор совпадает с двумя внешними эталонами, сопоставленными по названию товара. Каждый эталон размечен ИИ и сам может ошибаться — расхождение это кандидат на проверку, а не доказательство нашей ошибки. Оба сравниваются по 4-значной позиции ТН ВЭД (классификатор теперь решает на уровне позиции): у Ивана источник — 10-значный код, который мы обрезаем до позиции; Фёдор даёт позицию + товар/услуга (две модели согласны).",
     "memory": "память",
     "local ai": "local ai",
-    "web research": "веб-поиск"
+    "web research": "веб-поиск",
+    "found": "найдено",
+    "not found": "не найдено",
+    "no consensus": "нет консенсуса",
+    "not confident": "не уверен"
 }

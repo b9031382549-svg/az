@@ -179,18 +179,31 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $c->viewData('items')->total());
     }
 
-    public function test_card_shows_the_decision_source_pipeline(): void
+    public function test_card_shows_the_reached_source_steps_with_outcomes(): void
     {
-        // A cache hit: all three sources are shown; memory resolved it.
-        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '1104']);
+        // Web-search resolved: memory not found → local ai no consensus → web research found.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8528', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8528723000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'search', 'matched_code' => '8528', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        $this->actingComponent()->call('setFilter', 'all')
+            ->assertSee('memory')->assertSee('not found')
+            ->assertSee('local ai')->assertSee('no consensus')
+            ->assertSee('web research')->assertSee('found')
+            ->assertDontSee('vector')->assertDontSee('broker'); // no raw mechanism names
+    }
+
+    public function test_cache_hit_shows_only_the_memory_step(): void
+    {
+        // Resolved by the cache — the later steps were never reached, so they aren't listed.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'c', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '1104']);
         $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
         $this->actingComponent()->call('setFilter', 'all')
             ->assertSee('memory')
-            ->assertSee('local ai')
-            ->assertSee('web research')
-            ->assertDontSee('vector')   // individual mechanisms no longer shown on the card
-            ->assertDontSee('broker');
+            ->assertDontSee('local ai')
+            ->assertDontSee('web research');
     }
 
     public function test_dropdown_confirms_a_4digit_heading_correction(): void

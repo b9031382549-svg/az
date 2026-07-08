@@ -257,42 +257,37 @@
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span></p>
           @endif
 
-          {{-- Decision source — the pipeline that produced the answer: memory (cache) →
-               local ai (the on-box models) → web research. The step that RESOLVED it is
-               highlighted; a step that was tried but passed the item on is struck through;
-               a step never reached is faint. --}}
+          {{-- Decision source — the steps the pipeline ACTUALLY reached, one per line,
+               each with its outcome: memory (cache) → local ai (the on-box models) →
+               web research. A step that was never reached (a later one resolved it first)
+               is not listed at all. The step that resolved the item is the last, green one. --}}
           @php
             $cacheRow  = $item->results->firstWhere('mechanism', 'cache');
             $mechRan   = $item->results->whereIn('mechanism', ['vector', 'broker', 'direct'])->isNotEmpty();
             $searchRow = $item->results->firstWhere('mechanism', 'search');
 
-            $sMemory = $cacheRow !== null ? 'ok' : 'fail';
-            $sLocal = match (true) {
-                $cacheRow !== null => 'skip',                                                          // memory already answered
-                $item->final_code && $item->resolution !== 'ai_resolved' && $mechRan => 'ok',           // consensus resolved
-                $mechRan => 'fail',                                                                     // ran, no consensus
-                default => 'skip',
-            };
-            $sWeb = match (true) {
-                $sMemory === 'ok' || $sLocal === 'ok' => 'skip',                                        // resolved earlier
-                $item->resolution === 'ai_resolved' => 'ok',                                            // web search resolved
-                $searchRow !== null => 'fail',                                                          // searched, not confident
-                default => 'skip',                                                                      // never reached
-            };
-            $chipClass = fn ($st) => match ($st) {
-                'ok' => 'bg-ledger/12 text-ledger font-medium',
-                'fail' => 'text-faint line-through',
-                default => 'text-faint/50',
-            };
-            $flow = [['memory', $sMemory], ['local ai', $sLocal], ['web research', $sWeb]];
+            // memory is always tried; each later step is listed only if it was reached.
+            $steps = [['memory', $cacheRow !== null ? 'found' : 'not found', $cacheRow !== null]];
+            if ($cacheRow === null && $mechRan) {
+                $localOk = $item->final_code && $item->resolution !== 'ai_resolved';
+                $steps[] = ['local ai', $localOk ? 'found' : 'no consensus', $localOk];
+                if (! $localOk) {
+                    if ($item->resolution === 'ai_resolved') {
+                        $steps[] = ['web research', 'found', true];
+                    } elseif ($searchRow !== null) {
+                        $steps[] = ['web research', 'not confident', false];
+                    }
+                }
+            }
           @endphp
-          <div class="flex flex-col gap-1 mt-2">
-            <div class="flex items-center gap-1.5 flex-wrap text-xs">
-              @foreach($flow as $i => [$label, $state])
-                @if($i > 0)<span class="text-faint/50">→</span>@endif
-                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded {{ $chipClass($state) }}">{{ $state === 'ok' ? '✓' : ($state === 'fail' ? '✕' : '·') }} {{ __($label) }}</span>
-              @endforeach
-            </div>
+          <div class="flex flex-col gap-0.5 mt-2 text-xs">
+            @foreach($steps as [$label, $outcome, $ok])
+              <div class="flex items-center gap-1.5">
+                <span class="{{ $ok ? 'text-ledger' : 'text-faint' }}">{{ $ok ? '✓' : '✕' }}</span>
+                <span class="{{ $ok ? 'text-ink font-medium' : 'text-muted' }}">{{ __($label) }}</span>
+                <span class="text-faint">— {{ __($outcome) }}</span>
+              </div>
+            @endforeach
           </div>
 
           <a href="{{ route('review.decision', $item->id) }}" target="_blank"
