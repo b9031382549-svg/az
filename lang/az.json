@@ -346,5 +346,8 @@
     "the cached answer": "keşdən cavab",
     "the web-search answer": "veb-axtarışdan cavab",
     "the consensus answer": "konsensus cavabı",
-    "How well our classifier matches two external reference sets, joined by product name. Each reference is AI-labelled and can itself be wrong — a disagreement is a candidate to check, not proof we erred. Both are compared at the 4-digit HS heading (our classifier resolves at the heading now): Ivan's source is a 10-digit code we trim to its heading; Fedor gives the heading + good/service (two models agreed).": "Təsnifatçımızın məhsul adına görə birləşdirilmiş iki xarici etalonla nə qədər uyğun gəldiyi. Hər etalon Sİ tərəfindən işarələnib və özü də səhv edə bilər — uyğunsuzluq yoxlama namizədidir, səhvimizin sübutu deyil. Hər ikisi 4 rəqəmli HS mövqeyi üzrə müqayisə olunur (təsnifatçı artıq mövqe səviyyəsində həll edir): İvanın mənbəyi 10 rəqəmli koddur, onu mövqeyə qədər kəsirik; Fedor mövqe + mal/xidmət verir (iki model razılaşıb)."
+    "How well our classifier matches two external reference sets, joined by product name. Each reference is AI-labelled and can itself be wrong — a disagreement is a candidate to check, not proof we erred. Both are compared at the 4-digit HS heading (our classifier resolves at the heading now): Ivan's source is a 10-digit code we trim to its heading; Fedor gives the heading + good/service (two models agreed).": "Təsnifatçımızın məhsul adına görə birləşdirilmiş iki xarici etalonla nə qədər uyğun gəldiyi. Hər etalon Sİ tərəfindən işarələnib və özü də səhv edə bilər — uyğunsuzluq yoxlama namizədidir, səhvimizin sübutu deyil. Hər ikisi 4 rəqəmli HS mövqeyi üzrə müqayisə olunur (təsnifatçı artıq mövqe səviyyəsində həll edir): İvanın mənbəyi 10 rəqəmli koddur, onu mövqeyə qədər kəsirik; Fedor mövqe + mal/xidmət verir (iki model razılaşıb).",
+    "memory": "yaddaş",
+    "local ai": "local ai",
+    "web research": "veb axtarış"
 }
