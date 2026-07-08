@@ -118,6 +118,17 @@ class ReviewQueueTest extends TestCase
         $this->actingComponent()->assertOk();
     }
 
+    public function test_non_uuid_batch_is_listed_without_crashing(): void
+    {
+        // A seed/CLI batch key ("gold-ivan") is not a UUID; import_batches.key is a UUID
+        // column, so the label lookup must skip it rather than throw (prod 22P02).
+        ClassificationItem::create(['batch' => 'gold-ivan', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471300000']);
+
+        $c = $this->actingComponent()->assertOk();
+
+        $this->assertContains('gold-ivan', collect($c->viewData('batches'))->pluck('key')->all());
+    }
+
     public function test_heading_mode_reprojects_a_full_code_conflict_as_converged(): void
     {
         // Two mechanisms diverge on the full 10-digit code but share the 4-digit
