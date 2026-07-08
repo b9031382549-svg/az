@@ -336,5 +336,7 @@
     "pending": "в ожидании",
     "Vector": "Вектор",
     "Broker": "Брокер",
-    "Direct recall": "Прямой отзыв"
+    "Direct recall": "Прямой отзыв",
+    "What each mechanism proposed": "Что предложил каждый механизм",
+    "abstained — no match": "воздержался — нет совпадения"
 }

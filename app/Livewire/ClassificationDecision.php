@@ -34,6 +34,10 @@ class ClassificationDecision extends Component
             $codes = $codes
                 ->merge(collect($r->candidates ?? [])->pluck('code'))
                 ->push($r->matched_code);
+            // Each mechanism's 4-digit heading, so the "what each proposed" line can label it.
+            if ($r->matched_code) {
+                $rubricCodes->push(mb_substr((string) $r->matched_code, 0, 4));
+            }
             foreach (($r->trace['steps'] ?? []) as $step) {
                 $rubricCodes->push($step['code'] ?? null);
                 foreach (($step['options'] ?? []) as $opt) {

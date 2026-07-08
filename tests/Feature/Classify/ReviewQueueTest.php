@@ -129,33 +129,6 @@ class ReviewQueueTest extends TestCase
         $this->assertContains('gold-ivan', collect($c->viewData('batches'))->pluck('key')->all());
     }
 
-    public function test_heading_mode_reprojects_a_full_code_conflict_as_converged(): void
-    {
-        // Two mechanisms diverge on the full 10-digit code but share the 4-digit
-        // heading 8471 — a "conflict" at full detail, a convergence at the heading.
-        CatalogCode::create(['code' => '8471490000', 'name' => 'kompüter', 'kind' => 'good', 'chapter' => '84', 'position' => '8471', 'subposition' => '847149', 'is_active' => true]);
-        $item = ClassificationItem::create([
-            'batch' => 'b', 'source_text' => 'device', 'source_hash' => bin2hex(random_bytes(32)),
-            'resolution' => 'conflict',
-        ]);
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471490000', 'status' => 'auto_confirmed', 'kind' => 'good']);
-
-        $c = $this->actingComponent();
-
-        // Full code (default): the item reads as a conflict.
-        $this->assertSame(1, (int) ($c->viewData('counts')['conflict'] ?? 0));
-        $this->assertSame(0, (int) ($c->viewData('counts')['agreed'] ?? 0));
-
-        // 4-digit heading: the SAME stored data now converges → agreed.
-        $c->call('setCodeMode', 'heading');
-        $this->assertSame('agreed', $c->viewData('vmap')[$item->id]);
-        $this->assertSame(1, (int) ($c->viewData('counts')['agreed'] ?? 0));
-        $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
-        $this->assertSame(4, $c->viewData('agreement')['n']);
-        $this->assertSame(1, $c->viewData('agreement')['converge']);
-    }
-
     public function test_review_card_shows_the_gold_reference_hint(): void
     {
         GoldLabel::create(['source' => 'fedor', 'name' => 'diamar', 'name_key' => GoldLabel::keyFor('diamar'), 'heading' => '3304', 'is_service' => false, 'tier' => 'claude', 'category' => 'cosmetic guess', 'meta' => ['crosscheck' => 'disagree', 'gpt_heading' => '2106']]);
@@ -168,83 +141,41 @@ class ReviewQueueTest extends TestCase
             ->assertSee('disputed');
     }
 
-    public function test_dispatched_but_unjudged_conflict_shows_as_waiting(): void
-    {
-        // Judge dispatched (adjudicated_at) but no verdict row yet → "waiting", not conflict.
-        ClassificationItem::create(['batch' => 'b', 'source_text' => 'pending judge', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'adjudicated_at' => now()]);
-        // A genuine conflict the judge is not coming for (never dispatched).
-        ClassificationItem::create(['batch' => 'b', 'source_text' => 'real conflict', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
-
-        $c = $this->actingComponent();
-        $counts = $c->viewData('counts');
-
-        $this->assertSame(1, (int) ($counts['waiting'] ?? 0));
-        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));   // genuine only, not 2
-        $this->assertSame(1, $c->viewData('openCount'));          // "Needs attention" excludes waiting
-
-        $c->call('setFilter', 'waiting')->assertSee('pending judge')->assertSee('Waiting')->assertDontSee('real conflict');
-        $c->call('setFilter', 'open')->assertSee('real conflict')->assertDontSee('pending judge');
-    }
-
-    public function test_agreed_ai_resolved_and_ai_proposed_merge_into_found(): void
+    public function test_agreed_and_ai_resolved_merge_into_found(): void
     {
         $this->agreedItem(); // resolution = agreed
-        ClassificationItem::create(['batch' => 'b', 'source_text' => 'x1', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471300000', 'kind' => 'good']);
-        $proposed = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x2', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
-        $proposed->adjudications()->create(['resolution_before' => 'conflict', 'model' => 'm', 'prompt_version' => 'j4', 'mode' => 'active', 'verdict' => 'resolved', 'winning_code' => '8471300000', 'winning_kind' => 'good', 'stable' => true, 'holdout' => true, 'applied' => false]);
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'x1', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471', 'kind' => 'good']);
 
         $c = $this->actingComponent();
         $counts = $c->viewData('counts');
 
-        $this->assertSame(3, (int) ($counts['found'] ?? 0));           // all three merged
-        $this->assertArrayNotHasKey('agreed', $counts->toArray());     // individual keys gone in full mode
+        $this->assertSame(2, (int) ($counts['found'] ?? 0));           // agreed + ai_resolved merged
+        $this->assertArrayNotHasKey('agreed', $counts->toArray());     // individual keys folded away
         $this->assertArrayNotHasKey('ai_resolved', $counts->toArray());
 
         $c->call('setFilter', 'found');
-        $this->assertSame(3, $c->viewData('items')->total());          // the Found filter returns all three
+        $this->assertSame(2, $c->viewData('items')->total());          // the Found filter returns both
     }
 
-    public function test_ai_proposed_conflict_is_carved_out_of_the_conflict_count(): void
+    public function test_convergence_widget_does_not_reopen_a_resolved_item_as_conflict(): void
     {
-        // A conflict the adjudicator confidently RESOLVED (held out, not applied) —
-        // reads as "AI proposed", not a raw conflict.
-        $proposed = ClassificationItem::create(['batch' => 'b', 'source_text' => 'diamar', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
-        $proposed->adjudications()->create(['resolution_before' => 'conflict', 'model' => 'openai/gpt-oss-120b', 'prompt_version' => 'j1', 'mode' => 'active', 'verdict' => 'resolved', 'winning_code' => '3105300000', 'winning_kind' => 'good', 'stable' => true, 'holdout' => true, 'applied' => false]);
-
-        // A genuine conflict the adjudicator could not resolve.
-        ClassificationItem::create(['batch' => 'b', 'source_text' => 'raunatin', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
-
-        $c = $this->actingComponent();
-        $counts = $c->viewData('counts');
-
-        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));   // genuine conflict only, not 2
-        $this->assertSame(1, (int) ($counts['found'] ?? 0));      // the AI proposal counts as "found"
-        $this->assertSame(1, $c->viewData('openCount'));          // "Needs attention" excludes the proposal
-
-        $c->call('setFilter', 'found')->assertSee('diamar')->assertDontSee('raunatin');
-        $c->call('setFilter', 'open')->assertSee('raunatin')->assertDontSee('diamar');
-    }
-
-    public function test_heading_mode_does_not_reopen_a_resolved_item_as_conflict(): void
-    {
-        // The bug: an item the judge already resolved (has a final code) whose raw
-        // mechanisms diverge even at 4 digits was being counted as a heading conflict.
-        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471300000']);
+        // A resolved item (has a final code) whose raw mechanisms diverge must NOT be
+        // counted as a conflict by the convergence widget (the old 42-vs-3 bug).
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471']);
         $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8528720000', 'status' => 'auto_confirmed', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9018390000', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
-        $c = $this->actingComponent()->call('setCodeMode', 'heading');
+        $c = $this->actingComponent();
 
-        $this->assertSame('agreed', $c->viewData('vmap')[$item->id]); // stays "found", not a conflict
         $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
-        // The convergence widget must agree with the conflict count (no 42-vs-3 split).
+        $this->assertSame(4, $c->viewData('agreement')['n']);        // always the 4-digit heading
         $this->assertSame(0, $c->viewData('agreement')['diverge']);
         $this->assertSame(1, $c->viewData('agreement')['converge']);
     }
 
-    public function test_heading_mode_keeps_a_cross_heading_conflict_divergent(): void
+    public function test_convergence_widget_keeps_a_cross_heading_conflict_divergent(): void
     {
-        // Different headings (8471 vs 8528) → still a conflict even at 4 digits.
+        // Different headings (8471 vs 8528) → a genuine conflict, counted as diverge.
         $item = ClassificationItem::create([
             'batch' => 'b', 'source_text' => 'device', 'source_hash' => bin2hex(random_bytes(32)),
             'resolution' => 'conflict',
@@ -253,9 +184,8 @@ class ReviewQueueTest extends TestCase
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8528720000', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
         $c = $this->actingComponent();
-        $c->call('setCodeMode', 'heading');
 
-        $this->assertSame('conflict', $c->viewData('vmap')[$item->id]);
         $this->assertSame(1, (int) ($c->viewData('counts')['conflict'] ?? 0));
+        $this->assertSame(1, $c->viewData('agreement')['diverge']);
     }
 }

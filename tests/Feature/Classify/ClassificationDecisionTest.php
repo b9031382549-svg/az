@@ -132,6 +132,8 @@ class ClassificationDecisionTest extends TestCase
             ->assertOk()
             ->assertSee('Cache')->assertSee('miss')       // stage 1: miss
             ->assertSee('AI search')->assertSee('diverged') // stage 2: 3 mechanisms diverged
+            ->assertSee('What each mechanism proposed')     // each mechanism's code labelled up front
+            ->assertSee('9018390000')->assertSee('2106909200')
             ->assertSee('Web search')->assertSee('resolved') // stage 3: resolved by search
             ->assertSee('9018')
             ->assertSee('Human');                          // stage 4
