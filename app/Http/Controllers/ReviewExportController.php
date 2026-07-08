@@ -18,10 +18,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReviewExportController extends Controller
 {
-    private const STATUSES = ['open', 'agreed', 'review', 'conflict', 'blocked_on_fact', 'confirmed', 'rejected', 'no_match', 'all'];
+    private const STATUSES = ['open', 'found', 'conflict', 'blocked_on_fact', 'confirmed', 'rejected', 'no_match', 'all'];
 
     /** Resolutions grouped under the "open" (needs a human) filter. */
-    private const OPEN = ['review', 'conflict', 'blocked_on_fact'];
+    private const OPEN = ['conflict', 'blocked_on_fact'];
 
     private const MAX_ROWS = 20000;
 
@@ -46,7 +46,8 @@ class ReviewExportController extends Controller
             ])
             ->when($batchOk, fn ($q) => $q->where('batch', $batch))
             ->when($filter === 'open', fn ($q) => $q->whereIn('resolution', self::OPEN))
-            ->when(! in_array($filter, ['all', 'open'], true), fn ($q) => $q->where('resolution', $filter))
+            ->when($filter === 'found', fn ($q) => $q->whereIn('resolution', ['agreed', 'ai_resolved']))
+            ->when(! in_array($filter, ['all', 'open', 'found'], true), fn ($q) => $q->where('resolution', $filter))
             ->latest()
             ->limit(self::MAX_ROWS)
             ->get();
