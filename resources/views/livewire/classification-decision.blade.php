@@ -208,7 +208,7 @@
           <div class="flex-1 rounded-lg border hair p-3 min-w-0">
             <p class="kicker mb-1">{{ __('Output') }}</p>
             @if($search->matched_code)
-              <p><span class="font-mono">{{ $search->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit(data_get($search->trace, 'heading_name') ?: $anyName($search->matched_code), 55) }}</span></p>
+              <p><span class="font-mono">{{ $search->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($search->matched_code) ?: data_get($search->trace, 'heading_name'), 55) }}</span></p>
               <p class="text-xs mt-0.5 {{ $searchResolved ? 'text-ledger' : 'text-amber' }}">{{ __('confidence') }} {{ $pct($search->confidence) }} · {{ $searchResolved ? __('confident → taken as the answer') : __('not confident enough → a human decides') }}</p>
             @else
               <p class="text-muted">{{ __('could not confidently identify the item') }}</p>
@@ -262,7 +262,7 @@
           <p class="kicker mb-1">{{ __('Input') }}</p>
           @if($item->final_code)
             <p><span class="font-mono">{{ $item->final_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($finalName, 55) }}</span></p>
-            <p class="text-muted text-xs mt-0.5">{{ __('the AI-proposed answer') }}</p>
+            <p class="text-muted text-xs mt-0.5">{{ $isCacheHit ? __('the cached answer') : ($searchResolved ? __('the web-search answer') : __('the consensus answer')) }}</p>
           @else
             <p class="text-muted">{{ __('a conflict with no confident answer') }}</p>
           @endif

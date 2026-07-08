@@ -42,18 +42,20 @@ class BenchmarkServiceTest extends TestCase
         $this->assertSame(1, $a['heading_agree']);
     }
 
-    public function test_ivan_same_heading_different_tail_is_disagree_but_heading_hit(): void
+    public function test_ivan_is_scored_at_the_heading_not_the_full_code(): void
     {
-        // We differ from Ivan only in the last digits — a full-code disagreement that
-        // still converges at the 4-digit heading.
+        // Ivan's gold is a 10-digit code, but our classifier now answers with a 4-digit
+        // heading — so Ivan is scored at the heading: a shared heading AGREES even though
+        // the full codes differ.
         $this->gold('ivan', 'Şpris 5ml', ['code' => '9018311000', 'heading' => '9018', 'is_service' => false]);
-        $this->item('Şpris 5ml', '9018319000');
+        $this->item('Şpris 5ml', '9018'); // our answer is the 4-digit heading
 
         $a = app(BenchmarkService::class)->score()['sources']['ivan'];
 
-        $this->assertSame(0, $a['full_agree']);
-        $this->assertSame(1, $a['disagree']);
-        $this->assertSame(1, $a['heading_agree']); // heading still matched
+        $this->assertSame(1, $a['agree']);          // heading match → agree
+        $this->assertSame(0, $a['disagree']);
+        $this->assertSame(1, $a['heading_agree']);
+        $this->assertSame(0, $a['full_agree']);     // full 10-digit no longer drives status
     }
 
     public function test_item_without_a_final_code_is_no_code(): void

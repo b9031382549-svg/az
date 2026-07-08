@@ -17,7 +17,8 @@ class BenchmarkPageTest extends TestCase
     public function test_page_renders_and_filters(): void
     {
         GoldLabel::create(['source' => 'ivan', 'name' => 'Kateter', 'name_key' => GoldLabel::keyFor('Kateter'), 'code' => '9018390000', 'heading' => '9018', 'is_service' => false]);
-        ClassificationItem::create(['batch' => 'b', 'source_text' => 'Kateter', 'source_hash' => 'h', 'final_code' => '9018319000', 'kind' => 'good', 'resolution' => 'conflict']);
+        // Our answer is a 4-digit heading that DIFFERS from Ivan's heading → a disagreement.
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'Kateter', 'source_hash' => 'h', 'final_code' => '8471', 'kind' => 'good', 'resolution' => 'agreed']);
 
         Livewire::actingAs(User::factory()->create())
             ->test(Benchmark::class)

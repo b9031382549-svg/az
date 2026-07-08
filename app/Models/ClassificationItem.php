@@ -61,10 +61,26 @@ class ClassificationItem extends Model
             ->all();
     }
 
-    /** Confidence of the mechanism result backing the final code, if any. */
+    /**
+     * Confidence backing the final code. An exact match wins (cache/search rows carry
+     * the 4-digit heading verbatim); otherwise, since the answer is a 4-digit heading
+     * that no vector/broker 10-digit row equals exactly, fall back to the strongest
+     * mechanism whose code sits under that heading.
+     */
     public function finalConfidence(): ?float
     {
-        return $this->results->firstWhere('matched_code', $this->final_code)?->confidence;
+        if ($this->final_code === null || $this->final_code === '') {
+            return null;
+        }
+
+        $exact = $this->results->firstWhere('matched_code', $this->final_code)?->confidence;
+        if ($exact !== null) {
+            return $exact;
+        }
+
+        return $this->results
+            ->filter(fn ($r) => $r->matched_code !== null && str_starts_with((string) $r->matched_code, (string) $this->final_code))
+            ->max('confidence');
     }
 
     /** Cached display translation of this item's name, keyed by source_hash. */

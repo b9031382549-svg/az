@@ -23,13 +23,13 @@ class ReviewQueue extends Component
     use WithPagination;
 
     /** Resolutions that still need a human ("open"). */
-    private const OPEN = ['review', 'conflict', 'blocked_on_fact'];
+    private const OPEN = ['conflict', 'blocked_on_fact'];
 
     /** Terminal decisions that hold at any code granularity (kept in the 4-digit view). */
     private const HUMAN_DECIDED = ['confirmed', 'rejected', 'blocked_on_fact'];
 
-    /** Resolutions a bulk reject may target (not yet human-decided, not no_match). */
-    private const ACTIONABLE = ['agreed', 'review', 'conflict', 'blocked_on_fact'];
+    /** Resolutions a bulk reject may target (auto-resolved but not yet human-decided). */
+    private const ACTIONABLE = ['agreed', 'ai_resolved', 'conflict', 'blocked_on_fact'];
 
     /** Resolution display metadata for the report donut + legend. */
     private const RESOLUTION_META = [
@@ -37,7 +37,6 @@ class ReviewQueue extends Component
         // answer, via consensus or the web-search resolver).
         'found' => ['label' => 'Found', 'color' => '#3f6b4f'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
-        'review' => ['label' => 'Review', 'color' => '#c2872b'],
         'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
         'blocked_on_fact' => ['label' => 'Blocked (fact)', 'color' => '#7c5cbf'],
         'no_match' => ['label' => 'No match', 'color' => '#9a9183'],
@@ -89,6 +88,21 @@ class ReviewQueue extends Component
             return;
         }
 
+        // Confirm-as-is: the reviewer accepted the item's own answer. Today that answer
+        // is a 4-digit HS heading (or the bare "99" service level) with no exact 10-digit
+        // catalog leaf, so keep final_code/final_catalog_id/kind untouched — a CatalogCode
+        // is only required when CORRECTING to a different, real 10-digit code below.
+        if ($code === (string) $item->final_code) {
+            $item->update([
+                'resolution' => 'confirmed',
+                'confirmed_by' => auth()->id(),
+                'confirmed_at' => now(),
+            ]);
+            Audit::log('classification.confirm', ['id' => $id, 'code' => $code], $item);
+
+            return;
+        }
+
         if (! in_array($code, $item->allowedCodes(), true)) {
             return;
         }
@@ -129,7 +143,7 @@ class ReviewQueue extends Component
         }
 
         $updated = ClassificationItem::where('batch', $this->batch)
-            ->whereIn('resolution', ['agreed', 'review'])
+            ->whereIn('resolution', ['agreed', 'ai_resolved'])
             ->update([
                 'resolution' => 'confirmed',
                 'confirmed_by' => auth()->id(),
@@ -180,7 +194,7 @@ class ReviewQueue extends Component
         $scoped = fn () => ClassificationItem::query()
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
-        $q = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
+        $q = $scoped()->with(['finalCode', 'translation', 'results']);
         match ($this->filter) {
             'found' => $q->whereIn('resolution', ['agreed', 'ai_resolved']),
             'open' => $q->whereIn('resolution', self::OPEN),
@@ -201,8 +215,7 @@ class ReviewQueue extends Component
         $codes = $items->getCollection()
             ->flatMap(fn ($item) => $item->results
                 ->flatMap(fn ($r) => collect($r->candidates ?? [])->pluck('code')->push($r->matched_code))
-                ->push($item->final_code)
-                ->push($item->adjudications->sortByDesc('id')->first()?->winning_code))
+                ->push($item->final_code))
             ->filter()
             ->map(fn ($c) => (string) $c)
             ->unique()
@@ -299,12 +312,10 @@ class ReviewQueue extends Component
      */
     private function virtualResolutions(int $n): array
     {
-        $resolved = fn ($a) => $a->where('verdict', 'resolved');
         $items = ClassificationItem::query()
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch))
             ->where('resolution', '!=', 'pending')
-            ->withCount(['adjudications', 'adjudications as resolved_adj_count' => $resolved])
-            ->get(['id', 'resolution', 'final_code', 'adjudicated_at']);
+            ->get(['id', 'resolution', 'final_code']);
 
         // Mechanism codes, to test 4-digit convergence for the still-open items. Count
         // ONLY the authoritative voting mechanisms (same filter Consensus uses) — the
@@ -327,18 +338,11 @@ class ReviewQueue extends Component
 
                 continue;
             }
-            // Already RESOLVED (consensus/judge produced a code — including a heading or
-            // "99" service level) or the judge PROPOSED one: it stays found at any
-            // granularity. Heading mode must NOT re-open it as a conflict from the raw
-            // mechanism spread — that was the "42 conflicts" bug.
-            if (($it->final_code !== null && $it->final_code !== '') || $it->resolved_adj_count > 0) {
+            // Already RESOLVED (cache / consensus / web-search produced a 4-digit heading
+            // or the "99" service level): it stays found (converge). The widget must NOT
+            // re-open it as a conflict from the raw mechanism spread — the "42 conflicts" bug.
+            if ($it->final_code !== null && $it->final_code !== '') {
                 $map[$it->id] = 'agreed';
-
-                continue;
-            }
-            // Judge dispatched but no verdict yet → waiting (mirrors full mode).
-            if ($it->adjudicated_at !== null && (int) $it->adjudications_count === 0) {
-                $map[$it->id] = 'waiting';
 
                 continue;
             }
