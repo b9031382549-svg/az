@@ -2,7 +2,6 @@
 
 namespace App\Services\Classify;
 
-use App\Jobs\AdjudicateItemJob;
 use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
 use Illuminate\Support\Collection;
@@ -10,15 +9,16 @@ use Illuminate\Support\Collection;
 /**
  * Reconciles the per-mechanism results of one item into a parent resolution.
  *
- * Policy: MAJORITY vote — a code auto-resolves when at least 2 independent
- * mechanisms agree on it (2-of-3, or unanimity when only 2 run); it tolerates one
- * dissenter/hallucination. Without a 2-vote majority the item goes to a human.
+ * Policy: our answer is the 4-digit HEADING. An item auto-resolves when at least 2 of
+ * the 3 mechanisms (vector / broker / direct) land on the same first 4 characters —
+ * that heading is taken as correct. Short of a 2-mechanism agreement the heading is
+ * undecided and the item is a `conflict`, handed to the next stage of the flow (TBD).
+ * There is no AI judge in this flow (removed for now).
  *
  * resolution vocabulary:
  *   pending          — not every enabled mechanism has reported yet
- *   agreed           — a MAJORITY (>=2) returned the same code AND those are confident (auto)
- *   review           — a majority agreed on a code but at least one of them is not confident
- *   conflict         — no code reached a 2-mechanism majority (all divergent, or a lone code among abstentions)
+ *   agreed           — >=2 mechanisms share the same 4-digit heading (auto, confident)
+ *   conflict         — no heading reached a 2-mechanism agreement (divergent / too few)
  *   no_match         — no mechanism produced a code
  *   confirmed/rejected — set by a human in the review queue (never overwritten here)
  *   blocked_on_fact  — set by the broker mechanism (Phase 7)
@@ -59,62 +59,6 @@ class Consensus
         }
 
         $item->update($this->resolve($authResults));
-
-        $this->maybeAdjudicate($item);
-    }
-
-    /**
-     * Hand a DIVERGENT item (conflict / low-confidence review) to the AI
-     * adjudicator — a side effect kept out of the pure resolve(). Dispatched at
-     * most once per item: finalize() runs on every mechanism completion and on the
-     * failed() path, so the adjudicated_at atomic claim is the single-fire guard.
-     */
-    private function maybeAdjudicate(ClassificationItem $item): void
-    {
-        $cfg = (array) config('classify.adjudicator');
-        if (! ($cfg['enabled'] ?? false)) {
-            return;
-        }
-        if (! in_array($item->resolution, (array) ($cfg['scope'] ?? ['review', 'conflict']), true)) {
-            return;
-        }
-
-        // Genuinely underdetermined: a mechanism ABSTAINED and the ones that DID place
-        // a code disagree across CHAPTERS — three methods could not converge on a
-        // section. WITHOUT web search the arbiter could only pick a least-wrong code
-        // from that shared premise, so it goes straight to a human. WITH web search
-        // (a `:online` model) the arbiter has an INDEPENDENT premise — it looks the
-        // item up — so let it try; it still returns "uncertain" when the search
-        // doesn't settle it, and stability/holdout guards remain.
-        $arbiterCanSearch = str_contains((string) ($cfg['model'] ?? ''), ':online');
-        if ($item->resolution === 'conflict' && ! $arbiterCanSearch && $this->tooUncertainToAdjudicate($item)) {
-            return;
-        }
-
-        $claimed = ClassificationItem::whereKey($item->id)
-            ->whereNull('adjudicated_at')
-            ->update(['adjudicated_at' => now()]);
-
-        if ($claimed === 1) {
-            AdjudicateItemJob::dispatch($item->id);
-        }
-    }
-
-    /**
-     * A conflict is too uncertain for the adjudicator when at least one mechanism
-     * abstained AND the mechanisms that produced a code span more than one HS chapter
-     * — no independent method could confirm even the section, so a human decides.
-     */
-    private function tooUncertainToAdjudicate(ClassificationItem $item): bool
-    {
-        $results = $item->results()->get();
-        $abstained = $results->contains(fn ($r) => $r->matched_code === null || $r->matched_code === '');
-        $chapters = $results
-            ->filter(fn ($r) => $r->matched_code !== null && $r->matched_code !== '')
-            ->map(fn ($r) => mb_substr((string) $r->matched_code, 0, 2))
-            ->unique();
-
-        return $abstained && $chapters->count() > 1;
     }
 
     /**
@@ -133,27 +77,30 @@ class Consensus
             return ['resolution' => 'no_match'] + $none;
         }
 
-        // MAJORITY vote by exact code: the winning code needs a strict majority of the
-        // mechanisms that RAN — 1-of-1, 2-of-2, 2-of-3. Abstentions still count toward
-        // the denominator (a lone code among abstentions is NOT a majority). Anything
-        // short of a majority — all divergent, or too few agreeing — is a genuine
-        // disagreement and goes to a human. A 3-way majority tolerates ONE dissenter
-        // (e.g. a single mechanism's hallucination).
+        // Agreement is measured on the 4-digit HEADING, not the full code: group the
+        // mechanisms by the first 4 characters of their code and take the largest group.
+        // It wins with a strict MAJORITY of the mechanisms that ran — for the 3-mechanism
+        // flow that is exactly "2 of 3" (abstentions count toward the denominator, so a
+        // lone code among abstentions is not a majority). Anything short → conflict.
         $threshold = intdiv($results->count(), 2) + 1;
-        $winner = $coded->groupBy('matched_code')->sortByDesc(fn ($g) => $g->count())->first();
+        $winner = $coded
+            ->groupBy(fn ($r) => mb_substr((string) $r->matched_code, 0, 4))
+            ->sortByDesc(fn ($g) => $g->count())
+            ->first();
 
         if ($winner->count() < $threshold) {
             return ['resolution' => 'conflict'] + $none;
         }
 
-        $rep = $winner->first();
-        $allConfident = $winner->every(fn ($r) => $r->status === 'auto_confirmed');
+        // The answer is the shared heading itself (4 digits) — not any one mechanism's
+        // deeper code, which we no longer chase.
+        $heading = mb_substr((string) $winner->first()->matched_code, 0, 4);
 
         return [
-            'resolution' => $allConfident ? 'agreed' : 'review',
-            'final_code' => $rep->matched_code,
-            'final_catalog_id' => $rep->catalog_id,
-            'kind' => $rep->kind,
+            'resolution' => 'agreed',
+            'final_code' => $heading,
+            'final_catalog_id' => null,
+            'kind' => $winner->first()->kind,
         ];
     }
 }

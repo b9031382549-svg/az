@@ -6,10 +6,8 @@ use App\Jobs\AdjudicateItemJob;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Services\Classify\AdjudicatorService;
-use App\Services\Classify\Consensus;
 use App\Services\Llm\OpenRouterClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
 use Mockery;
 use Tests\TestCase;
 
@@ -269,69 +267,5 @@ class AdjudicatorTest extends TestCase
         (new AdjudicateItemJob($item->id))->handle(app(AdjudicatorService::class));
 
         $this->assertSame('conflict', $item->refresh()->resolution);
-    }
-
-    public function test_consensus_dispatches_adjudicator_on_conflict_when_enabled(): void
-    {
-        Bus::fake();
-        config()->set('classify.adjudicator.enabled', true);
-        $item = $this->divergentItem('pending'); // resolve() will compute conflict
-
-        app(Consensus::class)->finalize($item);
-
-        $this->assertSame('conflict', $item->refresh()->resolution);
-        $this->assertNotNull($item->adjudicated_at);
-        Bus::assertDispatched(AdjudicateItemJob::class);
-    }
-
-    public function test_consensus_does_not_dispatch_when_disabled(): void
-    {
-        Bus::fake();
-        config()->set('classify.adjudicator.enabled', false);
-        $item = $this->divergentItem('pending');
-
-        app(Consensus::class)->finalize($item);
-
-        Bus::assertNotDispatched(AdjudicateItemJob::class);
-        $this->assertNull($item->refresh()->adjudicated_at);
-    }
-
-    /** @return ClassificationItem an abstention + cross-chapter (85 vs 94) conflict */
-    private function underdeterminedItem(): ClassificationItem
-    {
-        $item = ClassificationItem::create(['batch' => 't', 'source_text' => 'Elektirov 4lük', 'source_hash' => 'u1', 'resolution' => 'pending']);
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8539299200', 'kind' => 'good', 'status' => 'auto_confirmed']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9405401000', 'kind' => 'good', 'status' => 'auto_confirmed']);
-        $item->results()->create(['mechanism' => 'direct', 'matched_code' => null, 'status' => 'no_match']);
-
-        return $item;
-    }
-
-    public function test_underdetermined_conflict_skips_a_non_searching_adjudicator(): void
-    {
-        Bus::fake();
-        config()->set('classify.adjudicator.enabled', true);
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
-        config()->set('classify.adjudicator.model', 'openai/gpt-oss-120b'); // no web search
-
-        // Abstention + cross-chapter (85 vs 94) and no web search → straight to a human.
-        app(Consensus::class)->finalize($this->underdeterminedItem());
-
-        Bus::assertNotDispatched(AdjudicateItemJob::class);
-    }
-
-    public function test_web_search_adjudicator_still_tries_an_underdetermined_conflict(): void
-    {
-        Bus::fake();
-        config()->set('classify.adjudicator.enabled', true);
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
-        config()->set('classify.adjudicator.model', 'openai/gpt-oss-120b:online'); // web search
-
-        // With web search the arbiter has an independent premise, so it gets to try.
-        $item = $this->underdeterminedItem();
-        app(Consensus::class)->finalize($item);
-
-        $this->assertNotNull($item->refresh()->adjudicated_at);
-        Bus::assertDispatched(AdjudicateItemJob::class);
     }
 }

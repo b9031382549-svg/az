@@ -8,14 +8,12 @@ use App\Support\LlmLog;
 use Throwable;
 
 /**
- * A third, independent path: a reasoning model that IDENTIFIES the item — using web
- * search for unfamiliar brands/drugs/products (the model runs with OpenRouter's
- * `:online` suffix) — then returns a single 10-digit XİF MN code + a short reason,
- * or abstains ("code": null) when even a search cannot tell what it is. A genuinely
- * different METHOD from vector-retrieval and broker-descent (it can reach knowledge
- * neither has), so its vote is independent in the consensus. A returned code is
- * trusted only if it actually exists in the catalog (the model may cite a
- * plausible-but-nonexistent code).
+ * A third, independent path: a reasoning model that IDENTIFIES the item from its own
+ * knowledge (NO web search), then returns a single 10-digit XİF MN code + a short
+ * reason, or abstains ("code": null) when it cannot tell what the item is. A genuinely
+ * different METHOD from vector-retrieval and broker-descent, so its vote is independent
+ * in the 2-of-3 heading consensus. A returned code is trusted only if it actually
+ * exists in the catalog (the model may cite a plausible-but-nonexistent code).
  */
 final class DirectLlmMechanism implements ClassifierMechanism
 {
@@ -29,7 +27,7 @@ final class DirectLlmMechanism implements ClassifierMechanism
     public function classify(string $text): MechanismResult
     {
         $text = trim($text);
-        $model = (string) config('classify.direct.model', 'deepseek/deepseek-v4-flash:online');
+        $model = (string) config('classify.direct.model', 'openai/gpt-oss-120b');
         if ($text === '') {
             return new MechanismResult(null, null, null, null, 'error', explanation: 'Empty item.', model: $model);
         }
@@ -169,12 +167,11 @@ final class DirectLlmMechanism implements ClassifierMechanism
           no action, stays a GOOD. Settle this before choosing a code.
         - The text is Azerbaijani and often noisy (brands, sizes, transliteration,
           dropped diacritics). For a good, read the head-noun; ignore size noise.
-        - If the item is an UNFAMILIAR brand, drug, or product name, USE WEB SEARCH to
-          find what it is (its category, active ingredient, material) before coding it.
-          Prefer the real identification over a guess.
-        - Only if even a web search cannot tell what it is (truly garbled token, or a
-          bare brand with no discoverable product), return "code": null. Do NOT invent
-          a code for an unintelligible item.
+        - Identify the item from your OWN knowledge — its category, active ingredient,
+          material. If a brand is familiar, use what you know it is; do not guess wildly.
+        - Only if you genuinely cannot tell what it is (truly garbled token, or a bare
+          brand you do not recognise), return "code": null. Do NOT invent a code for an
+          unintelligible item.
         - Give a FULL 10-digit code, digits only.
 
         Respond with strict JSON only (no extra keys):

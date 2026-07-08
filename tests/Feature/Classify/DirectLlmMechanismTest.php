@@ -40,7 +40,7 @@ class DirectLlmMechanismTest extends TestCase
         $this->assertSame('9018390000', $r->matchedCode);
         $this->assertSame('good', $r->kind);
         $this->assertSame('auto_confirmed', $r->status);
-        $this->assertSame('deepseek/deepseek-v4-flash:online', $r->model);
+        $this->assertSame('openai/gpt-oss-120b', $r->model); // search-free direct model
     }
 
     public function test_captures_web_search_sources_into_the_reason(): void
