@@ -52,7 +52,7 @@ class ClassifyMechanismJobTest extends TestCase
             'classification_item_id' => $item->id, 'mechanism' => 'fake', 'matched_code' => '8471300000',
         ]);
         $this->assertSame('agreed', $item->fresh()->resolution);
-        $this->assertSame('8471300000', $item->fresh()->final_code);
+        $this->assertSame('8471', $item->fresh()->final_code); // resolved at the 4-digit heading
     }
 
     public function test_failed_records_abstaining_error_and_unblocks(): void

@@ -1,0 +1,442 @@
+<title>How the Invoice AI Works — Flow & Details</title>
+<style>
+  body{margin:0;background:#FAF9F6;color:#1C2733;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 16px 60px}
+  h1{font-family:Charter,Georgia,serif;font-size:1.9rem;margin:0 0 4px;text-wrap:balance}
+  h2{font-family:Charter,Georgia,serif;font-size:1.5rem;margin:0 0 10px;text-wrap:balance}
+  h3{font-size:1.08rem;margin:0 0 6px}
+  .sub{color:#5C6862;font-size:.95rem;margin:0 0 18px}
+  svg{width:100%;height:auto;display:block}
+  svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .mono{font-variant-numeric:tabular-nums}
+  .page{margin-top:64px;padding-top:34px;border-top:3px double #D8D5CC}
+  .pageno{display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:#0C6E5E;background:#E3EEEB;border-radius:20px;padding:4px 14px;margin-bottom:12px}
+  .card{background:#FFFFFF;border:1px solid #E4E2DB;border-radius:10px;padding:18px 22px;margin:0 0 16px}
+  .card.human{border-color:#E0BFB4}
+  .card .n{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;
+    background:#0C6E5E;color:#fff;font-weight:700;margin-right:10px;font-size:.95rem}
+  .card.human .n{background:#B3402A}
+  .card p{margin:.5em 0;font-size:.95rem}
+  .card .io{font-size:.85rem;color:#5C6862;background:#F4F3EE;border-radius:6px;padding:8px 12px;margin-top:10px}
+  .card .io b{color:#1C2733}
+  .fact{display:inline-block;font-size:.8rem;font-weight:600;color:#0C6E5E;background:#E3EEEB;border-radius:20px;
+    padding:2px 12px;margin:6px 6px 0 0}
+  .card.human .fact{color:#B3402A;background:#F6E7E2}
+  .ex{border-left:4px solid #0C6E5E;background:#FFFFFF;border-radius:0 8px 8px 0;padding:10px 16px;margin:12px 0;
+    font-size:.92rem;border-top:1px solid #E4E2DB;border-right:1px solid #E4E2DB;border-bottom:1px solid #E4E2DB}
+  .ex .code{font-family:ui-monospace,Menlo,monospace;background:#E3EEEB;color:#0C6E5E;border-radius:5px;padding:1px 7px}
+  .chips-flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+  .chips-flow .c{background:#FFFFFF;border:1.5px solid #0C6E5E;border-radius:8px;padding:9px 14px;font-size:.87rem;font-weight:600}
+  .chips-flow .arr{color:#0C6E5E;font-weight:700}
+  .chips-flow .c.red{border-color:#B3402A;color:#B3402A}
+  .note{background:#F3EDDD;border:1px solid #E5D9B8;border-radius:8px;padding:12px 16px;font-size:.9rem;color:#5C4E1E;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.92rem}
+  th{text-align:left;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:#5C6862;border-bottom:2px solid #1C2733;padding:7px 10px}
+  td{border-bottom:1px solid #E4E2DB;padding:8px 10px;vertical-align:top}
+  td.num{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;color:#0C6E5E;font-weight:600;white-space:nowrap}
+  .layers{margin:18px 0 6px}
+  .layer{margin-bottom:14px}
+  .layer .bar{height:30px;border-radius:6px;display:flex;align-items:center;padding:0 12px;color:#fff;
+    font-size:.85rem;font-weight:700;white-space:nowrap;min-width:52px}
+  .layer small{color:#5C6862;display:block;margin-top:4px;font-size:.85rem;max-width:66ch}
+  @media print{.page{break-before:page;margin-top:0;border-top:none} body{background:#fff}}
+</style>
+
+<div class="wrap">
+
+<!-- ===================== PAGE 1 — THE DIAGRAM ===================== -->
+<h1>One million invoice lines — where they flow, and the loop that makes it smarter</h1>
+<p class="sub">Volumes are illustrative for 1,000,000 lines at today’s measured rates. Teal = automatic · Green = answered · Red = human · Gold dashes = the self-learning loop. Pages 2–5 explain every step in detail.</p>
+
+<svg viewBox="0 0 1280 1330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flow diagram: one million invoice lines pass through six stations; answers loop back into memory">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0C6E5E"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6D1F"/>
+    </marker>
+  </defs>
+  <rect x="60" y="26" width="430" height="66" rx="33" fill="#1C2733"/>
+  <text x="275" y="58" text-anchor="middle" fill="#FFFFFF" font-size="24" font-weight="700" class="mono">1,000,000 invoice lines</text>
+  <text x="275" y="80" text-anchor="middle" fill="#B9C2BD" font-size="14">every month</text>
+  <line x1="275" y1="92" x2="275" y2="140" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <rect x="60" y="150" width="430" height="104" rx="10" fill="#FFFFFF" stroke="#0C6E5E" stroke-width="2.5"/>
+  <circle cx="102" cy="202" r="22" fill="#0C6E5E"/><text x="102" y="210" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">1</text>
+  <text x="140" y="196" font-size="24" font-weight="700">MEMORY</text>
+  <text x="140" y="226" font-size="15.5" fill="#5C6862">seen &amp; confirmed before? → answered instantly, $0</text>
+  <line x1="490" y1="202" x2="770" y2="202" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="630" y="190" text-anchor="middle" font-size="15" fill="#0C6E5E" font-weight="600" class="mono">seen before · ~350,000</text>
+  <rect x="780" y="150" width="330" height="104" rx="10" fill="#E3EEEB" stroke="#0C6E5E" stroke-width="2"/>
+  <text x="945" y="196" text-anchor="middle" font-size="21" font-weight="700" fill="#0C6E5E">✓ ANSWERED</text>
+  <text x="945" y="224" text-anchor="middle" font-size="15" fill="#3E5A52">instant, zero cost</text>
+  <line x1="275" y1="254" x2="275" y2="316" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="292" y="292" font-size="15" fill="#5C6862" class="mono">new names · ~650,000</text>
+  <rect x="60" y="326" width="430" height="104" rx="10" fill="#FFFFFF" stroke="#0C6E5E" stroke-width="2.5"/>
+  <circle cx="102" cy="378" r="22" fill="#0C6E5E"/><text x="102" y="386" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">2</text>
+  <text x="140" y="372" font-size="24" font-weight="700">SERVICE CHECK</text>
+  <text x="140" y="402" font-size="15.5" fill="#5C6862">transport, rent, repairs, utilities → no code needed</text>
+  <line x1="490" y1="378" x2="770" y2="378" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="630" y="366" text-anchor="middle" font-size="15" fill="#0C6E5E" font-weight="600" class="mono">services · ~100,000</text>
+  <rect x="780" y="326" width="330" height="104" rx="10" fill="#E3EEEB" stroke="#0C6E5E" stroke-width="2"/>
+  <text x="945" y="372" text-anchor="middle" font-size="21" font-weight="700" fill="#0C6E5E">✓ “SERVICE”</text>
+  <text x="945" y="400" text-anchor="middle" font-size="15" fill="#3E5A52">99%+ reliable</text>
+  <line x1="275" y1="430" x2="275" y2="492" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="292" y="468" font-size="15" fill="#5C6862" class="mono">goods · ~550,000</text>
+  <rect x="60" y="502" width="430" height="104" rx="10" fill="#FFFFFF" stroke="#0C6E5E" stroke-width="2.5"/>
+  <circle cx="102" cy="554" r="22" fill="#0C6E5E"/><text x="102" y="562" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">3</text>
+  <text x="140" y="548" font-size="24" font-weight="700">LOCAL AI</text>
+  <text x="140" y="578" font-size="15.5" fill="#5C6862">reads the name, proposes a code — on your hardware</text>
+  <line x1="275" y1="606" x2="275" y2="668" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="292" y="644" font-size="15" fill="#5C6862">proposal + written justification</text>
+  <rect x="60" y="678" width="430" height="104" rx="10" fill="#FFFFFF" stroke="#0C6E5E" stroke-width="2.5"/>
+  <circle cx="102" cy="730" r="22" fill="#0C6E5E"/><text x="102" y="738" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">4</text>
+  <text x="140" y="724" font-size="24" font-weight="700">AGREEMENT GATE</text>
+  <text x="140" y="754" font-size="15.5" fill="#5C6862">released only if an independent opinion agrees</text>
+  <line x1="490" y1="730" x2="770" y2="730" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="630" y="718" text-anchor="middle" font-size="15" fill="#0C6E5E" font-weight="600" class="mono">two agree · ~350,000</text>
+  <rect x="780" y="678" width="330" height="104" rx="10" fill="#E3EEEB" stroke="#0C6E5E" stroke-width="2"/>
+  <text x="945" y="724" text-anchor="middle" font-size="21" font-weight="700" fill="#0C6E5E">✓ ANSWERED</text>
+  <text x="945" y="752" text-anchor="middle" font-size="15" fill="#3E5A52">≥95% correct, guaranteed by agreement</text>
+  <line x1="275" y1="782" x2="275" y2="844" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="292" y="820" font-size="15" fill="#5C6862" class="mono">opinions differ · ~200,000</text>
+  <rect x="60" y="854" width="430" height="104" rx="10" fill="#FFFFFF" stroke="#0C6E5E" stroke-width="2.5"/>
+  <circle cx="102" cy="906" r="22" fill="#0C6E5E"/><text x="102" y="914" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">5</text>
+  <text x="140" y="900" font-size="24" font-weight="700">WEB RESEARCH</text>
+  <text x="140" y="930" font-size="15.5" fill="#5C6862">finds what the product really is — must cite evidence</text>
+  <line x1="490" y1="906" x2="770" y2="906" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="630" y="894" text-anchor="middle" font-size="15" fill="#0C6E5E" font-weight="600" class="mono">evidence found · ~175,000</text>
+  <rect x="780" y="854" width="330" height="104" rx="10" fill="#E3EEEB" stroke="#0C6E5E" stroke-width="2"/>
+  <text x="945" y="900" text-anchor="middle" font-size="21" font-weight="700" fill="#0C6E5E">✓ ANSWERED</text>
+  <text x="945" y="928" text-anchor="middle" font-size="15" fill="#3E5A52">with the source attached</text>
+  <line x1="275" y1="958" x2="275" y2="1020" stroke="#0C6E5E" stroke-width="3" marker-end="url(#a)"/>
+  <text x="292" y="996" font-size="15" fill="#5C6862" class="mono">no evidence · ~25,000</text>
+  <rect x="60" y="1030" width="430" height="104" rx="10" fill="#FFFFFF" stroke="#B3402A" stroke-width="2.5"/>
+  <circle cx="102" cy="1082" r="22" fill="#B3402A"/><text x="102" y="1090" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">6</text>
+  <text x="140" y="1076" font-size="24" font-weight="700">HUMAN EXPERT</text>
+  <text x="140" y="1106" font-size="15.5" fill="#5C6862">gets a pre-written question — answers in seconds</text>
+  <line x1="490" y1="1082" x2="770" y2="1082" stroke="#B3402A" stroke-width="3" marker-end="url(#a)"/>
+  <text x="630" y="1070" text-anchor="middle" font-size="15" fill="#B3402A" font-weight="600" class="mono">decided · ~25,000 (2.5%)</text>
+  <rect x="780" y="1030" width="330" height="104" rx="10" fill="#F6E7E2" stroke="#B3402A" stroke-width="2"/>
+  <text x="945" y="1076" text-anchor="middle" font-size="21" font-weight="700" fill="#B3402A">✓ ANSWERED</text>
+  <text x="945" y="1104" text-anchor="middle" font-size="15" fill="#7A4A3C">remembered forever — never asked twice</text>
+  <line x1="1145" y1="202" x2="1145" y2="1082" stroke="#8A6D1F" stroke-width="3" stroke-dasharray="9 7"/>
+  <line x1="1110" y1="202" x2="1145" y2="202" stroke="#8A6D1F" stroke-width="3" stroke-dasharray="9 7"/>
+  <line x1="1110" y1="378" x2="1145" y2="378" stroke="#8A6D1F" stroke-width="3" stroke-dasharray="9 7"/>
+  <line x1="1110" y1="730" x2="1145" y2="730" stroke="#8A6D1F" stroke-width="3" stroke-dasharray="9 7"/>
+  <line x1="1110" y1="906" x2="1145" y2="906" stroke="#8A6D1F" stroke-width="3" stroke-dasharray="9 7"/>
+  <line x1="1110" y1="1082" x2="1145" y2="1082" stroke="#8A6D1F" stroke-width="3" stroke-dasharray="9 7"/>
+  <path d="M 1145 202 C 1145 70, 950 44, 500 118" fill="none" stroke="#8A6D1F" stroke-width="3.5" stroke-dasharray="9 7" marker-end="url(#g)"/>
+  <text x="850" y="36" text-anchor="middle" font-size="17" font-weight="700" fill="#8A6D1F">SELF-LEARNING LOOP</text>
+  <text x="850" y="58" text-anchor="middle" font-size="14.5" fill="#8A6D1F">every confirmed answer flows back into MEMORY → next month, fewer lines need AI, research or people</text>
+  <rect x="60" y="1180" width="1050" height="110" rx="10" fill="#1C2733"/>
+  <text x="90" y="1226" font-size="19" font-weight="700" fill="#FFFFFF">The result: 1,000,000 in → 1,000,000 honestly answered.</text>
+  <text x="90" y="1258" font-size="15.5" fill="#B9C2BD">~97.5% fully automatic at ≥95% accuracy · ~2.5% decided by people · zero guesses anywhere —</text>
+  <text x="90" y="1280" font-size="15.5" fill="#B9C2BD">and the gold arrow keeps shrinking the expensive part, month after month.</text>
+</svg>
+
+<!-- ===================== PAGE 2 — THE SIX STATIONS ===================== -->
+<div class="page">
+  <span class="pageno">Page 2 · The six stations, in detail</span>
+  <h2>What actually happens inside each box</h2>
+
+  <div class="card">
+    <h3><span class="n">1</span>MEMORY — the confirmed-answer store</h3>
+    <p>Before any AI runs, the line is checked against everything the system has ever answered <i>and had
+    confirmed</i>. The lookup ignores cosmetic differences — spacing, capitalisation, punctuation — so
+    “Coca-Cola 1L” and “COCA COLA 1 L” hit the same record.</p>
+    <p>Where memory entries come from: answers confirmed by the agreement gate, research results with
+    citations, human decisions, and the double-verified reference set. Memory only ever contains
+    <b>confirmed</b> knowledge — a plain guess can never enter it.</p>
+    <div class="io"><b>In:</b> raw product name · <b>Out:</b> the confirmed code, instantly — or “not seen, pass on”</div>
+    <span class="fact">zero cost</span><span class="fact">instant</span><span class="fact">grows every day</span>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">2</span>SERVICE CHECK — goods or not?</h3>
+    <p>Invoices are full of lines that are not products at all: transport fees, rent, repair works,
+    utility bills, subscription charges, even letter references and dates. These must get <b>no</b>
+    commodity code. A dedicated detector — patterns and vocabulary tuned on your real invoices, plus the
+    AI’s own judgement — separates them out with over 99% reliability.</p>
+    <div class="io"><b>In:</b> unseen line · <b>Out:</b> “Service” (done) — or “this is a good, continue”</div>
+    <span class="fact">99%+ measured</span><span class="fact">protects everything downstream</span>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">3</span>LOCAL AI — the reader</h3>
+    <p>A compact language model that we <b>trained specifically on this task</b>, using thousands of worked
+    examples with written reasoning, built from your own invoice data. It decodes what a line actually
+    means — brands, Azerbaijani and Russian words, transliterations, abbreviations, size codes — decides
+    what the real product is, and proposes the 4-digit code <i>with a short written justification</i>.</p>
+    <p>It runs entirely on your own hardware. One line takes about a second; many copies run side by side
+    for volume. No product name leaves the building at this step.</p>
+    <div class="io"><b>In:</b> product name · <b>Out:</b> proposed code + one-paragraph justification</div>
+    <span class="fact">~83% correct alone — before the safety layers</span><span class="fact">runs on your servers</span>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">4</span>AGREEMENT GATE — the certainty test</h3>
+    <p>The key discovery of this project: an AI’s own “confidence” is worthless — models feel equally sure
+    when right and when wrong. What actually predicts correctness is <b>agreement between independent
+    opinions</b>. So the proposal from step 3 is checked against opinions that were formed differently:</p>
+    <p>· the <b>similarity search</b> — do the nearest already-confirmed products carry the same code?
+    (page 3 explains how) <br>· a <b>second AI</b> of a different design, reasoning from scratch.</p>
+    <p>All agree → the answer is released; measured <b>≥95% correct on everything released this way, with
+    zero service/product mix-ups</b>. Any disagreement → the line is escalated, never guessed.</p>
+    <div class="io"><b>In:</b> proposal + independent opinions · <b>Out:</b> released answer — or escalation</div>
+    <span class="fact">≥95% on released answers</span><span class="fact">0 wrong-type leaks measured</span>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">5</span>WEB RESEARCH — the evidence hunt</h3>
+    <p>Runs only for the minority the models disagree on — typically cryptic brand names. The system
+    searches the open web for what the product really is and may resolve the line <b>only if it can cite
+    the evidence</b>. No citation — no answer. Page 4 walks through the process with real cases.</p>
+    <div class="io"><b>In:</b> disputed line · <b>Out:</b> answer + source link — or “to human review”</div>
+    <span class="fact">88% of disputes resolved</span><span class="fact">~96% correct</span><span class="fact">every answer cited</span>
+  </div>
+
+  <div class="card human">
+    <h3><span class="n">6</span>HUMAN EXPERT — the honest residue</h3>
+    <p>The few percent that survive every automatic step. The reviewer doesn’t start from zero: each line
+    arrives with the AI’s analysis and a <b>pre-written question</b> that names the exact missing fact —
+    e.g. <i>“Is this cream sold as a cosmetic or as a registered medicine?”</i> One click to answer.</p>
+    <p>The answer is written into MEMORY permanently. <b>The same question is never asked twice.</b></p>
+    <div class="io"><b>In:</b> unresolved line + a targeted question · <b>Out:</b> decision → memory, forever</div>
+    <span class="fact">~2.5% of volume</span><span class="fact">shrinks every month</span>
+  </div>
+</div>
+
+<!-- ===================== PAGE 3 — VECTOR SEARCH DEEP-DIVE ===================== -->
+<div class="page">
+  <span class="pageno">Page 3 · Deep dive — the similarity search (“vectors”)</span>
+  <h2>How the system finds “products like this one”</h2>
+
+  <p>Computers can’t compare meanings — only numbers. So every product name is converted into a
+  <b>meaning fingerprint</b>: a long list of numbers computed by a language model, built so that names
+  with similar <i>meaning</i> get similar numbers — even when the spelling, language or word order is
+  completely different. “Coca-Cola 1L”, “koka kola 0,5”, and “Кока-Кола ПЭТ” land practically on top of
+  each other; a timber board lands far away.</p>
+
+  <svg viewBox="0 0 980 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scatter of product fingerprints: clusters for drinks, timber, detergents; a new item lands inside the drinks cluster">
+    <rect x="10" y="10" width="960" height="340" rx="12" fill="#FFFFFF" stroke="#E4E2DB"/>
+    <!-- drinks cluster -->
+    <circle cx="230" cy="140" r="86" fill="#E3EEEB"/>
+    <circle cx="200" cy="120" r="7" fill="#0C6E5E"/><circle cx="245" cy="150" r="7" fill="#0C6E5E"/>
+    <circle cx="215" cy="175" r="7" fill="#0C6E5E"/><circle cx="265" cy="115" r="7" fill="#0C6E5E"/>
+    <circle cx="185" cy="155" r="7" fill="#0C6E5E"/>
+    <text x="230" y="255" text-anchor="middle" font-size="15" font-weight="700" fill="#0C6E5E">soft drinks · code 2202</text>
+    <!-- timber cluster -->
+    <circle cx="560" cy="220" r="74" fill="#F3EDDD"/>
+    <circle cx="540" cy="200" r="7" fill="#8A6D1F"/><circle cx="580" cy="235" r="7" fill="#8A6D1F"/>
+    <circle cx="555" cy="255" r="7" fill="#8A6D1F"/><circle cx="595" cy="200" r="7" fill="#8A6D1F"/>
+    <text x="560" y="325" text-anchor="middle" font-size="15" font-weight="700" fill="#8A6D1F">timber &amp; boards · 44xx</text>
+    <!-- detergent cluster -->
+    <circle cx="820" cy="120" r="64" fill="#F6E7E2"/>
+    <circle cx="800" cy="105" r="7" fill="#B3402A"/><circle cx="838" cy="130" r="7" fill="#B3402A"/>
+    <circle cx="815" cy="150" r="7" fill="#B3402A"/>
+    <text x="820" y="215" text-anchor="middle" font-size="15" font-weight="700" fill="#B3402A">detergents · 3402</text>
+    <!-- new item -->
+    <path d="M 330 60 l 8 18 20 2 -15 13 5 20 -18 -11 -18 11 5 -20 -15 -13 20 -2 z" fill="#1C2733"/>
+    <text x="365" y="52" font-size="15" font-weight="700" fill="#1C2733">new line: “Sprite 0,33 banka”</text>
+    <line x1="330" y1="85" x2="262" y2="122" stroke="#1C2733" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#a)"/>
+    <text x="490" y="380" text-anchor="middle" font-size="14.5" fill="#5C6862">the new name lands inside the soft-drinks neighbourhood — its confirmed neighbours vote “2202”</text>
+  </svg>
+
+  <p><b>The vote.</b> When a new name arrives, the system finds its nearest neighbours among
+  <i>confirmed</i> products only. If several close neighbours all carry the same code, that is an
+  independent opinion: “everything that means this, is coded this.” If the neighbours disagree, or nothing
+  is close enough, the similarity search honestly abstains — it never votes on weak evidence.</p>
+
+  <p><b>Three jobs, one mechanism:</b></p>
+  <table>
+    <tr><th>Job</th><th>How similarity search does it</th></tr>
+    <tr><td>Second opinion in the agreement gate</td><td>nearest confirmed neighbours vote on the proposed code</td></tr>
+    <tr><td>Collapse duplicates</td><td>“Fairy 450ml”, “FAIRY qabyuyan 0.45” — one family, answered once</td></tr>
+    <tr><td>Route the rare stuff</td><td>a name with <i>no</i> close neighbour is flagged “genuinely new” early</td></tr>
+  </table>
+
+  <div class="note"><b>Why it strengthens itself:</b> the neighbour map is drawn over <i>confirmed</i>
+  answers only. Every month the map gets denser, so more new names land next to solid neighbours — the
+  free layer keeps taking work away from the paid ones. Today the confirmed map holds ~1,300
+  double-verified products and everything the flywheel confirms on top.</div>
+</div>
+
+<!-- ===================== PAGE 4 — RESEARCH DEEP-DIVE ===================== -->
+<div class="page">
+  <span class="pageno">Page 4 · Deep dive — how web research works</span>
+  <h2>What happens when the models disagree</h2>
+
+  <div class="chips-flow">
+    <span class="c">1 · build search queries</span><span class="arr">→</span>
+    <span class="c">2 · read real sources</span><span class="arr">→</span>
+    <span class="c">3 · identify the product</span><span class="arr">→</span>
+    <span class="c">4 · apply the rulebook</span><span class="arr">→</span>
+    <span class="c">5 · answer + citation</span><span class="arr">→</span>
+    <span class="c red">no evidence? → human</span>
+  </div>
+
+  <p><b>1 — Queries.</b> The researcher builds several searches from the line: the brand alone, the brand +
+  product words, transliterations (Azerbaijani ↔ Russian ↔ English), and any model/part numbers.</p>
+  <p><b>2 — Sources.</b> It reads what comes back: manufacturer pages, retailer listings, pharmacy
+  registries, parts catalogues. Marketing pages are treated as identification evidence, not as
+  classification authority.</p>
+  <p><b>3 — Identification.</b> The goal is one sentence: <i>what is this thing, really?</i> This is where
+  names that fooled everything upstream get cracked:</p>
+
+  <div class="ex">“Maqna Nano <b>Carbon Black</b>” — looks like an industrial chemical. A retailer page shows
+  it is a <b>cigarette brand</b> → <span class="code">2402</span>, not the chemical code. The invoice
+  header even said otherwise; the research step caught the truth.</div>
+  <div class="ex">“SARAVOY ALT CBKD-11” — meaningless until the part number matches a
+  <b>lower ball joint for a Chevrolet Lacetti</b> on a parts site → vehicle part
+  <span class="code">8708</span>.</div>
+  <div class="ex">“Caramel 101 C1 43-18-125” — the numbers <i>43-18-125</i> are a standard
+  <b>lens-bridge-temple</b> measurement → <b>eyeglass frames</b> <span class="code">9003</span>, not food.</div>
+
+  <p><b>4 — The rulebook.</b> With the product identified, the code is chosen using the official
+  international classification rules and their explanatory notes (the same book customs officers use) —
+  e.g. a vitamin sold as a food supplement goes to <span class="code">2106</span>, not to medicines;
+  alcohol-free beer goes to soft drinks <span class="code">2202</span>.</p>
+  <p><b>5 — The evidence rule.</b> The step may answer <b>only</b> if it can attach the source it used.
+  No source → the line goes to a human, with everything the research found already written up. Measured on
+  real disputed lines: <b>88% resolved, ~96% of those correct</b>.</p>
+
+  <div class="note"><b>Privacy:</b> this is the only step where a product name is sent outside your
+  infrastructure (as a web search). It can be restricted to approved sources or switched off entirely —
+  those lines then go straight to human review.</div>
+</div>
+
+<!-- ===================== PAGE 5 — MEASUREMENT & LEARNING ===================== -->
+<div class="page">
+  <span class="pageno">Page 5 · How we know the numbers are true — and why it improves</span>
+  <h2>Measurement, the answer key, and the loop</h2>
+
+  <p><b>The answer key.</b> You can’t grade a system without a trusted key. Ours is built from your real
+  invoice data by <b>two unrelated frontier AI systems working independently</b> — one from Anthropic
+  (with web research), one from OpenAI. Only items where <b>both arrive at the same code</b> enter the key;
+  disagreements are excluded and flagged. Today the key holds <b>1,300+ double-verified products</b> and
+  grows in weekly waves, prioritising the most frequent products on your invoices.</p>
+
+  <p><b>The grading discipline.</b> The model being graded never sees the answer key during training —
+  a held-out slice is kept frozen purely for measurement. Every number on these pages comes from grading
+  against that key, and every upgrade is re-measured before it ships. An upgrade that measures worse is
+  rejected (this has already happened once — the measurement caught it).</p>
+
+  <table>
+    <tr><th>What’s measured</th><th>Today</th></tr>
+    <tr><td>Good vs service decision</td><td class="num">99%+</td></tr>
+    <tr><td>Answers released by the agreement gate</td><td class="num">≥95% correct</td></tr>
+    <tr><td>Local AI alone (before safety layers), 4-digit code</td><td class="num">~83%</td></tr>
+    <tr><td>Disputed lines resolved by cited research</td><td class="num">88% at ~96%</td></tr>
+    <tr><td>Double-verified reference products</td><td class="num">1,342 · growing</td></tr>
+  </table>
+
+  <p><b>The loop, concretely.</b> Every confirmed answer does three things at once: joins MEMORY (that
+  exact name never costs again) · joins the similarity map (its whole neighbourhood gets easier) · joins
+  the next training set for the local AI (the reader itself gets smarter). That’s one confirmation
+  improving three different layers — which is why the expensive tail shrinks month after month without
+  anyone maintaining rules by hand.</p>
+
+  <p><b>What makes it stronger next</b> — in order of impact: using the whole invoice line (supplier,
+  price, VAT, unit — not just the name); a second local AI of a different family so even the offline
+  council is fully independent; and calibrating the gate into a formal, auditable ≥95% guarantee.</p>
+</div>
+
+<!-- ===================== PAGE 6 — CURRENT ACCURACY ===================== -->
+<div class="page">
+  <span class="pageno">Page 6 · Current accuracy — the honest scoreboard</span>
+  <h2>What the system measures today</h2>
+
+  <p>Accuracy is reported <b>per level</b>, because each level has different difficulty and value —
+  and per <b>delivery mode</b>, because an answer released by the agreement gate carries a guarantee
+  that a raw model answer does not.</p>
+
+  <table>
+    <tr><th>Level / mode</th><th>Measured today</th><th>Meaning</th></tr>
+    <tr><td><b>Good vs Service</b></td><td class="num">99%+</td>
+        <td>the split is essentially solved; zero service/product mix-ups on released answers</td></tr>
+    <tr><td><b>Product family</b> (2-digit chapter), local AI alone</td><td class="num">81–84%</td>
+        <td>84% on the stable benchmark; 81% on the hardest fully-diverse mix</td></tr>
+    <tr><td><b>Commercial group</b> (4-digit heading), local AI alone</td><td class="num">74–83%</td>
+        <td>83% stable benchmark / 74% hardest mix — <i>before</i> any safety layer</td></tr>
+    <tr><td><b>Released by the agreement gate</b></td><td class="num">95–98%</td>
+        <td>strict mode releases ~22% of brand-new items at ~98%; wide mode ~66% at ~95%</td></tr>
+    <tr><td><b>Evidence research</b> on disputed lines</td><td class="num">88% at ~96%</td>
+        <td>share of disputes resolved, and how often those answers are right — each cited</td></tr>
+    <tr><td><b>Delivered automation today</b></td><td class="num">≈55–80%</td>
+        <td>memory + services + gated answers, at ≥95% accuracy; the rest honestly escalated</td></tr>
+  </table>
+
+  <p><b>How far the reader itself has come</b> — the same test, four generations of engine:</p>
+  <div class="layers">
+    <div class="layer"><div class="bar" style="background:#C9C5B9;width:8%;color:#1C2733">6%</div>
+      <small>an untrained AI, straight out of the box — proof the task is genuinely hard</small></div>
+    <div class="layer"><div class="bar" style="background:#8FA79F;width:49%">49%</div>
+      <small>the previous production engine (pure text-similarity search — no understanding)</small></div>
+    <div class="layer"><div class="bar" style="background:#3E8E7E;width:83%">83%</div>
+      <small>today’s local AI — trained on thousands of worked, reasoned examples from your data</small></div>
+    <div class="layer"><div class="bar" style="background:#0C6E5E;width:96%">95–98%</div>
+      <small>what actually ships: the local AI behind the agreement gate</small></div>
+  </div>
+
+  <p><b>The answer key behind these numbers:</b> <span class="mono">1,342</span> products double-verified
+  by two independent frontier AIs (agreement rate between them: 89–91%), growing in weekly waves that
+  prioritise your highest-volume products; ~600 more are labeled and awaiting their second verification
+  right now. Key caveats we keep on the record: the key is AI-verified pending a customs-expert
+  spot-check, and small samples carry a few points of statistical noise — we treat 2-point differences
+  as noise, not news.</p>
+</div>
+
+<!-- ===================== PAGE 7 — BUILT vs TO BUILD ===================== -->
+<div class="page">
+  <span class="pageno">Page 7 · What exists — and what we build next</span>
+  <h2>Built, running, and next</h2>
+
+  <h3 style="color:#0C6E5E">✔ Built and working today</h3>
+  <table>
+    <tr><th>Component</th><th>State</th></tr>
+    <tr><td>The six-station pipeline (pages 1–2) serving answers end-to-end</td><td>live</td></tr>
+    <tr><td>Agreement gate with independent second opinions</td><td>live · 95–98% on released answers</td></tr>
+    <tr><td>Evidence research with the citation rule</td><td>proven · 88% at ~96%</td></tr>
+    <tr><td>Double-verified answer key from your real data</td><td>1,342 items · growing weekly</td></tr>
+    <tr><td>Confirmed knowledge feeding memory + similarity search</td><td>wired in, eval-safe</td></tr>
+    <tr><td>Human-confirmation writeback (a decision becomes permanent knowledge)</td><td>built · tested</td></tr>
+    <tr><td>Training-set builder + independence prep for a second AI</td><td>built · ready to run</td></tr>
+  </table>
+
+  <h3 style="color:#8A6D1F;margin-top:22px">⟳ Running right now</h3>
+  <p style="font-size:.93rem">Growing the answer key in frequency-ranked waves (highest-volume products
+  first) · verifying the pending ~600 through the second frontier AI — both on existing subscriptions,
+  no per-item fees.</p>
+
+  <h3 style="color:#B3402A;margin-top:22px">→ Next to build — in order of impact</h3>
+  <table>
+    <tr><th>Upgrade</th><th>What it buys</th><th>Waits on</th></tr>
+    <tr><td><b>1 · Retrain the local AI on the verified key</b></td>
+        <td>the reader itself jumps in quality — its current teacher material was ~85% grade; the new key is ~97–99% grade</td>
+        <td>key reaching ~3–5k items (automatic, weeks)</td></tr>
+    <tr><td><b>2 · Second local AI, different family, different half of the data</b></td>
+        <td>a fully independent offline council → more lines released automatically at the same ≥95% bar</td>
+        <td>a go decision — scripts are ready</td></tr>
+    <tr><td><b>3 · Formal accuracy guarantee</b></td>
+        <td>“≥95%” becomes a calibrated, auditable bound — the claim a tax authority can stand behind</td>
+        <td>upgrade 2</td></tr>
+    <tr><td><b>4 · Research as an always-on service</b></td>
+        <td>the review queue drains continuously, without an operator</td>
+        <td>scheduling only</td></tr>
+    <tr><td><b>5 · Use the whole invoice line</b> — supplier, price, VAT, unit</td>
+        <td>the single biggest accuracy lift available: a supplier’s history makes ambiguous names easy</td>
+        <td><b>client permission</b> to use those fields</td></tr>
+    <tr><td><b>6 · Full catalog markup</b> — all 382,527 distinct products, in batches</td>
+        <td>a complete verified reference for the whole dataset; each batch inspected before the next</td>
+        <td>a go per batch — method proven, priced at ≈$0 on subscriptions</td></tr>
+  </table>
+
+  <div class="note"><b>The two decisions that unlock the most:</b> permission to use the full invoice
+  fields (upgrade 5 — biggest lift), and the go for the second local AI (upgrade 2 — unlocks the formal
+  guarantee). Everything else proceeds on its own.</div>
+</div>
+
+</div>

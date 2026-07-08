@@ -1,0 +1,1133 @@
+ITEM (source): {"item":"Qrelka (isidici) 2\u00a0000 \u043c\u043b \u2116 3 (Dig\u0259rl\u0259r) (Dr.Para)\nNormalized: isidici qrelka"}
+MODEL: openai/gpt-4o  AT: 2026-07-06 13:07:06  PROMPT_CHARS: 133523
+
+===== SYSTEM =====
+You are a customs classification expert navigating Azerbaijan's XİF MN
+(HS) tree top-down. You are at one fork. You receive an ITEM and the child
+BRANCHES, each with its code, title and a few EXAMPLE member items.
+
+Decide which single branch the item belongs under. Rules:
+- Some branches carry authoritative LEGAL RULES (COVERS / INCLUDES /
+  EXCLUDES / CLOSED LIST), distilled from the HS notes. These are BINDING
+  and OUTRANK the example items:
+    * If the item matches a branch's INCLUDES, choose that branch.
+    * If a branch EXCLUDES the item's kind (shown as "→ see heading X"),
+      do NOT choose it; choose the referenced branch when it is present.
+    * CLOSED LIST means ONLY the listed goods belong there — if the item
+      is not plainly one of them, do NOT choose that branch.
+    * When a rule decides it, cite that rule in "criterion".
+- Otherwise judge each branch by WHERE IT LEADS — its example items — not
+  its title, and by what the item functionally IS (its purpose).
+- Name the ONE distinguishing criterion that separates these branches.
+- If two branches are genuinely equally plausible AND the item text lacks
+  the fact that would decide between them, set "decisive" to false and put
+  the single yes/no or short factual question in "question".
+
+Respond with strict JSON only:
+{"criterion":"<what separates the branches>","choice":"<chosen child code or null>","confidence":0.0,"decisive":true,"question":"<the missing fact question, or empty>","reason":"<short>"}
+
+===== USER (ITEM + 97 BRANCHES) =====
+ITEM: Qrelka (isidici) 2 000 мл № 3 (Digərlər) (Dr.Para)
+Normalized: isidici qrelka
+
+BRANCHES:
+code=01 | Canlı heyvanlar
+    COVERS: Bütün diri heyvanlar (ev və vəhşi) — balıqlar, su onurğasızları, mikroorqanizm kulturaları və sirk/tamaşa heyvanları istisna olmaqla.
+    EXCLUDES: Balıqlar, xərçəngkimilər, molyusklar və digər su onurğasızları (diri olsa belə) → see 0301
+    EXCLUDES: Mikroorqanizmlərin kulturaları və 3002 mövqeyinin digər məhsulları (vaksin, qan, aşı kulturaları) → see 3002
+    EXCLUDES: Sirk, hərəkət edən heyvanxana və oxşar səyyar tamaşaların heyvanları → see 9508
+    EXCLUDES: Kəsilmiş heyvanların əti və yeməli əlavə məhsulları (diri deyil) → see 0201
+    EXCLUDES: Diri qurdlar, bağırsaqlar, dəri, tük, sümük və s. heyvan mənşəli xammal → see 0511
+    e.g.: Diri atlar, ulaqlar, qatırlar və at qatırları:– atlar:– – safqanlı cins heyvanlar; Diri iribuynuzlu heyvanlar: – safqanlı cins heyvanlar; Digər diri heyvanlar:– məməlilər:– – primatlar:– – – digərləri; Digər diri heyvanlar:– digərləri:– – digərləri
+code=02 | Ət və yeyilən ət subməhsulları
+    COVERS: Ət və yeyilən ət subməhsulları — təzə, soyudulmuş, dondurulmuş, duzlanmış, duzlu suda, qurudulmuş və ya hisə verilmiş; qida üçün yararlı.
+    EXCLUDES: qida üçün yararsız (insan istehlakına yararsız) ət və subməhsullar → see 0511
+    EXCLUDES: yeyilə bilən, canlı olmayan həşəratlar → see 0410
+    EXCLUDES: heyvanların bağırsaqları, kisələri və mədələri → see 0504
+    EXCLUDES: heyvan qanı → see 0511
+    EXCLUDES: heyvan piyi (0209 istisna olmaqla) → see 15
+    EXCLUDES: kolbasa, sosiska və bişmiş/hazır ət məmulatları → see 16
+    EXCLUDES: canlı heyvanlar → see 01
+    EXCLUDES: balıq, xərçəngkimilər, molyusklar əti → see 03
+    e.g.: İribuynuzlu heyvanın əti, təzə və ya soyudulmuş:– cəmdəklər və şaqqalar; 0105 mal mövqeyində göstərilən ev quşlarının ət…i, qaraciyəri və pətənəyi üstündə olan, «70%-li cücə» kimi təqdim olunan; 0105 mal mövqeyində göstərilən ev quşlarının ət…sələri:– – – – sümükdən ayrılmamışlar:– – – – – döş və onlardan parçalar; Ət və qidaya yararlı ət əlavələri, duzlu, duzlu…ən və ya ət əlavələrindən qidaya yararlı olan qaba və narın üyüdülmüş un
+code=03 | Balıqlar, xərçəngkimilər və molyusklar
+    COVERS: Balıqlar, xərçəngkimilər, molyusklar və digər su onurğasızları — diri, təzə, soyudulmuş, dondurulmuş, qurudulmuş, duzlanmış, duzlu suda saxlanmış və ya hisə verilmiş halda (qida üçün yararlı, emal olunmamış).
+    EXCLUDES: dəniz məməliləri (balina, delfin, suiti, kit) → see 0106
+    EXCLUDES: 0106 məməlilərinin əti → see 0208
+    EXCLUDES: ölü, öz növü və ya vəziyyətinə görə qida üçün yararsız balıq, xərçəngkimi, molyusk → see 05
+    EXCLUDES: balıqdan/su onurğasızlarından qida üçün yararsız un, narın və qaba üyüdülmüş un və qranullar → see 2301
+    EXCLUDES: nərə kürüsü və balıq kürüsündən hazırlanmış kürü əvəzediciləri → see 1604
+    EXCLUDES: hazırlanmış və ya konservləşdirilmiş balıq (bişmiş, unlanmış, panirlənmiş, marinadlanmış), balıq konservi → see 1604
+    EXCLUDES: hazırlanmış və ya konservləşdirilmiş xərçəngkimilər və molyusklar → see 1605
+    EXCLUDES: balıq yağı və dəniz məməlilərinin piyi → see 1504
+    e.g.: Diri balıq:– dekorativ balıq:– – şirin suda yaşayan balıq; Dondurulmuş balıq, balıq filesi və 0304 mal möv…sprattus):– – – Sardinoрs cinsli sardinalar; sardinella(Sardinella sрр.); Qurudulmuş balıq, duzlu və ya duzlu suda; hisə…ar:– yeməkdə istifadə üçün yararlı qaba və narın balıq unu və qranulalar; Su onurğasızları, xərçəngkimilər və molyusklard…da üçün yararlı qaba və narın un və qranulalar:– digərləri:– – digərləri
+code=04 | Süd məhsulları; yumurta; təbii bal
+    COVERS: Süd məhsulları (süd, qaymaq, qatıq/yoğurt, zərdab, kərə yağı, pendir, kəsmik); quş yumurtaları; təbii bal; başqa yerdə göstərilməyən yeməli heyvan mənşəli məhsullar (yeməli həşəratlar daxil).
+    EXCLUDES: Canlı olmayan, qida üçün yararsız həşəratlar (unu daxil) → see 0511
+    EXCLUDES: Zərdabdan alınan, quru maddəyə görə 95%-dən çox laktoza olan məhsullar; təmiz/kommersiya laktozası → see 1702
+    EXCLUDES: Süddə bir və ya bir neçə təbii komponenti başqa maddə ilə əvəz etməklə alınan məhsullar (məs. süd yağı bitki yağı ilə əvəz olunmuş 'doldurulmuş süd') → see 1901
+    EXCLUDES: Albuminlər (o cümlədən 80%-dən çox zərdab zülalı olan konsentratlar); qlobulinlər → see 3502
+    EXCLUDES: Kazein → see 3501
+    EXCLUDES: Süd yağından başqa yağ olan və ya 39%-dən az süd yağı olan yayılan yağlar (marqarin tipli) → see 1517
+    EXCLUDES: Kakao və ya digər maddələrlə dadlandırılmış süd içkiləri → see 2202
+    EXCLUDES: Dondurma və digər yeməli buz → see 2105
+    EXCLUDES: Süd və ya yumurta əsaslı, ədviyyat/qatqı əlavə olunmuş qida preparatları → see 2106
+    e.g.: Süd və qaymaq, qatılaşdırılmamış və şəkər və ya…-dən çox yağ olmayan: – – netto həcmi 2 litrdən çox olmayan bağlamalarda; Ayran, çürümüş süd və qaymaq, yoqurt, kefir və…dələr əlavə edilmədən, yağın miqdarı:– – – – – 3 kütlə %-dən çox olmayan; Pendirlər və kəsmik:– əridilmiş pendirlər, narı…dən çox olmayan, quru maddədə:– – – – tərkibi 48 kütlə %-dən çox olmayan; Başqa yerdə adı çəkilməyən heyvan mənşəli yeyinti məhsulları
+code=05 | Heyvan mənşəli digər məhsullar
+    COVERS: Başqa yerdə göstərilməyən heyvan mənşəli məhsullar: insan tükü, heyvan qılı, bağırsaq/mədə/sidik kisəsi, quş lələyi və ələ, sümük/fil sümüyü/buynuz, mərcan/balıqqulağı, heyvani əczaçılıq məhsulları, toxum və qan.
+    EXCLUDES: yeyilən heyvan məhsulları (bağırsaq, sidik kisəsi, mədə və heyvan qanından başqa) → see 02
+    EXCLUDES: gön və dəri, xəz daxil (0505 malları və 0511-in emal olunmamış gön kəsiklərindən başqa) → see 41
+    EXCLUDES: heyvan mənşəli tekstil materialları (at tükü və tullantısından başqa) → see 51
+    EXCLUDES: süpürgə və ya fırça hazırlanması üçün hazır düyünlər və dəstələr → see 9603
+    EXCLUDES: steril cərrahi katqut (bağırsaqdan hazırlanmış tikiş materialı) → see 3006
+    EXCLUDES: terapevtik, profilaktik və ya diaqnostik məqsədlə hazırlanmış heyvan qanı → see 3002
+    e.g.: İnsan tükü, emal olunmamış, yuyulmuş və ya yuyulmamış, təmizlənmiş və ya təmizlənməmiş; onların tullantıları; Sümüklər və buynuz özəyi, emal olunmamış, yağsı…ya jelatini çıxarılmış; bu məhsulların tozu və tullantıları:– digərləri; Başqa yerdə adı çəkilməyən, heyvan mənşəli məhs…üş heyvanlar:– – – digərləri:– – – – kriokonservləşdirilmiş balıq mənisi; Başqa yerdə adı çəkilməyən, heyvan mənşəli məhs…çün yararsız:– digərləri:– – digərləri:– – – digərləri:– – – – digərləri
+code=06 | Canlı ağaclar və bitkilər; kəsilmiş güllər
+    COVERS: Canlı ağaclar və digər bitkilər; soğanaqlar, köklər və oxşarları; kəsilmiş güllər və dekorativ yaşıllıq — adətən şitilliklərdən və ya çiçək mağazalarından əkin və ya bəzək məqsədilə göndərilən mallar.
+    EXCLUDES: kartof, baş soğan, şalot, sarımsaq və digər yeməli tərəvəz məhsulları → see 07
+    EXCLUDES: əsasən ətriyyat, əczaçılıq, həşərat/göbələk əleyhinə istifadə üçün bitkilər (buket/bəzək üçün yararsız halda) → see 1211
+    EXCLUDES: 12.12 mövqeyinin qovrulmamış kasnı kökləri (Cichorium intybus sativum) → see 1212
+    EXCLUDES: hörgü materialları (bitki hissələri, buket/bəzək üçün yararsız halda) → see 1401
+    EXCLUDES: zəncəfil kökümsovları → see 0910
+    EXCLUDES: kollajlar və analoji dekorativ təsvirlər (lövhələr) → see 9701
+    e.g.: Soğanaqlar, kök yumruları, yumruvari köklər, kö…maqla, vegetativ durğunluq vəziyyətində olan soğanaqlar:– – sünbülçiçəyi; Başqa canlı bitkilər (kökləri də daxil olmaqla)…şitillər, göbələk telləri:– qızılgüllər, peyvənd edilmiş və ya edilməmiş; Kəsilmiş güllər və qönçələr, buket düzəltmək üç…ş, hopdurulmuş və ya başqa üsullarla hazırlanmış:– təzə:– – xrizantemlər; Yarpaqlar, budaqlar və bitkilərin çiçəksiz və q…və ya başqa üsulla hazırlanmış:– digərləri:– – digərləri:– – – digərləri
+code=07 | Tərəvəzlər və bəzi yeməli kök və kökümsovlar
+    COVERS: Yeməli tərəvəzlər və nişasta/inulinlə zəngin bəzi kök və kök yumruları; təzə, soyudulmuş, dondurulmuş, müvəqqəti konservləşdirilmiş və ya sadəcə qurudulmuş formada.
+    EXCLUDES: Yem məhsulları (heyvan yemi) → see 1214
+    EXCLUDES: Capsicum və ya Pimenta cinsinin qurudulmuş, döyülmüş və ya üyüdülmüş barları (quru istiot, paprika, çili tozu) → see 0904
+    EXCLUDES: Sirkə/sirkə turşusu ilə və ya suda/buxarda bişirilməkdən başqa üsulla hazırlanmış tərəvəzlər → see 20
+    EXCLUDES: Kartof unu, tozu, lopaları, qranulları → see 1105
+    EXCLUDES: Qurudulmuş qabıqsız paxlalı tərəvəzlərin unu, yarması, tozu → see 1106
+    EXCLUDES: Soya paxlası → see 1201
+    EXCLUDES: Nişastalar → see 1108
+    EXCLUDES: Tapioka → see 1903
+    EXCLUDES: Un/yarma şəklində şəkər qarğıdalısı → see 1102
+    e.g.: Kartof, təzə və ya soyudulmuş:– toxumluq:– – mart, aprel, may və sentyabr, oktyabr, noyabr ayları üzrə; Digər tərəvəz, təzə və ya soyudulmuşlar:– digərləri:– – zeytunlar:– – – istifadə üçün, yağ üçün emaldan başqa; Qurudulmuş tərəvəzlər, bütöv, doğranmış, diliml…r(Auricularia spp.), tremella göbələkləri və yerdombalanı: – – digərləri; Maniok, maranta, səhləb (salep), yerarmudu və y…ə ya qranulalar halında; saqo palmasının özəyi:– digərləri:– – digərləri
+code=08 | Yeməli meyvələr və qoz-fındıq
+    COVERS: Yeməli meyvələr və qoz-fındıq; sitrus meyvələrinin və ya qovunun (qarpız daxil) qabığı — təzə, soyudulmuş, dondurulmuş, qurudulmuş və ya müvəqqəti konservləşdirilmiş halda.
+    EXCLUDES: qidaya yararsız (qeyri-yeməli) qoz-fındıq və meyvələr → see 14
+    EXCLUDES: emal/konservləşdirilmiş meyvə: mürəbbə, cem, jele, şirədə saxlanmış, sirkədə, bişmiş və ya başqa cür hazırlanmış → see 20
+    EXCLUDES: meyvə və tərəvəz şirələri → see 2009
+    EXCLUDES: kopra — yağçıxarma üçün qurudulmuş hindqozu əti (qidaya yararsız) → see 1203
+    EXCLUDES: yerfındığı (araxis) → see 1202
+    EXCLUDES: ədviyyatlar, ardıc giləsi, petitgrain üçün cavan portağal → see 09
+    EXCLUDES: meyvədən şəkərli qənnadı məmulatları → see 1704
+    EXCLUDES: tərəvəzlər (o cümlədən Çin su şabalıdı yumrusu) → see 07
+    e.g.: Hindqozu, Braziliya fındığı, keşyü fındığı, təz…bıqsız, qabığı təmizlənmiş və ya təmizlənməmiş:– hindqozu:– – qurudulmuş; Sitrus meyvələri, təzə və ya qurudulmuş:– manda…la); klementinlər, vilkinqlər və analoji sitrus hibridləri:– – digərləri; Meyvə və qoz-fındıq, təzə və ya qaynayan suda,…dirici maddələr əlavə etməklə:– – – 13 kütlə %-dən çox şəkər miqdarı ilə; Sitrus və ya qovun qabıqları (qarpız qabıqları…i konservləşdirici məhlulda az müddətli saxlanma üçün konservləşdirilmiş
+code=09 | Qəhvə, çay, mate və ədviyyatlar
+    COVERS: Qəhvə, çay, mate və ədviyyatlar (bibər, vanil, darçın, mixək, muskat, kardamon, zəncəfil, zəfəran, sarıkök və s.).
+    EXCLUDES: Kubeba bibəri (Piper cubeba) və 1211 mal mövqeyindəki digər bitki məhsulları → see 1211
+    EXCLUDES: Dad əlavələri və ya ədviyyat qarışıqları (mixed condiments / seasonings), 0904-0910 məhsullarının əsas xüsusiyyətini itirmiş qarışıqlar → see 2103
+    EXCLUDES: Qəhvə ekstraktları, essensiyaları, konsentratları (həll olan/instant qəhvə) və tərkibində qəhvə olmayan qovrulmuş qəhvə əvəzediciləri → see 2101
+    EXCLUDES: Kofein (qəhvə/çay alkaloidi) → see 2939
+    EXCLUDES: Təzə (əzilməmiş və üyüdülməmiş) isti bibər / paprika / Capsicum və Pimenta meyvələri → see 0709
+    EXCLUDES: Otlardan/bitkilərdən dəmləmə üçün məhsullar, bitki çayları (əsl Thea/Camellia çayı olmayan) → see 2106
+    EXCLUDES: Vanil şəkəri → see 1701
+    EXCLUDES: Vanilin (vanilin sintetik/təbii ətir maddəsi) → see 2912
+    EXCLUDES: Siropda konservləşdirilmiş zəncəfil → see 2008
+    EXCLUDES: Qəhvə mumu → see 1521
+    e.g.: Qəhvə, qovrulmuş və ya qovrulmamış, kofeinlə və…nisbətdə qəhvə olan qəhvə əvəzediciləri:– qovrulmamış qəhvə:– – kofeinli; Vanil:– doğranmamış və döyülməmiş; Cirə(anis), badyan, razyana, koriandr, roma zir…vələri:– roma, və ya voloş zirəsinin toxumu:– – doğranmış və ya döyülmüş; Zəncəfil, zəfəran, sarıkök, kəklikotu (kəkotu),…viyyatlar:– – digərləri:– – – digərləri:– – – – doğranmış və ya döyülmüş
+code=10 | Dənli bitkilər (taxıl)
+    COVERS: Taxıl (dənli bitkilər): sünbül və ya saplaqda olub-olmamasından asılı olmayaraq yalnız DƏN halında olan buğda, çovdar, arpa, yulaf, qarğıdalı, düyü, sorqo, qarabaşaq, darı və s.
+    EXCLUDES: Qabığı soyulmuş və ya digər üsullarla emal olunmuş dənlər (düyü və kinoa istisna) → see 11
+    EXCLUDES: Taxıl unu, yarması, krupası, dənəvər/lopa məhsulları → see 11
+    EXCLUDES: Səməni (cücərdilmiş taxıl, malt) və qovrulmuş səməni → see 1107
+    EXCLUDES: Şəkər qarğıdalısı (təzə, dondurulmuş və ya konservləşdirilmiş) → see 07
+    EXCLUDES: Qovrulmuş taxıl (qəhvə əvəzediciləri) → see 2101
+    EXCLUDES: Şişirdilmiş/qovrulmuş hazır taxıl məmulatları (corn flakes, müsli) → see 1904
+    EXCLUDES: Tibbi alət və cihazlar (şpris/iynə/kateter), taxılla qarışdırılmır → see 9018
+    e.g.: Buğda və meslin:– bərk buğda:– – toxumluq; Düyü:– dən pərdəsi təmizlənməmiş düyü (xam düyü):– – digəri:– – – buğa verilmiş:– – – – ortadənli; Düyü:– qabığı yarı təmizlənmiş və ya qabığı tam…i:– – – – – uzunluğunun eninə nisbəti 2-dən çox, lakin 3-dən çox olmayan; Qarabaşaq, darı və bülbülotu toxumları; digər dənli bitkilər:– digər dənli bitkilər
+code=11 | Un-yarma sənayesi məhsulları; nişasta
+    COVERS: Un-üyütmə sənayesinin məhsulları: un, yarma, qaba un, dənəvər məhsullar; səməni (malt); nişastalar; inulin; buğda kleykovinası (qlüten).
+    EXCLUDES: Qəhvə əvəzedicisi kimi qablaşdırılmış qovrulmuş səməni → see 2101
+    EXCLUDES: Hazır un, yarma, qaba un və ya nişasta preparatları (qida hazırlığı) → see 1901
+    EXCLUDES: Qarğıdalı lopaları və digər bişmiş/hazır dənli məhsullar → see 1904
+    EXCLUDES: Hazırlanmış və ya konservləşdirilmiş tərəvəz → see 2005
+    EXCLUDES: Əczaçılıq (farmasevtik) məhsulları → see 30
+    EXCLUDES: Ətriyyat, kosmetika və tualet vasitəsi xassəli nişastalar → see 33
+    EXCLUDES: Un-üyütmə qalıqları (kəpək, tullantı) → see 2302
+    EXCLUDES: Tibbi alət və cihazlar (şpris, iynə, kateter) → see 9018
+    e.g.: Buğda unu və ya buğda-çovdar unu:– buğda unu:– – bərk buğdadan; Taxıl, başqa üsullarla emal olunmuş (məsələn, d…lmış və ya lopa halına salınmış taxıl:– – yulafın:– – – yastılaşdırılmış; Taxıl, başqa üsullarla emal olunmuş (məsələn, d…gəri:– – – – hər hansı digər emal olmadan xırdalanmış:– – – – – çovdarın; Buğda kleykovinası, quru və ya nəm
+code=12 | Yağlı toxumlar və meyvələr; müxtəlif toxumlar
+    COVERS: Yağlı toxumlar və yağlı meyvələr; müxtəlif dən, toxum və meyvələr; sənaye və ya dərman bitkiləri; küləş (saman) və yem bitkiləri.
+    EXCLUDES: Qovrulmuş və ya bişirilmiş yağlı toxum/yerfındığı → see 20
+    EXCLUDES: Yeməli qoz və qərzəkli meyvələr (kokos, ərəbdənəsi və s.) → see 0801
+    EXCLUDES: Zeytun → see 07
+    EXCLUDES: Dərman vasitələri (medikamentlər) → see 30
+    EXCLUDES: Ətriyyat, kosmetika və tualet vasitələri → see 33
+    EXCLUDES: İnsektisidlər, funqisidlər, herbisidlər, dezinfeksiyaedicilər → see 3808
+    EXCLUDES: Bitki cövhərləri və ekstraktları (mayaotu, biyan ekstraktı, aqar-aqar) → see 1302
+    EXCLUDES: Yağsızlaşdırılmış un-tullantılar (küncüt/soya jmıxı) → see 2304
+    EXCLUDES: Canlı bitkilər, tinglər, soğanaqlar, kökümsovlar (əkin/bəzək üçün) → see 06
+    EXCLUDES: Gübrələr → see 3101
+    EXCLUDES: Tibbi alət və cihazlar (şpris, iynə, kateter) → see 9018
+    e.g.: Soya paxlaları, xırdalanmış və ya xırdalanmamış:– toxumluq; Digər yağlı bitkilərin toxumları və meyvələri,…mış və ya xırdalanmamış:– digərləri:– – xaşxaş toxumları:– – – digərləri; Əkin üçün toxumlar, meyvələr və sporlar:– digər…ın toxumları:– – – – qafqaz ağ şamının (Abies nordmanniana(Stev.) Spach); Şalğam, yarpaq çuğunduru (manqold), yem meyvəkö…qranulalaşdırılmış və ya qranulalaşdırılmamış:– digərləri:– – digərləri
+code=13 | Şellak; kitrələr, qatranlar və bitki şirələri
+    COVERS: Bitki mənşəli laklar, təbii kitrələr, qatranlar, qummi qatranları və oleorezinlər; bitki şirələri və ekstraktları, pektin maddələri, aqar-aqar və digər selikli maddələr/qatılaşdırıcılar.
+    EXCLUDES: tərkibində 10 kütlə %-dən çox saxaroza olan və ya qənnadı kimi hazırlanmış biyan/biyan ekstraktı → see 1704
+    EXCLUDES: səməni (səməniotu) ekstraktı → see 1901
+    EXCLUDES: qəhvə, çay və ya mate (paraqvay çayı) ekstraktları → see 2101
+    EXCLUDES: spirtli içki təşkil edən bitki şirələri və ya ekstraktları → see 22
+    EXCLUDES: kamfora, qlissirrizin və 2914/2938 mal mövqeyinin digər məhsulları → see 2938
+    EXCLUDES: tərkibində alkoloidlərin miqdarı 50 kütlə %-dən az olmayan xaşxaş çöpü konsentratı → see 2939
+    EXCLUDES: 3003/3004 mal mövqeyindəki dərman vasitələri → see 3004
+    EXCLUDES: qan qrupunu müəyyən etmək üçün reagentlər → see 3822
+    EXCLUDES: aşılayıcı və ya boyayıcı ekstraktlar → see 3201
+    EXCLUDES: efir yağları, konkretlər, absolyutlar, rezinoidlər, çıxarılmış oleorezinlər, içki istehsalı üçün ətirli maddələr əsaslı hazır məhsullar → see 3301
+    EXCLUDES: təbii kauçuk, balata, quttaperça, qvayula, çikl və analoji təbii kitrələr → see 4001
+    e.g.: Təmizlənməmiş təbii şellak; təbii kitrələr, qat…yapışqanlı qatranlar və terpentinlər (məsələn, balzamlar):– qummiarabik; Bitki şirələri və ekstraktları; pektin maddələr…iş və ya şəklidəyişməmiş:– bitki şirələri və ekstraktları:– – mayaotunun; Bitki şirələri və ekstraktları; pektin maddələr…klidəyişməmiş:– pektin maddələri, pektinatlar və pektatlar:– – digərləri; Bitki şirələri və ekstraktları; pektin maddələr…n və qatılaşdırıcılar, şəklidəyişmiş və ya şəklidəyişməmiş:– – digərləri
+code=14 | Toxuculuq üçün bitki materialları
+    COVERS: Bitki mənşəli hörmə materialları və başqa yerdə göstərilməyən bitki mənşəli məhsullar (bambuk, rotanq, qamış, söyüd, pambıq linteri, boyaq/aşı bitkiləri).
+    EXCLUDES: Əsasən toxuculuq üçün istifadə olunan bitki lifləri (kətan, pambıq lifi, cut, kənaf) → see XI
+    EXCLUDES: Lay-lay kəsilmiş oduncaq (chipwood) → see 4404
+    EXCLUDES: Ağac yunu (wood wool) → see 4405
+    EXCLUDES: Süpürgə və ya fırça hazırlamaq üçün hazırlanmış bağlamalar/dəstələr → see 9603
+    EXCLUDES: Boyaq/aşı üçün istifadə olunmayan oduncaq (yonqar/toz halında olmayan) → see 44
+    EXCLUDES: Tibbi məqsədlə hazırlanmış pambıq (medikamentli və ya pərakəndə üçün) → see 3005
+    e.g.: Əsasən toxuma üçün istifadə edilən bitki mənşəl…təmizlənmiş, ağardılmış və ya boyadılmış küləşi və cökə qabığı):– bambuk; Əsasən toxuma üçün istifadə edilən bitki mənşəl…təmizlənmiş, ağardılmış və ya boyadılmış küləşi və cökə qabığı):– rotanq; Başqa yerdə adı çəkilməyən və ya daxil edilməyən bitki mənşəli materiallar:– pambıq tiftiyi; Başqa yerdə adı çəkilməyən və ya daxil edilməyən bitki mənşəli materiallar:– digərləri
+code=15 | Heyvan və ya bitki mənşəli yağlar
+    COVERS: Heyvani, bitki və ya mikrob piyləri və yağları və onların parçalanma məhsulları; hazır yeməli piylər; heyvani və ya bitki mumları.
+    EXCLUDES: Donuz piyi və ya ev quşu piyi (təzə/duzlanmış/dondurulmuş, 0209) → see 0209
+    EXCLUDES: Kakao-yağı, kakao-piyi → see 1804
+    EXCLUDES: Tərkibində 0405 süd məhsulları 15 kütlə %-dən çox olan hazır qida məhsulları → see 21
+    EXCLUDES: Cızdaqlar və yağ istehsalı tullantıları/qalıqları → see 2301
+    EXCLUDES: Yağ turşuları → see 3823
+    EXCLUDES: Dərman vasitələri → see 30
+    EXCLUDES: Boyalar, laklar → see 32
+    EXCLUDES: Sabun → see 3401
+    EXCLUDES: Ətriyyat, kosmetika və ya tualet vasitələri → see 33
+    EXCLUDES: Sulfidləşdirilmiş (sulfonlaşdırılmış) yağlar və VI bölmənin digər malları → see 3402
+    EXCLUDES: Yağlardan alınan faktis → see 4002
+    EXCLUDES: Təmizliyi 95%-dən çox olan kimyəvi təyin edilmiş qliserin → see 2905
+    EXCLUDES: Soya lesitini → see 2923
+    EXCLUDES: Hazır (süni) mumlar və mum qarışıqları → see 3404
+    e.g.: Donuz piyi (əridilmiş donuz piyi daxil olmaqla)…aye tətbiqi üçün, qidada istifadə olunan məhsulların istehsalından başqa; Günəbaxan, saflor və ya pambıq yağı və onların…a sənaye tətbiqi üçün, qida üçün yararlı məhsulların istehsalından başqa; Digər buxarlanmayan bitki piyləri, yağları (joj…işdirilmədən:– küncüt yağı və onun fraksiyaları:– – xam yağ:– – – digəri; Deqra; yağlı maddələrin, heyvan və ya bitki mən…mənşəli mumların emaldan sonrakı qalıqları:– – digərləri:– – – digərləri
+code=16 | Ət və balıq məhsullarından hazır məhsullar
+    COVERS: Ət, balıq, xərçəngkimilər, molyusklar, digər su onurğasızları, həşərat və qandan hazırlanmış və ya konservləşdirilmiş məhsullar (kolbasa, konservlər, ekstraktlar, kürü).
+    EXCLUDES: 02 və ya 03 qrupun üsulları (soyudulmuş, dondurulmuş, duzlanmış, hisə verilmiş) ilə hazırlanmış ət/balıq → see 02/03
+    EXCLUDES: Tərkibində 20 kütlə %-dən az ət/balıq/onurğasız olan qida məhsulları → see 21
+    EXCLUDES: Ət və ya ət məhsulu ilə doldurulmuş makaron məmulatları (ravioli, pelmeni, manti) → see 1902
+    EXCLUDES: Souslar, qarışıq ədviyyatlar, ət ekstraktı əsaslı souslar → see 2103
+    EXCLUDES: Şorbalar, bulyonlar və homogenləşdirilmiş mürəkkəb qida məhsulları → see 2104
+    EXCLUDES: Ət və ya balığın dərmani maddə üçün daşıyıcı kimi çıxış etdiyi dərman vasitələri → see 30
+    e.g.: Ətdən, ət əlavələrindən və ya qandan hazırlanan…ullar; onların əsasında hazırlanan hazır qida məhsulları:– qara ciyərdən; Ətdən, ət əlavələrindən və ya qandan hazırlanan…ullar daxil olmaqla:– – hər hansı heyvanın qanından hazırlanan məhsullar; Hazır və ya konservləşdirilən balıq; nərə balığ…– merluza (Merluccius spp.) və amerikan saplələkli nalim (Urophycis spp); Hazır və ya konservləşdirilmiş xərçəngkimilər,…yusklar və digər su onurğasızları:– digər su onurğasızları:– – digərləri
+code=17 | Şəkər və şəkərdən qənnadı məmulatları
+    COVERS: Şəkər və qənnadı: qamış/çuğundur şəkəri, digər şəkərlər və siroplar, melassa (patoka) və kakaosuz şəkər qənnadı məmulatları.
+    EXCLUDES: tərkibində kakao olan şəkər qənnadı məmulatları → see 1806
+    EXCLUDES: kimyəvi təmiz şəkərlər (saxaroza, laktoza, maltoza, qlükoza və fruktozadan başqa) → see 2940
+    EXCLUDES: dərman vasitələri və 30-cu qrupun digər məhsulları → see 30
+    EXCLUDES: dad-aromatik və ya boyayıcı əlavəli şəkər siropları (içki hazırlanması üçün preparatlar) → see 2106
+    e.g.: Şəkər qamışından və ya şəkər çuğundurundan alın…xam şəkər:– – şəkər çuğundurundan alınan şəkər:– – – saflaşdırılma üçün; Şəkər qamışından və ya şəkər çuğundurundan alın…kimyəvi təmiz saxaroza, bərk vəziyyətdə:– digəri:– – digəri:– – – digəri; Şəkərin digər növləri, kimyəvi cəhətdən təmiz l…el kuleri:– – – tərkibində 50 kütlə % və ya çox quru halda saxaroza olan; Şəkərdən hazırlanan qənnadı məmulatları (ağ şok…ləri:– – digərləri:– – – digərləri:– – – – digərləri:– – – – – digərləri
+code=18 | Kakao və ondan hazırlanan məhsullar
+    COVERS: Kakao və kakaodan hazırlanan məhsullar: kakao dənələrindən (paxlalarından) tutmuş şokolad və tərkibində kakao olan qida məhsullarına qədər.
+    EXCLUDES: Tərkibində 20 kütlə %-dən çox kolbasa, ət, ət əlavə məhsulları, qan, həşərat, balıq, xərçəngkimilər, molyusk və ya digər su onurğasızları olan hazır qida məhsulları → see 16
+    EXCLUDES: 0403, 1901, 1902, 1904, 1905, 2105, 2202, 2208, 3003 və ya 3004 mövqelərinin hazır məhsulları (məs. kakaolu yoğurt/içki tozu, kakaolu makaron/vermişel məmulatları, kakaolu unlu-şirniyyat, dondurma, kakaolu içkilər, kakaolu dərmanlar) → see 19
+    EXCLUDES: Kakao tozunun yalnız daşıyıcı/köməkçi rol oynadığı dərman preparatları → see 3003
+    EXCLUDES: Ətirli və ya rəngli şəkər xarakteri daşıyan (şirinləşdirici kimi işlədilən) tozlar → see 1701
+    EXCLUDES: Kofein, teobromin və digər kimyəvi cəhətdən təmiz alkaloidlər → see 2939
+    EXCLUDES: Yağsızlaşdırılmış soya unu, bitki mənşəli zülal izolatları → see 2304
+    e.g.: Kakao dənləri, bütöv və ya xırdalanmış, çiy və ya qovrulmuş; Şokolad və tərkibində kakao olan digər hazır ər…rt şəkər daxil olmaqla) və ya saxaroza kimi ifadə olunan izoqlükoza olan; Şokolad və tərkibində kakao olan digər hazır ər…siz:– – – dənli bitkilərin dəni, meyvələri və ya qoz-fındıq əlavə edilən; Şokolad və tərkibində kakao olan digər hazır ərzaq məhsulları:– digərləri:– – digərləri
+code=19 | Dənli bitki və un məhsulları; unlu qənnadı
+    COVERS: Dənli bitki, un, yarma, nişasta və ya səməni ekstraktından hazır qida məhsulları; makaron, unlu-qənnadı və çörək məmulatları.
+    EXCLUDES: tərkibində 20 kütlə %-dən çox kolbasa, ət, ət əlavə məhsulları, qan, balıq və ya su onurğasızları olan qida məhsulları (1902-nin içlikli məmulatları istisna) → see 16
+    EXCLUDES: un və ya nişasta əsasında heyvan yemi kimi hazırlanmış quru peçenye və digər məmulatlar → see 2309
+    EXCLUDES: dərman vasitələri və 30-cu qrupun digər məhsulları → see 30
+    EXCLUDES: tamamilə şokoladla örtülmüş və ya 6/40 kütlə %-dən çox kakao olan hazır qida məhsulları → see 1806
+    EXCLUDES: qurudulmuş tərəvəz, kartof və ya paxlalı tərəvəzin unu və tozu → see 0712
+    e.g.: Səməni ekstraktı; tərkibində kakao olmayan və y…ya təsnif olunmayan:– uşaq qidası, pərakəndə satış üçün çəkilib bükülmüş; Nişastadan hazırlanmış tapioka və onun əvəzediciləri, lopa, qranulalar, dən, dənəcik və ya digər analoji formalarda; Çörək, unlu qənnadı məmulatlar, pirojnalar, peç…və ya tərkibində kakao olan, digər məmulatlarla örtülmüş:– – – – digəri; Çörək, unlu qənnadı məmulatlar, pirojnalar, peç…ji məhsullar:– digərləri:– – digərləri:– – – digərləri:– – – – digərləri
+code=20 | Tərəvəz və meyvə emalı məhsulları
+    COVERS: Tərəvəz, meyvə, qoz-fındıq və bitkilərin digər hissələrindən hazırlanmış və ya konservləşdirilmiş qida məhsulları və şirələr (07, 08, 11-ci qrupda göstərilməyən üsullarla).
+    EXCLUDES: 07, 08 və ya 11-ci qrupun üsulları ilə hazırlanmış və ya konservləşdirilmiş tərəvəz, meyvə, qoz-fındıq (soyudulmuş, dondurulmuş, qurudulmuş, duzlu suda müvəqqəti saxlanılmış) → see 07,08,11
+    EXCLUDES: bitki mənşəli piy və yağlar → see 15
+    EXCLUDES: tərkibində 20 kütlə %-dən çox kolbasa, ət, ət əlavə məhsulları, qan, balıq, xərçəngkimilər, molyusk olan hazır qida məhsulları → see 16
+    EXCLUDES: çörək-bulka və unlu qənnadı məmulatları, xrustlu şor qəlyanaltılar → see 1905
+    EXCLUDES: homogenləşdirilmiş mürəkkəb hazır qida məhsulları → see 2104
+    EXCLUDES: şəkərlə örtülmüş badam, meyvə jelesi/pastası qənnadı məmulatı formasında → see 1704
+    EXCLUDES: şokoladlı qənnadı məmulatları → see 1806
+    EXCLUDES: tomat ketçupu və digər tomat souslar → see 2103
+    EXCLUDES: tomat şorbası və onun hazırlanması üçün məhsullar → see 2104
+    EXCLUDES: spirtin qatılığı 0,5 həcm %-dən çox olan meyvə/tərəvəz şirələri və içkilər → see 22
+    e.g.: Sirkə və ya sirkə turşusu əlavə etməklə konserv…z-fındıq və bitkilərin digər yeyilən hissələri:– xiyarlar və kornişonlar; Meyvələr, qoz-fındıq və bitkilərin digər yeyilə…– – – tərkibində şəkərin miqdarı 13 kütlə %-dən çox:– – – – – digərləri; Meyvə şirələri (üzüm şirəsi daxil olmaqla) və t…rəsi:– – dondurulmuş:– – – Briks ədədi 67-dən çox olmayan:– – – – digəri; Meyvə şirələri (üzüm şirəsi daxil olmaqla) və t…əri:– – – – – – tərkibində şəkər əlavəsi olmayan:– – – – – – – digərləri
+code=21 | Müxtəlif qida məhsulları
+    COVERS: Müxtəlif qida məhsulları: qəhvə/çay ekstraktları, mayalar, souslar, şorbalar, dondurma və başqa qrupda göstərilməyən hazır qida preparatları (2101-2106).
+    EXCLUDES: tərəvəz qarışıqları → see 0712
+    EXCLUDES: tərkibində qəhvə olan qovrulmuş qəhvə əvəzediciləri → see 0901
+    EXCLUDES: dad-aromatik əlavəli (ətirləndirilmiş) çay → see 0902
+    EXCLUDES: ədviyyatlar və digər məhsullar (0904-0910) → see 0904
+    EXCLUDES: 20 kütlə %-dən çox kolbasa, ət, qan, balıq və ya xərçəngkimilər olan hazır qida (2103/2104 istisna) → see 16
+    EXCLUDES: 2404 mal mövqeyi məhsulları (tütünsüz nikotin/inhalyasiya məhsulları) → see 2404
+    EXCLUDES: dərman vasitəsi kimi qablaşdırılmış maya və ya digər məhsullar → see 3004
+    EXCLUDES: hazır ferment (enzim) preparatları → see 3507
+    EXCLUDES: qida əlavəsi kimi qablaşdırılmış tək vitaminlər/provitaminlər (dərman kimi) → see 2936
+    e.g.: Qəhvə, çay və ya mate və ya paraqvay çayının ek…qdarı 95 kütlə% və ya çox olan bərk qəhvə ekstraktları və konsentratları; Mayalar (aktiv və ya qeyri-aktiv); digər ölü bi…rəkçilik tozları:– aktiv mayalar:– – çörəkçilik mayaları:– – – digərləri; Hazır şorba və bulyonlar və onların hazırlanmas…homogenləşdirilmiş mürəkkəb hazır ərzaq məhsulları:– – uşaq qidası üçün; Başqa yerdə adları çəkilməyən və ya təsnif olunmayan ərzaq məhsulları:– digərləri:– – digərləri:– – – digərləri
+code=22 | İçkilər, spirtli mayelər və sirkə
+    COVERS: İçkilər, spirtli mayelər (spirt) və sirkə.
+    EXCLUDES: kulinariya məqsədləri üçün hazırlanmış və içki kimi yararsız məhsullar → see 2103
+    EXCLUDES: dəniz suyu → see 2501
+    EXCLUDES: distillə olunmuş və ya konduktometrik su, analoji təmizlikdə su → see 2853
+    EXCLUDES: qatılığı 10 kütlə %-dən çox olan sirkə turşusu → see 2915
+    EXCLUDES: 3003/3004 mal mövqelərinin dərman vasitələri → see 3004
+    EXCLUDES: ətriyyat və ya tualet vasitələri → see 33
+    EXCLUDES: meyvə, qoz və ya tərəvəz şirələri (içki kimi olsa belə) → see 2009
+    EXCLUDES: yeməli buz (dondurma və s.) → see 2105
+    EXCLUDES: quru buz (bərk karbon qazı) → see 2811
+    EXCLUDES: tərkibində kakao və ya meyvə olan maye qatıq və qıcqırdılmış süd içkiləri → see 0403
+    EXCLUDES: şəkər siropları və ətirləndirilmiş şəkər siropları → see 2106
+    e.g.: Sular, təbii mineral və ya süni minerallaşdırıl…buz və qar:– mineral və qazlı sular:– – təbii mineral sular:– – – qazsız; Təbii üzüm şərabları, spirt qatılmışlar daxil o…arada şərab:0– – – – – – – madera və Muskatel setübal (Setubal muscatel); Digər qıcqırdılmış içkilər (sidr, perri və ya a…– köpüklənməyən, qablarda, tutumu:– – – 2 litrdən çox:– – – – digərləri; Sirkə və onun sirkə turşusundan alınan əvəzediciləri:– digərləri, qablarda tutumu:– – 2 litrdən çox olan
+code=23 | Qida sənayesi qalıqları; hazır heyvan yemi
+    COVERS: Qida sənayesinin qalıqları və tullantıları; hazır heyvan yemi (un/qranul, jmıx/şrot, jom, kəpək və yem preparatları).
+    EXCLUDES: Melassa (şəkər hasili/təmizlənməsindən) → see 1703
+    EXCLUDES: Qeyri-aktiv və ya işlənmiş maya → see 2102
+    EXCLUDES: Yağ çöküntüləri (oil dregs) → see 1522
+    EXCLUDES: Şərab daşı (kaliy hidrotartratı, cream of tartar) və kalsium tartratı → see 2918
+    EXCLUDES: Toxumadan asılı olmayan (tekstur) soya unu və zülal konsentratları → see 2106
+    EXCLUDES: Taxılın döyülməsindən alınan taxıl qabıqları → see 1213
+    EXCLUDES: İnsan qidası üçün yararlı ərzaq məhsulları (bu qrup yalnız qalıq/tullantı və heyvan yemidir) → see 04
+    e.g.: Ətdən və ya ət əlavələrindən, balıqdan və ya xə…ələrindən hazırlanan narın və qaba üyüdülmüş un və qranulalar; cızdaqlar; Bitki piy və yağlarının ekstraksiyası nəticəsin…qranulalaşdırılmış və ya qranulalaşdırılmamış: – günəbaxan toxumlarının; Heyvan yemi üçün istifadə edilən məhsullar:– it…ox olmayan:– – – – – tərkibində süd məhsulları 50 kütlə %-dən az olmayan; Heyvan yemi üçün istifadə edilən məhsullar:– di…ləri:– – digərləri:– – – digərləri:– – – – digərləri:– – – – – digərləri
+code=24 | Tütün və tütün əvəzediciləri
+    COVERS: Tütün və emal olunmuş tütün əvəzediciləri; tütün və ya nikotin saxlayan, alışdırılmadan nəfəsə çəkilməsi üçün nəzərdə tutulmuş məhsullar.
+    EXCLUDES: Müalicəvi (dərman) siqaretlər → see 30
+    EXCLUDES: Nikotin (tütündən çıxarılan alkaloid, təmiz kimyəvi maddə) → see 2939
+    EXCLUDES: Tütün ekstraktı əsaslı insektisidlər və parazitisidlər (qablaşdırılmış hazır preparatlar) → see 3808
+    EXCLUDES: Kannabis (çətənə) və tütün olmayan çəkilən bitki qarışıqları → see 1211
+    e.g.: Tütün xammalı; tütün tullantıları:– orta damarcığı çıxarılmayan tütün:– – kölgədə qurudulan açıq rəngli tütün; Tütün xammalı; tütün tullantıları:– orta damarc…və ya tamamilə çıxarılmış tütün:– – kölgədə qurudulan tünd rəngli tütün; Siqarlar, ucları kəsilmiş siqarlar, siqarilla v…n hazırlanan siqaretlər:– tərkibində tütün olan siqaretlər:– – digərləri; Digər sənayedə emal olunmuş tütün və tütünün sə…ün; tütün ekstraktları və essensiyaları:– digəri:– – digəri:– – – digəri
+code=25 | Duz; kükürd; torpaq və daş; gips, əhəng, sement
+    COVERS: Mineral məhsullar: duz, kükürd, torpaqlar və daşlar, gips, əhəng və sement - yalnız xam və ya 1-ci qeyddə icazə verilən mexaniki/fiziki emaldan keçmiş halda.
+    EXCLUDES: Sublimasiya edilmiş, çökdürülmüş və ya kolloid kükürd → see 2802
+    EXCLUDES: Fe2O3-ə görə 70%+ birləşmiş dəmir olan mineral boyaqlar (torpaq boyaları) → see 2821
+    EXCLUDES: Dərman vasitələri və 30-cu qrupun digər məhsulları → see 30
+    EXCLUDES: Ətriyyat, kosmetika və tualet vasitələri → see 33
+    EXCLUDES: Dolomitli doldurma (ramming) qarışığı → see 3816
+    EXCLUDES: Yol daşları (dördtin daşlar), bordyur daşları, döşəmə plitələri; mozaika kubikləri; dam örtüyü/üzlük şistləri → see 6801
+    EXCLUDES: Qiymətli və ya az qiymətli daşlar → see 7102
+    EXCLUDES: NaCl və ya MgO-nun süni yetişdirilmiş kristalları (≥2,5 q, optik elementlərdən başqa) → see 3824
+    EXCLUDES: Bilyard təbaşiri → see 9504
+    EXCLUDES: Yazı/rəsm təbaşirləri və dərzi təbaşirləri → see 9609
+    EXCLUDES: Metal filizləri və metaltərkibli qumlar/mineral (metalın sənaye üsulu ilə çıxarıldığı) → see 26
+    EXCLUDES: Təmizlənmiş və ya kimyəvi sintez üsulu ilə alınmış mineral birləşmələr → see 28
+    EXCLUDES: Bişirilmiş, kalsinələnmiş, qarışdırma yolu ilə və ya mövqedə göstərilməyən üsullarla emal edilmiş məhsullar və daşdan məmulatlar → see 68
+    e.g.: Duz (xörək duzu və denaturasiya olunmuş duz dax…in əlavəsi olan yaxud olmayan; dəniz suyu:– dəniz suyu və duz məhlulları; Təbii barium sulfatı (barit); təbii barium karb…16 mal mövqeyindəki barium oksiddən başqa:– təbii barium sulfatı (barit); Təbii maqnezium karbonatı (maqnezit); əridilmiş…nezium oksidləri, aşqarlarla və ya aşqarlarsız:– digərləri:– – digərləri; Başqa yerdə adları çəkilməyən və ya təsnif olunmayan mineral maddələr:– digərləri
+code=26 | Filizlər, şlaklar və kül
+    COVERS: Filizlər və konsentratlar (2601-2617), habelə şlak, kül, qalıq və şlam (2618-2621) — metalların hasilində istifadə olunan mineral xammal və metallurgiya tullantıları.
+    EXCLUDES: makadam formasında hazırlanmış şlak və ya analoji sənaye tullantısı → see 2517
+    EXCLUDES: təbii maqnezium karbonat (maqnezit), susuzlaşdırılmış və ya yox → see 2519
+    EXCLUDES: əsasən neft məhsullarından ibarət neft saxlama çənləri şlamı → see 2710
+    EXCLUDES: 31-ci qrupun qələvi (əsası) şlakı, o cümlədən Tomas şlakı — gübrə → see 31
+    EXCLUDES: şlak pambığı, mineral (silikat) pambıq və analoji mineral pambıqlar → see 6806
+    EXCLUDES: qiymətli metal və ya onunla örtülmüş metal tullantı və qırıntıları → see 7112
+    EXCLUDES: əridilmə (şteyn) prosesi ilə alınan mis, nikel və ya kobalt şteyni → see 7401
+    EXCLUDES: piqment üçün narın üyüdülmüş dəmir/titan filizləri (maqnetit, rutil) → see 32
+    EXCLUDES: qeyri-metallurgiya prosesi ilə alınan uran/torium 'konsentratları' → see 2844
+    e.g.: Dəmir filizləri və konsentratları, yandırılmış…və konsentratları, yandırılmış piritdən başqa:– – aqlomerasiya edilməmiş; Uran və ya torium filizləri və konsentratları:– uran filizləri və konsentratları:– – digərləri; Tərkibində arsen və metallar və ya onların birl…ın istehsalının qalıqlarından başqa):– əsasən sink tərkibli:– – qartsink; Digər şlak və kül, dəniz yosunlarından alınan k…fatı tullantılarının yandırılmasından alınan kül və qalıqlar:– digərləri
+code=27 | Mineral yanacaq, neft və emal məhsulları
+    COVERS: Mineral yanacaqlar, neft və onun distillə məhsulları, bitumlu maddələr və mineral mumlar (kömür, torf, koks, neft, təbii qaz, bitum və s.).
+    EXCLUDES: Müəyyən kimyəvi tərkibli üzvi birləşmələr (təmiz metan və propandan başqa) → see 29
+    EXCLUDES: Dərman vasitələri (medikamentlər) → see 3003
+    EXCLUDES: Doymamış karbohidrogenlərin qarışıqları (efir yağları, parfümeriya qarışıqları, həşərat/mikrob əleyhinə preparatlar) → see 3301
+    EXCLUDES: Duru sintetik poliolefinlər (300°C-də 60 həcm %-dən az qovulan) → see 39
+    EXCLUDES: Ağac (odun) qatranı və odun qatranı yağları → see 3807
+    EXCLUDES: Bitumlu boyalar və laklar → see 3210
+    EXCLUDES: Sürtkü (yağlama) preparatları → see 3403
+    e.g.: Daş kömür; briketlər, okatışlar və daş kömürdən…10 kütlə %-dən çox olmayan (mineral maddələrsiz quru əsasa hesablanmada); Bitumlu minerallardan alınmış neft və neft məhs…– – digər məqsədlər üçün:– – – – xüsusi benzinlər:– – – – – uayt-spirit; Bitumlu minerallardan alınmış neft və neft məhs…də kükürdün miqdarı 2 kütlə %-dən çox, lakin 2,8 kütlə %-dən çox olmayan; Elektrik enerjisi
+code=28 | Qeyri-üzvi kimya məhsulları
+    COVERS: Qeyri-üzvi kimya: ayrı-ayrı kimyəvi elementlər və müəyyən kimyəvi tərkibli ayrı-ayrı qeyri-üzvi birləşmələr (turşular, oksidlər, hidroksidlər, duzlar, qeyri-metallar, radioaktiv elementlər).
+    EXCLUDES: Natrium xlorid (yeməli/texniki duz) və maqnezium oksid → see 25
+    EXCLUDES: Üzvi kimyəvi birləşmələr → see 29
+    EXCLUDES: Metallar, ərintilər, metal-keramika və aqlomerasiya edilmiş metal karbidləri → see 72
+    EXCLUDES: Qiymətli və yarımqiymətli daşlar, qiymətli metallar → see 71
+    EXCLUDES: Gübrələr (mineral və kimyəvi) → see 31
+    EXCLUDES: Lüminoforlar, şüşə fritta, toz/qranul şüşə → see 32
+    EXCLUDES: Süni qrafit, odsöndürən yükləri, becərilmiş iri kristallar → see 38
+    EXCLUDES: Optik elementlər (qələvi metal halogenidlərindən linzalar və s.) → see 9001
+    EXCLUDES: Ölçülü dozalarda və ya pərakəndə satış üçün dərman kimi qablaşdırılmış kimyəvi maddələr → see 30
+    EXCLUDES: Pərakəndə satış üçün diaqnostik və ya laboratoriya reaktivləri → see 3822
+    e.g.: flüor, xlor, brom, yod:– xlor; Kobalt oksidləri və hidroksidləri; texniki kobalt oksidləri; Karbonatlar; peroksokarbonatlar (perkarbonatlar…i texniki ammonium karbonat:– natrium hidrokarbonat (natrium bikarbonat); Digər qeyri-üzvi birləşmələr (distillə edilmiş…ava; amalqamalar, qiymətli metalların amalqamalarından başqa:– digərləri
+code=29 | Üzvi kimyəvi birləşmələr
+    COVERS: Ayrı-ayrı, müəyyən kimyəvi tərkibli üzvi (organik) kimya məhsulları — birləşmə, onun duzları, anhidridləri, efirləri və törəmələri.
+    EXCLUDES: etil spirti / etanol (təmiz olsa belə) → see 2207
+    EXCLUDES: metan və propan → see 2711
+    EXCLUDES: asiklik karbohidrogen izomerlərinin qarışıqları → see 27
+    EXCLUDES: kimyəvi təmiz saxaroza/qlükoza/laktoza/maltoza/fruktoza → see 17
+    EXCLUDES: xam qliserin → see 1520
+    EXCLUDES: karbamid (sidik cövhəri) gübrə kimi → see 3102
+    EXCLUDES: boyayıcı maddələr, sintetik üzvi boyalar → see 32
+    EXCLUDES: fermentlər (enzimlər) → see 3507
+    EXCLUDES: qeyri-üzvi karbon birləşmələri (28-ci qrup qeyd 2) → see 28
+    EXCLUDES: dozalanmış və ya pərakəndə dərman vasitələri, immunoloji məhsullar → see 30
+    EXCLUDES: kimyəvi tərkibi müəyyən olmayan preparatlar və qarışıqlar → see 38
+    EXCLUDES: polimerlər/plastik və sintetik kauçuk → see 39
+    EXCLUDES: optik elementlər → see 9001
+    EXCLUDES: tibbi alət və cihazlar (şpris, iynə, kateter) → see 9018
+    e.g.: Asiklik karbohidrogenlər:– doymuşlar; Tərkibində digər oksigentərkibli funksional qru…funksional qruplar olmayan asiklik ketonlar:– – butanon (metiletilketon); Tərkibində funksional nitril qrupu olan birləşmələr:– akrilonitril; Digər üzvi birləşmələr
+code=30 | Farmasevtik məhsullar
+    COVERS: Əczaçılıq (farmasevtik) məhsulları: dərman vasitələri, qan və immunoloji preparatlar, vaksinlər, sarğı materialları və 3006 mal mövqeyinin xüsusi farmasevtik malları.
+    EXCLUDES: tibbi cihazlar və alətlər: şpris, iynə, kateter, sistem, damcı sistemi → see 9018
+    EXCLUDES: qida məhsulları və içkilər (pəhriz, diabetik, zənginləşdirilmiş qidalar, qida əlavələri, tonuslandırıcı içkilər, mineral sular) → see IV
+    EXCLUDES: nikotinli siqaret tərgitmə məhsulları (həb, saqqız, plastr/transdermal sistem) → see 2404
+    EXCLUDES: stomatologiya üçün susuzlaşdırılmış/narın gips → see 2520
+    EXCLUDES: tibbi efir yağlarının su distillyatları/məhlulları → see 3301
+    EXCLUDES: ətriyyat, kosmetika və tualet vasitələri (terapevtik xassəli olsa belə) → see 3304
+    EXCLUDES: tərkibində dərman əlavəsi olan sabun və 3401 məhsulları → see 3401
+    EXCLUDES: stomatologiya üçün gips əsaslı vasitələr → see 3407
+    EXCLUDES: terapevtik/profilaktiki üçün hazırlanmamış qan albumini → see 3502
+    EXCLUDES: 3822 mal mövqeyinin diaqnostik/laboratoriya reagentləri → see 3822
+    e.g.: Orqanoterapiya üçün nəzərdə tutulmuş vəzlər və…rın və ya onların ifraz etdiyi maddələrin ekstraktları:– – insan mənşəli; Dərman vasitələri (3002, 3005 və ya 3006 mal mö…örəmələri və ya tərkibində streptomisinlər olan və ya onların törəmələri; Dərman vasitələri (3002, 3005 və ya 3006 mal mö…ılmış və ya pərakəndə satış üçün formalara və ya bağlamalara:– digərləri; Bu qrupun 4k. qeydində göstərilən əczaçılıq məhsulları:– digərləri:– – yararsız əczaçılıq vasitələri
+code=31 | Gübrələr
+    COVERS: Gübrələr: heyvan/bitki mənşəli, mineral və ya kimyəvi azotlu, fosforlu, kalium gübrələri, həmçinin iki-üç qida elementli mürəkkəb (NPK) gübrələr.
+    EXCLUDES: heyvan qanı (maye və ya qurudulmuş) → see 0511
+    EXCLUDES: müəyyən kimyəvi tərkibli ayrı-ayrı birləşmələr (qeyd 2(a),3(a),4(a),5-də sadalananlardan başqa) — gübrə kimi istifadə olunsa belə → see 28
+    EXCLUDES: kalium xloridin süni yetişdirilmiş kristalları (hər biri ≥2,5 q, optik elementlərdən başqa) → see 3824
+    EXCLUDES: kalium xloridin optik elementləri → see 9001
+    EXCLUDES: torpaq strukturunu yaxşılaşdıran, lakin qida elementi verməyən vasitələr (əhəng, gips təkbaşına) → see 2521
+    e.g.: Heyvan və ya bitki mənşəli gübrələr, qarışıq və…i mənşəli məhsulların qarışdırılması və ya kimyəvi emal edilmiş gübrələr; Mineral və ya kimyəvi azot gübrələri:– natrium nitrat:– – digəri; Mineral və ya kimyəvi kalium gübrələri:– digərləri; Tərkibində iki və ya üç qida elementi: azot, fo…dan artıq olmayan bağlamalarda:– digərləri:– – digərləri:– – – digərləri
+code=32 | Aşılayıcı və boyayıcı ekstraktlar; boyalar, laklar
+    COVERS: Aşılayıcı və boyayıcı ekstraktlar; tanninlər; boyayıcı maddələr, piqmentlər; boyalar, laklar; mastikalar/zamazka; mürəkkəblər.
+    EXCLUDES: Ayrı-ayrı kimyəvi təmiz elementlər və birləşmələr (dəmir/sink/qurğuşun oksidləri və s.) → see 28
+    EXCLUDES: Tanatlar və digər tanin törəmələri → see 2936
+    EXCLUDES: Asfalt və ya digər bitumlu mastikalar → see 2715
+    EXCLUDES: Kosmetik boyalar, üz və göz makiyajı vasitələri → see 3304
+    EXCLUDES: Pastel, rəsm təbaşiri, rəssamlıq/rəsm karandaşları, kömür karandaşları → see 9609
+    EXCLUDES: Qələmlər, markerlər, flomasterlər (mürəkkəblə doldurulmuş alət) → see 9608
+    e.g.: Bitki mənşəli aşılayıcı ekstraktlar; tanninlər…uzları, sadə və mürəkkəb efirləri; digər törəmələri:– kvebraxo ekstraktı; Digər boyayıcı maddələr; bu qrupun 3-cü qeydind…ə quru maddəyə görə hesablamada 80 kütlə % və ya çox titan dioksidi olan; Sintetik polimerlər və ya kimyəvi modifikasiya…an 2,2-(tret-butilimion) dietanol və 4,4-metilendisikloqeksildiizosionat; Tipoqrafiya boyaları, yazı və ya rəsm üçün mürə…tılaşdırılmış və ya qatılaşdırılmamış, bərk və ya qeyri-bərk:– digərləri
+code=33 | Efir yağları; ətriyyat və kosmetika vasitələri
+    COVERS: Efir yağları və rezinoidlər; ətriyyat, kosmetik və tualet vasitələri (33.01–33.07).
+    EXCLUDES: Təbii oleorezinlər (təbii terpenlər) və bitki ekstraktları → see 1301
+    EXCLUDES: Bitki ekstraktları (efir yağı olmayan) → see 1302
+    EXCLUDES: Sabun və digər üzvi səthi-aktiv məhsullar → see 3401
+    EXCLUDES: Terpentin, ağac və ya sulfat skipidarı → see 3805
+    EXCLUDES: Dərmani (terapevtik/profilaktik) dəri kremləri və məlhəmlər → see 3004
+    EXCLUDES: Ətirli şamlar → see 3406
+    EXCLUDES: Süni dırnaqlar (plastik) → see 3926
+    e.g.: Efir yağları (tərkibində terpenlər olan və ya o…eyvələrinin efir yağları:– – portağaldan:– – – tərkibində terpenlər olan; Efir yağları (tərkibində terpenlər olan və ya o…rı; efir yağlarının sulu distillyatları və sulu məhlulları:– rezinoidlər; Kosmetik vasitələr və ya makiyaj üçün vasitələr…qla; manikür və ya pedikür vəsitələri:– gözlərin makiyajı üçün vasitələr; Təraşa qədər, təraş zamanı və ondan sonra istif…nfeksiyaedici xassələri olan və ya olmayan ev dezodorantları:– digərləri
+code=34 | Sabun, səthi-aktiv maddələr, yuyucu vasitələr
+    COVERS: Sabun, üzvi səthi-aktiv maddələr, yuyucu, sürtkü, cilalama və təmizləyici vasitələr, süni və hazır mumlar, şamlar, modelləmə və diş texnikası pastaları.
+    EXCLUDES: forma yağlanması üçün heyvan/bitki/mikrobioloji piy və yağlar əsasında qida qarışıqları → see 1517
+    EXCLUDES: müəyyən kimyəvi tərkibli ayrı-ayrı birləşmələr → see 29
+    EXCLUDES: şampunlar, diş təmizləmə vasitələri, təraş kremləri və köpükləri, vanna vasitələri (sabun/səthi-aktiv maddə tərkibli) → see 3307
+    EXCLUDES: ətriyyat, kosmetika və tualet vasitələri (sabundan başqa) → see 33
+    EXCLUDES: qarışdırılmamış heyvan və ya bitki mumları → see 1521
+    EXCLUDES: mineral mumlar (parafin, neft mumu) və analoji məhsullar → see 2712
+    e.g.: Sabun; sabun kimi istifadə edilən üzvi səthi-ak…– tualet sabunu (tərkibində dərman vasitələri olan sabun daxil olmaqla); Üzvi səthi-aktiv maddələr (sabundan başqa); sət…akəndə satış üçün qablaşdırılmış üzvi səthi-aktiv maddələr:– – digərləri; Süni mumlar və hazır mumlar:– polioksietilen(polietilenqlikoldan); Yapma üçün pastalar, uşaqlar üçün yapma plastil…ya kalsium-sulfat) əsaslı diş müalicəsi məqsədləri üçün digər tərkiblər
+code=35 | Zülali maddələr; nişasta məhsulları; yapışqanlar
+    COVERS: Zülal maddələri (kazein, albuminlər, jelatin, peptonlar), modifikasiya olunmuş nişastalar (dekstrinlər), yapışqanlar və fermentlər (enzimlər).
+    EXCLUDES: mayalar → see 2102
+    EXCLUDES: terapevtik/profilaktik məqsədlə hazırlanmış qan fraksiyaları və dərman vasitələri → see 30
+    EXCLUDES: ilkin aşılanma üçün ferment preparatları → see 3202
+    EXCLUDES: isladılma/yuyulma üçün ferment preparatları → see 34
+    EXCLUDES: bərkidilmiş (sərtləşdirilmiş) proteinlər → see 3913
+    EXCLUDES: poliqrafiya sənayesi üçün jelatindən məhsullar → see 49
+    EXCLUDES: reduksiyaedici şəkəri quru maddədə 10%-dən çox olan nişasta parçalanma məhsulları → see 1702
+    e.g.: Kazein, kazeinatlar və kazeinin digər törəmələr…ları:– kazein:– – regenerasiya olunmuş toxuculuq liflərin istehsalı üçün; Albuminlər (quru məhsula hesablanmada 80 kütlə…i:– – – qurudulmuş (məsələn, lövhələr, pulcuqlar, lopalar, toz şəklində); Dekstrinlər və digər modifikasiya olunmuş nişas…muş nişastalar:– – digər modifikasiya olunmuş nişastalar:– – – digərləri; Fermentlər; ayrı yerdə adları çəkilməyən və ya daxil edilməyən ferment preparatları:– digərləri:– – digərləri
+code=36 | Partlayıcı maddələr; pirotexnika; kibrit
+    COVERS: Partlayıcı maddələr; piroteknika; kibritlər; piroforik ərintilər; qeyd 2-də göstərilən müəyyən yanan (alışqan) materiallardan məmulatlar.
+    EXCLUDES: Müəyyən kimyəvi tərkibli ayrı-ayrı birləşmələr (qeyd 2(a),(b)-də göstərilənlərdən başqa) → see 28
+    EXCLUDES: Üzvi müəyyən kimyəvi birləşmələr → see 29
+    EXCLUDES: Patronlar və digər döyüş sursatı, hərbi silahlar → see 9306
+    EXCLUDES: Fotoqrafiya üçün işıq (blits) materialları → see 3707
+    EXCLUDES: Kimyəvi işıqlanma (xemilüminessensiya) yolu ilə işıq verən məmulatlar → see 3824
+    e.g.: Barıt:– barıt, hərbi məqsədlər üçün; Odkeçirən şnurlar; detonasiya şnurları; zərbə və ya detonasiya kapsulları; fitillər; elektrodetonatorlar:– digərləri; Fişənglər, siqnal raketləri, yağış raketləri, dumanaqarşı siqnallar və digər pirotexnika məmulatları: 0– – – digərləri; Ferroserium və istənilən formada digər pirofor…n alışqan materiallardan hazırlanan məmulatlar:– digərləri:– – digərləri
+code=37 | Foto və kino üçün mallar
+    COVERS: Fotoqrafiya və kinematoqrafiya malları: sensibilizasiya olunmuş foto lövhələr, lentlər, kağız və toxumalar; ekspozisiya olunmuş/işlənmiş materiallar; foto məqsədli kimyəvi preparatlar.
+    EXCLUDES: Tullantılar və qırıntılar (fotoqrafiya materiallarının) → see Section VI / müvafiq tullantı mövqeləri
+    EXCLUDES: Foto kameralar, kino kameralar, proyektorlar, artırıcı və işıqlandırıcı foto aparatlar → see 9006, 9007, 9008, 9010
+    EXCLUDES: Foto məqsədli olmayan və ölçülü dozalarda qablaşdırılmamış təmiz kimyəvi maddələr → see 28, 29
+    EXCLUDES: Maqnit və ya digər qeyri-foto üsulla yazılmış səs/məlumat daşıyıcıları → see 8523
+    EXCLUDES: İşlənmiş fotoqrafiya çapı (şəkillər, açıqcalar, çap məhsulları) → see 49
+    e.g.: Fotoplastinkalar və yastı fotoplyonkalar, sensi…ada olan və ya olmayan: – rentgen:– – tibbi və baytarlıq məqsədləri üçün; Fotoplyonkalar rulonlarda, sensibilizasiya olun…uzunluğu 200 m-dən çox olan, rəngli fotoqrafiya üçün plyonkalardan başqa; Fotoqrafik plastinkalar, plyonka, kağız, karton…spozisiya olunmuş, lakin aydınlaşdırılmamış:– plastinkalar və plyonkalar; Fotokimyəvi maddələr (laklardan, yapışqanlardan…ır şəkildə pərakəndə satış üçün qablaşdırılmış:– digərləri:– – digərləri
+code=38 | Müxtəlif kimya məhsulları
+    COVERS: Müxtəlif (qeyri-müəyyən) kimyəvi məhsullar və tərkiblər: pestisidlər, katalizatorlar, həlledicilər, aşqarlar, reagentlər, tökmə/qaynaq köməkçi vasitələri, biodizel və kimya sənayesi tullantıları.
+    EXCLUDES: Müəyyən kimyəvi tərkibli ayrı-ayrı elementlər və birləşmələr (süni qrafit, 3808/3813 istisna olmaqla) → see 28/29
+    EXCLUDES: Dərman vasitələri (baytarlıq preparatları daxil) → see 3003
+    EXCLUDES: Qida dəyəri olan maddələrlə qarışıq kimyəvi qida tərkibləri → see 2106
+    EXCLUDES: Tütün və nikotin məhsulları → see 2404
+    EXCLUDES: Tərkibində metal/arsenium olan şlak, kül və qalıqlar → see 2620
+    EXCLUDES: İşlənmiş katalizatorlar (qiymətsiz metal çıxarımı üçün 2620; qiymətli metal bərpası üçün 7112; sırf metal/ərinti katalizatorları XIV/XV bölmə) → see 2620
+    EXCLUDES: Yanğınsöndürən aparatlar/cihazlar (yalnız yükləri deyil, cihazın özü) → see 8424
+    EXCLUDES: Tibbi alət və cihazlar (yeni şpris, iynə, kateter) → see 9018
+    e.g.: Süni qrafit; kolloid və ya yarımkolloid qrafit;…stin, yaxud digər yarımfabrikatlar şəklində olan məhsullar:– süni qrafit; Bəzək vurma vasitələri, boyanmanı sürətləndirən…digərləri:– – tekstil sənayesində və ya analoji sahələrdə tətbiq edilən; Tökmə formaların və ya tökmə özəklərin istehsal…– tərkibində, D-qlüsitlə hesablanmada, 2 kütlə % və ya az D-mannit olan; Biodizel və onun qarışıqları, tərkibində 70 küt…rından alınmış neft və ya neft məhsulları olan və ya olmayan:– digərləri
+code=39 | Plastik kütlələr və onlardan məmulatlar
+    COVERS: Plastik kütlələr (polimerlər) və onlardan hazırlanan məmulatlar.
+    EXCLUDES: Sintetik kauçuk və ondan hazırlanan məmulatlar → see 40
+    EXCLUDES: Sürtkü materialları → see 2710
+    EXCLUDES: Mumlar → see 3404
+    EXCLUDES: Müəyyən kimyəvi tərkibli ayrı-ayrı üzvi birləşmələr → see 29
+    EXCLUDES: Heparin və ya onun duzları → see 3001
+    EXCLUDES: Tekstil materialları və tekstil məmulatları → see XI
+    EXCLUDES: Ayaqqabı, baş geyimləri, çətirlər, çəliklər (XII bölmə) → see XII
+    EXCLUDES: Kağız əsaslı divar örtükləri (oboylar) → see 4814
+    EXCLUDES: Mebel, lampalar və işıqlandırıcı avadanlıq, yığma tikililər → see 94
+    EXCLUDES: Oyuncaqlar, oyunlar, idman inventarı → see 95
+    EXCLUDES: Fırçalar, düymələr, zəncirbəndlər, daraqlar, qələmlər (qr.96) → see 96
+    EXCLUDES: Optik elementlər, eynək çərçivələri, çertyoj alətləri (qr.90 məmulatları) → see 90
+    EXCLUDES: Bijuteriya → see 7117
+    EXCLUDES: Çamadanlar, çantalar, sərraclıq məmulatları → see 4202
+    EXCLUDES: Maşınlar və mexaniki/elektrik qurğular (XVI bölmə) → see XVI
+    EXCLUDES: Tibbi alət və cihazlar (plastik şpris/şприц, iynə, kateter, sistem) → see 9018
+    EXCLUDES: Süni dişlər, protezlər, süni bədən üzvləri, ortopedik məmulatlar → see 9021
+    e.g.: Etilen polimerləri, ilkin formalarda:– xüsusi çəkisi 0,94-dən az olan polietilen:– – xətti polietilen; Amino-aldehid qatranları, fenol-aldehid qatranları və poliuretanlar, ilkin formalarda:– poliuretanlar:– – digərləri; Plastmassalardan plitələr, təbəqələr, plyonkala…astifikatorlar 6 kütlə%-dan az olmayan:– – – qalınlığı 1 mm-dən çox olan; Plastmassadan digər məmulatlar və 3901-3914 mal…n məmulatlar:– digərləri:– – digərləri:– – – digərləri:– – – – digərləri
+code=40 | Kauçuk, rezin və onlardan məmulatlar
+    COVERS: Kauçuk (təbii və sintetik, vulkanlaşdırılmış və ya vulkanlaşdırılmamış, bərk və ya qeyri-bərk) və rezindən məmulatlar.
+    EXCLUDES: Tekstil materialları və tekstil məmulatları → see XI bölmə
+    EXCLUDES: Ayaqqabı və onun hissələri → see 64
+    EXCLUDES: Baş geyimləri və hissələri (üzgüçülük papaqları daxil) → see 65
+    EXCLUDES: Bərk rezindən mexaniki və ya elektrik qurğuları və hissələri → see XVI bölmə
+    EXCLUDES: Tibbi/cərrahi alət və cihazlar, optika, saatlar, silah, mebel, fırça və s. → see 90
+    EXCLUDES: Oyuncaqlar, oyunlar və idman ləvazimatları → see 95
+    EXCLUDES: Plastik kütlələr və onlardan məmulatlar (vulkanlaşma/gərilmə testinə uyğun gəlməyən materiallar) → see 39
+    e.g.: Təbii kauçuk, balata, quttaperça, qvayula, çikl…– az vulkanlaşdırılmış və ya az vulkanlaşdırılmamış təbii kauçuk lateksi; Vulkanlaşdırılmış rezindən, bərk rezindən başqa…əbəqələr və zolaqlar və ya lentlər:– – – döşəmə örtükləri və ayaqaltılar; Təzə pnevmatik rezin şinlər:– digərləri:– – kən…eşə təsərrüfatında istifadə edilən nəqliyyat vasitələri və maşınlar üçün; Bərk rezin (məsələn, ebonit) bütün formalarda,…və skrap daxil olmaqla; bərk rezindən hazırlanan məmulatlar:– digərləri
+code=41 | Xam gön-dəri və emal olunmuş dəri
+    COVERS: Emal olunmamış (xam) gönlər və dərilər (xəzdən başqa) və aşılanmış dəri; kompozit dəri.
+    EXCLUDES: xam gön və dərilərin kəsikləri və analoji tullantıları → see 0511
+    EXCLUDES: lələkli və ya pərğulu quş dəriləri və onların hissələri → see 0505
+    EXCLUDES: tüklü və ya yunlu (xəzli) gön və dərilər — xam, aşılanmış və ya emal olunmuş xəz → see 43
+    EXCLUDES: heyvanların yeməli (bişməmiş) dəriləri → see 0206
+    EXCLUDES: dəridən məmulatlar (çanta, kəmər, əlcək, yəhər-qayış, çamadan) → see 42
+    EXCLUDES: dəri ayaqqabı və onun hissələri → see 6403
+    e.g.: İribuynuzlu mal-qaranın (camış daxil olmaqla) v…ayrı konservləşdirilmə halında 16 kq-dan çox olmayan kütlə ilə:– – təzə; İribuynuzlu mal-qaranın (camış daxil olmaqla) g…la məruz qalmış, lakin dəri məmulatlarının istehsalı üçün tamam yararsız; Tük və ya yun örtüyü olmayan digər heyvanların…nməmiş, , lakin sonra emal edilməmiş: – digərləri:– – quru halda (krast); Təbii dəri və ya lövhə, təbəqə və ya zolaq və y…məmulatlarının istehsalı üçün yararsız; dəri tozu, dəri ovuntusu və unu
+code=42 | Dəri məmulatları; yəhər-qayış; səyahət ləvazimatı
+    COVERS: Təbii/kompozisiya dəridən məmulatlar; yəhər-qoşqu; səyahət ləvazimatı, çantalar və analoji qablar; heyvan bağırsağından (ipəkqurdu bağırsağı istisna) məmulatlar.
+    EXCLUDES: Steril cərrahiyyə kətqutu və analoji steril tikiş (sutura) materialları → see 3006
+    EXCLUDES: Astarı və ya üzü təbii/süni xəzdən olan geyim və geyim ləvazimatları (əlcəklərdən başqa) → see 4303
+    EXCLUDES: Tordan hazır məmulatlar → see 5608
+    EXCLUDES: Ayaqqabı və ayaqqabı hissələri → see 64
+    EXCLUDES: Baş geyimləri və onların hissələri → see 65
+    EXCLUDES: Qırmanclar, qamçılar → see 6602
+    EXCLUDES: Qol düymələri, bilərziklər və digər bijuteriya → see 7117
+    EXCLUDES: Ayrıca təqdim olunan qoşqu furniturası (üzəngi, ağızlıq, toqqa) → see XV
+    EXCLUDES: Musiqi aləti simləri, baraban dəriləri və digər alət hissələri → see 9209
+    EXCLUDES: Mebel, lampalar və işıqlandırma avadanlığı → see 94
+    EXCLUDES: Oyuncaqlar, oyunlar, idman inventarı → see 95
+    EXCLUDES: Düymələr, knopkalar, basma bəndlər və onların hissələri → see 9606
+    EXCLUDES: Əsas xassəni müəyyən edən qiymətli metal/mirvari/daş hissəli məmulatlar → see 71
+    EXCLUDES: Tibbi alət və cihazlar (şpris/şprits, iynə, kateter, cərrahi alət) → see 9018
+    e.g.: Hər hansı heyvan üçün istənilən materialdan haz…ullar, aşırma xurcunlar, it çulları və analoji məmulatlar daxil olmaqla); Sakvoyajlar, çamadanlar, qadın çanta-çamadanlar…n və ya toxuculuq materiallarından olan:– – – toxuculuq materiallarından; Sakvoyajlar, çamadanlar, qadın çanta-çamadanlar…– – – – yol çantaları, kosmetika çantaları, rükzaklar və idman çantaları; Bağırsaqlardan (barama fibroinindən olan liflərdən başqa) sinyuqadan, kisəcikdən və ya vətərdən hazırlanan məmulatlar
+code=43 | Natural və süni xəz və onlardan məmulatlar
+    COVERS: Təbii və süni xəz: xam xəz dəriləri, aşılanmış/emal edilmiş xəz gönləri və onlardan hazırlanan geyim və məmulatlar.
+    EXCLUDES: quşların lələkli və ya pərğulu dəriləri və hissələri → see 0505
+    EXCLUDES: tüklü/yunlu xam (aşılanmamış) heyvan gönləri → see 41
+    EXCLUDES: dəri ilə xəzdən (və ya dəri ilə süni xəzdən) əlcək, təkbarmaq əlcək və yarıməlcəklər → see 4203
+    EXCLUDES: ayaqqabı və onun hissələri → see 64
+    EXCLUDES: baş geyimləri və onların hissələri (xəz papaq daxil) → see 65
+    EXCLUDES: oyuncaqlar, oyunlar və idman inventarı → see 95
+    EXCLUDES: toxunma və ya hörmə yolu ilə alınan təbii xəz təqlidləri (uzunxovlu parçalar) → see 5801
+    EXCLUDES: tüksüz adi dəri və dəri məmulatları → see 41
+    e.g.: Xam xəzlik dəri-xəz (xəz məmulatlarının hazırla…utreola) , bütöv, başla, quyruqla, pəncələrlə və ya onlarsız:– – qəhvəyi; Xəzlik dəri və xəz, aşılanmış və ya işlənmiş xə…ə ya onlarsız, yığılmamış:– – digərləri:– – – dovşan və ya ev dovşanının; Xəzlik dəri və xəz, aşılanmış və ya işlənmiş xə…zlik dəri, parçalar və kəsiklər, yığılmış:– – digərləri:– – – ondatranın; Süni xəz və ondan hazırlanan məmulatlar
+code=44 | Ağac və ağacdan məmulatlar; ağac kömürü
+    COVERS: Oduncaq (taxta) və oduncaqdan məmulatlar; ağac kömürü — xammaldan (yanacaq odunu, tir, mişarlanmış taxta, faner, plitələr) hazır taxta məmulatlarına qədər.
+    EXCLUDES: ətriyyat, əczaçılıq, insektisid/funqisid üçün talaşa, yonqar, toz şəklində oduncaq → see 1211
+    EXCLUDES: hörmə üçün emal olunmamış bambuk və oduncaq təbiətli materiallar → see 1401
+    EXCLUDES: boyama və ya aşılama üçün talaşa/yonqar/toz şəklində oduncaq → see 1404
+    EXCLUDES: aktivləşdirilmiş (aktivləşmiş) ağac kömürü → see 3802
+    EXCLUDES: 42.02 mal mövqeyinin məmulatları (çamadan, çanta və s. taxta korpuslu) → see 4202
+    EXCLUDES: hörmə materiallarından məmulatlar (səbət, həsir) → see 46
+    EXCLUDES: taxta ayaqqabılar və ya onların detalları → see 64
+    EXCLUDES: çətir, çəlik və onların hissələri (hazır məmulat) → see 66
+    EXCLUDES: oduncaqlı sement/həll materialından məmulatlar → see 6808
+    EXCLUDES: taxtadan bijuteriya (təqlidi zərgərlik) → see 7117
+    EXCLUDES: maşınların taxta hissələri, örtükləri, gövdələri (XVI/XVII bölmə) → see 84
+    EXCLUDES: saat korpusları, musiqi alətləri və hissələri (XVIII bölmə) → see 92
+    EXCLUDES: odlu silahların taxta hissələri (qundaq) → see 9305
+    EXCLUDES: taxta mebel, lampalar, işıqlandırıcı avadanlıq, yığma tikinti konstruksiyaları → see 94
+    EXCLUDES: taxta oyuncaqlar, oyunlar, idman inventarı → see 95
+    EXCLUDES: tənbəki çubuqları, düymələr, karandaşlar, ştativlər (96-cı qrup; 9603 fırçalar üçün taxta korpus/qulp istisna) → see 96
+    EXCLUDES: sənət əsərləri (taxta heykəl/oyma orijinal) → see 97
+    EXCLUDES: çərçivəli güzgü (taxta çərçivədə) → see 7009
+    e.g.: Şalban, odun, budaq, çırpı bağlamaları və ya an…cağı şalban, girdin, çırpı bağlaması formasında və ya analoji formalarda; Uzununa mişarlanma və ya yarılma, təbəqələrə ay…əri olan, rəndələnmiş və ya rəndələnməmiş, cilalanmış və ya cilalanmamış; Qatranlar və ya digər üzvi bağlayıcı maddələr h…):– – – işlənməmiş və ya cilalanmadan başqa sonrakı emala məruz qalmamış; Digər ağac məmulatları:– digərləri:– – digərləri
+code=45 | Probka və ondan məmulatlar
+    COVERS: Təbii və aqlomerasiya edilmiş mantar (probka) və ondan hazırlanan məmulatlar.
+    EXCLUDES: ayaqqabı və ya ayaqqabı detalları (mantar altlıqlı, çıxarılan iç altlıqlar daxil) → see 64
+    EXCLUDES: baş geyimləri və onların hissələri → see 65
+    EXCLUDES: oyuncaqlar, oyunlar, idman inventarı (balıq ovu tilov qoltuqları/üzgəcləri daxil) → see 95
+    EXCLUDES: mantar disklə örtülmüş metal tac-tıxaclar (kron-probka) → see 8309
+    EXCLUDES: mantar patron pıçtaqları (yığcamlar) → see 9306
+    EXCLUDES: linoleum və oxşar döşəmə örtükləri (mantar əsaslı olsa belə) → see 5904
+    e.g.: Təbii mantar, emal edilməmiş və ya ilkin emalda…üdülmüş mantar:– təbii mantar, emal edilməmiş və ya ilkin emaldan keçmiş; Təbii mantardan məmulatlar:– tıxaclar və mantarlar:– – digərləri; Aqlomerasiya edilmiş mantar (bağlayıcı maddə il…indrlər, disklər daxil olmaqla:– – tıxaclar və mantarlar:– – – digərləri; Aqlomerasiya edilmiş mantar (bağlayıcı maddə ilə və ya onsuz) və ondan hazırlanan məhsullar:– digərləri:– – digərləri
+code=46 | Küləş və hörmə materiallarından məmulatlar
+    COVERS: Hörmə üçün materiallardan (saman, bambuk, rotanq, qarğı, qamış, söyüd və s.) hörmələr, həsirlər, səbətçilik və analoji məmulatlar.
+    EXCLUDES: Divar örtükləri (kağız/hörmə material üzərində) → see 4814
+    EXCLUDES: Ciyələr, kəndirlər, kanatlar, troslar (hörülmüş və ya hörülməmiş) → see 5607
+    EXCLUDES: Ayaqqabı, baş geyimləri və onların hissələri → see 64
+    EXCLUDES: Hörmə üçün materiallardan nəqliyyat vasitələri və ya kuzovlar → see 87
+    EXCLUDES: Mebel, lampalar və işıqlandırıcı avadanlıq → see 94
+    EXCLUDES: Təbii/kompozit dəridən, keçədən, fetrdən və ya toxunmamış materiallardan zolaqlar, insan saçı, at tükü, toxuculuq ipliyi, 54-cü qrupun monosap və zolaqları → see 54
+    EXCLUDES: Emal edilməmiş xam bitki materialları (hörməyə yararlı formaya gətirilməmiş saman, bambuk, rotanq) → see 14
+    e.g.: Zolaqlar və ya lent şəklində birləşdirilmiş və…– – hörmə materiallarından hazırlanan hörülmüş və ya analoji məmulatlar; Zolaqlar və ya lent şəklində birləşdirilmiş və…– – hörmə materiallarından hazırlanan hörülmüş və ya analoji məmulatlar; Zolaqlar və ya lent şəklində birləşdirilmiş və…r, zolaqlar və ya lentlər şəklində birləşdirilmiş və ya birləşdirilməmiş; Bilavasitə hörmə materiallarından və ya 4601 ma…ət, hörmə və digər məmulatlar; lüfədən hazırlanan məmulatlar:– digərləri
+code=47 | Ağacdan və ya lifli materialdan sellüloz
+    COVERS: Oduncaqdan və ya digər lifli sellülozlu materialdan sellüloz (kütlə); regenerasiya olunan (makulatura) kağız və ya karton (tullantı və qırıntı).
+    EXCLUDES: kağız və karton, habelə kağız kütləsindən, kağızdan və ya kartondan hazırlanmış məmulatlar → see 48
+    EXCLUDES: kağız yunu (hətta makulaturadan hazırlanmış olsa belə) → see 4823
+    EXCLUDES: qiymətli metal və ya birləşmələrini bərpa etmək üçün işlədilən, qiymətli metal saxlayan kağız/karton tullantısı (məs. gümüşlü foto kağız) → see 7112
+    EXCLUDES: regenerasiya olunmuş sellüloz tekstil lifləri (viskoza, asetat ştapel/filament) → see 54
+    EXCLUDES: kağız kütləsindən çıxarılmış selikli materiallar, süni tel/tekstil kimi emal olunmuş məhsullar → see 39
+    e.g.: Oduncaq kütləsi:– termo-mexaniki oduncaq kütləsi; Oduncaq sellülozu, sulfitli, həll olan növlərdən başqa:– ağardılmamış:– – yarpaqlı növlərdən; Lifli kütlə, regenerasiya olunan kağızdan və ya…ə ya digər lifli sellüloz materiallardan alınmış:– digəri:– – oduncaqdan; Regenerasiya olunan kağızdan və ya kartondan (t…i, çeşidlənməmiş tullantılar və makulatura daxil olmaqla:– – çeşidlənmiş
+code=48 | Kağız və karton; kağız kütləsindən məmulatlar
+    COVERS: Kağız, karton, sellüloz pambığı (vata) və sellüloz liflərindən təbəqələr və onlardan hazırlanmış məmulatlar.
+    EXCLUDES: 30-cu qrup məmulatları (dərman vasitələri, tibbi sarğılar, farmasevtik hopdurulmuş sellüloz vata) → see 30
+    EXCLUDES: Tibbi alət və cihazlar: şpris (şprist), iynə, kateter, süzgəc/filtr blokları deyil → see 9018
+    EXCLUDES: Basma naxış (ştamp) folqası → see 3212
+    EXCLUDES: Ətirli kağız və ya kosmetik vasitələrlə örtülmüş/hopdurulmuş kağız → see 33
+    EXCLUDES: Sabun/yuyucu ilə örtülmüş kağız və ya sellüloz pambığı → see 3401
+    EXCLUDES: Pardaqlayıcı, krem və analoji maddələrlə örtülmüş kağız və ya sellüloz pambığı → see 3405
+    EXCLUDES: Sensibilizasiya olunmuş (işığa həssas) foto kağız və karton → see 3701
+    EXCLUDES: Diaqnostik və ya laboratoriya reagentləri ilə hopdurulmuş kağız → see 3822
+    EXCLUDES: Plastmas layı üstün olan kağız/karton və ya kağızla möhkəmləndirilmiş plastmas təbəqələr (4814 divar örtükləri istisna) → see 39
+    EXCLUDES: 4202 mal mövqeyinin məmulatları (çamadan, çanta, yol ləvazimatı) → see 4202
+    EXCLUDES: Hörmə materiallarından məmulatlar → see 46
+    EXCLUDES: Kağız iplik və ondan tekstil məmulatları → see XI
+    EXCLUDES: Ayaqqabı və baş geyimləri → see 64
+    EXCLUDES: Abraziv kağız və ya karton (zımpara) → see 6805
+    EXCLUDES: Kağız/karton əsaslı qarğadüzü (slyuda) — lakin slyuda tozu ilə örtülmüş kağız burada qalır → see 6814
+    EXCLUDES: Kağız/karton əsaslı metal folqa → see XIV
+    EXCLUDES: 9209 mal mövqeyinin məmulatları (musiqi aləti hissələri) → see 9209
+    EXCLUDES: 95-ci qrup məmulatları (oyuncaqlar, oyunlar, idman inventarı) → see 95
+    EXCLUDES: 96-cı qrup məmulatları (düymələr, gigiyenik bezlər/tamponlar, uşaq bələkləri/əskiləri) → see 96
+    EXCLUDES: Çap sənayesi məhsulları (kitab, qəzet, jurnal, çap şəkilləri) — çapın əsas məqsəd olduğu hallar → see 49
+    EXCLUDES: Sellüloz kütləsi (kağız istehsalı üçün oduncaq və ya digər lifli sellüloz kütlə) → see 47
+    EXCLUDES: Oduncaq lifli plitə (MDF, HDF, fibreboard) → see 4411
+    e.g.: Qəzet kağızı, rulonlarda və ya vərəq şəklində; Digər təbaşirlənməmiş kağız və karton, rulonlar…östərilən şəkildə emal olunan:– büzmələmə kağızı:– – digəri:– – – digəri; Papiros kağızı, ölçü üzrə və ya kitabça və ya b…sında kəsilmiş və ya kəsilməmiş:– kitabçalar və ya borucuqlar formasında; Forma və ya ölçü üzrə kəsilmiş kağız, karton, s…parçalardan digər məmulatlar: – digərləri:– – digərləri:– – – digərləri
+code=49 | Çap kitabları, qəzetlər və çap məhsulları
+    COVERS: Çap sənayesinin məhsulları: çap kitabları, qəzet və jurnallar, şəkillər, xəritələr, əlyazmalar, maşınyazıları və planlar.
+    EXCLUDES: şəffaf əsaslı fotoqrafiya neqativləri və pozitivləri → see 37
+    EXCLUDES: relyefli (qabarıq) xəritələr, planlar və qlobuslar → see 9023
+    EXCLUDES: oyun kartları və 95-ci qrupun digər malları (oyuncaqlar) → see 95
+    EXCLUDES: qravür, estamp və litoqrafiya orijinalları, 100 ildən yuxarı əntiq əşyalar → see 9702
+    EXCLUDES: istifadə olunmuş poçt/rüsum markaları, birinci gün zərfləri, poçt dəftərxana ləvazimatı → see 9704
+    EXCLUDES: kağız/kartondan məmulatlar ki, çap onların əsas təyinatına yalnız köməkçidir (yazı-dəftərxana) → see 48
+    EXCLUDES: xəritə naxışlı toxuculuq məmulatları (şərf, dəsmal) → see 63
+    e.g.: Çap kitablar, broşüralar, vərəqlər və analoji ç…lər şəklində: – ayrı-ayrı vərəqlər şəklində, qatlanmış və ya qatlanmamış; Coğrafi və ya hidroqrafik xəritələr və ya bütün…ar xəritələri, topoqrafik planlar və qlobuslar daxil olmaqla:– qlobuslar; Köçürmə şəkillər (dekalkomaniya):– köçürmə şəkillər (dekalkomaniya), şüşələnəbilən; Digər çap məhsulları, çap reproduksiyaları və fotoşəkillər daxil olmaqla:– digəri:– – digərləri
+code=50 | İpək
+    COVERS: İpək: barama və xam ipəkdən tutmuş ipək tullantısı, ipək və ipək tullantısı ipliyi, ipək qurdu bağırsağı və ipək parçalara qədər.
+    EXCLUDES: Yun, nazik və ya qaba heyvan tükü → see 51
+    EXCLUDES: Pambıq → see 52
+    EXCLUDES: Süni və sintetik saplı liflər (kimyəvi liflər) → see 54
+    EXCLUDES: Steril ipək qurdu bağırsağı (tibbi tikiş üçün) → see 3006
+    EXCLUDES: İpəkdən saxta ket-qut (imitasiya catgut) → see 5604
+    EXCLUDES: Qarmaqlı və ya balıq tutma tiliyi kimi hazırlanmış ipək qurdu bağırsağı → see 9507
+    EXCLUDES: İpəkdən qaytan, kəndir, ip (şpaqat) → see 5607
+    EXCLUDES: 57-59-cu fəsillərin toxuma parçaları (məs. ələk parçası) → see 5911
+    EXCLUDES: Tibbi alət və cihazlar (şpris/şpris iynəsi, kateter) → see 9018
+    e.g.: Barama qurdunun baraması, açılmağa yararlı; İpək sap və ipək tullantılarından iplik, pərakə…ya digər ipək tullantılarından hazırlanan iplik; barama fibroinindən lif; İpək sapından və ya ipək tullantılarından parça…igərləri:– – – digərləri:– – – – ağardılmamış, yuyulmuş və ya ağardılmış; İpək sapından və ya ipək tullantılarından parçalar:– digər parçalar:– – çap olunmuş
+code=51 | Yun və heyvan tükü; at tükündən ip və parça
+    COVERS: Yun, zərif və qaba heyvan tükü, at tükü (qıl); onların tullantı, daranmış lifləri, ipliyi və toxunma parçaları.
+    EXCLUDES: insan saçı → see 0501
+    EXCLUDES: fırça istehsalı üçün tük və qıl (donuz qılı, porsuq tükü) → see 0502
+    EXCLUDES: at tükü/qıl (at və ya iribuynuzlu heyvanların yal və quyruq tükü — tək lif) → see 0511
+    EXCLUDES: emal olunmamış gön, dəri və xəzlər → see 4101
+    EXCLUDES: vatin, tibbi tənzif/bint (dərmanlı və ya pərakəndə satış üçün) → see 3005
+    EXCLUDES: yalnız gübrə kimi yararlı yun/tük tullantısı → see 3101
+    EXCLUDES: köhnəlmiş və ya təzə cır-cındır (daranmamış) → see 6310
+    EXCLUDES: texniki təyinatlı toxunma parçalar → see 5911
+    EXCLUDES: tibbi alət və avadanlıq (şpris, iynə, kateter) → see 9018
+    e.g.: Yun, kardo və daraqla daranmaya məruz qalmamış:…təbəqə formasında qırxılmış yuyulmuş yun daxil olmaqla:– – qırxılmış yun; Aparatla əyrilmiş yun iplik, pərakəndə satış üç…mamış:– tərkibində 85 kütlə % və ya daha artıq yun olan:– – ağardılmamış; Aparatda əyrilmiş yun ipliyindən və ya aparatda…və ya zərif heyvan tükü olan:– – səthi sıxlığı 300 q/m2-dan çox olmayan; Qaba heyvan tükündən və ya at tükündən parçalar
+code=52 | Pambıq
+    COVERS: Pambıq: xam liftən (mahlıc) tullantı, daraqlanmış lif, ip/sap və pambıq parçalara qədər bütün emal mərhələləri.
+    EXCLUDES: Pambıq linteri (qısa lif, ≤5 mm) → see 1404
+    EXCLUDES: Vata (pambıq vatası, tibbi vata daxil) → see 5601
+    EXCLUDES: Tibbi cəhətdən emal olunmuş və ya pərakəndə satış üçün bağlama sarğılar/bintlər → see 3005
+    EXCLUDES: Ilgəkli (mahmal/frotə) dəsmal parça, tül, qazlı doku, xüsusi texniki parçalar → see 5802
+    EXCLUDES: Trikotaj (toxunma-hörmə) parça və məmulatlar → see 6006
+    EXCLUDES: Şpaqat, kanat, ip (twine, cordage) tərifinə düşən qalın sap → see 5607
+    e.g.: Pambıq lifi, kardo- və ya daraqla daranmaya məruz qalmamış:– hiqroskopik və ya ağardılmış; Tərkibində 85 kütlə %-dən az pambıq lifləri ola…üçün 14 metrik nömrədən yuxarı, lakin 43 metrik nömrədən yuxarı olmayan); Tərkibində 85 kütlə%-i və ya daha çox pambıq li…ə ya 4-saplı sarja toxunuşlu digər parçalar, ikiüzlü sarja daxil olmaqla; Digər pambıq parçalar:– səthi sıxlığı 200 q/ m2-dan çox olan:– – çap olunmuş:– – – digərləri qarışdırılmış
+code=53 | Digər bitki toxuculuq lifləri; kağız ipliyi
+    COVERS: Digər bitki mənşəli tekstil lifləri (kətan, çətənə, cut, kokos, sizal, abaka, rami və s.), onlardan iplik, həmçinin kağız ipliyi və kağız ipliyindən toxunma parçalar.
+    EXCLUDES: Pambıq lifi, pambıq ipliyi və pambıq parçaları → see 52
+    EXCLUDES: Yun və heyvan tükü, onlardan iplik və parça → see 51
+    EXCLUDES: Süni və sintetik liflər/saplar (kimyəvi liflər), viskoza, poliester və s. → see 54
+    EXCLUDES: Kanat, ip, məftil, qaytan (twine, cordage, rope) → see 5607
+    EXCLUDES: Metallaşdırılmış iplik (metal saplı iplik) → see 5605
+    EXCLUDES: Xam bitki tekstil xammalı (kapok, istle və s. — tekstil üçün hazırlanmamış) → see 1404
+    EXCLUDES: Əsasən kağız zolaqlarının hörülməsi ilə alınan parçalar (hörmə) → see 4601
+    EXCLUDES: Hazır tekstil məmulatları (çuval, örtük, brezent və s.) → see 63
+    EXCLUDES: Cırıq-cındır, köhnə kanat və ip qırıntıları → see 63
+    e.g.: Xam kətan və ya emal edilmiş kətan, lakin əyril…antıları və didilmiş xammal daxil olmaqla):– xam kətan və ya islaq kətan; Kətan iplik:– təksaplı:– – pərakəndə satış üçün…:– – – xətti sıxlığı 277,8 dteks-dən az (36 metrik nömrədən yuxarı olan); Digər toxuculuq bitki liflərindən iplik; kağız iplik:– digəri:– – kağız iplik; Digər toxuculuq bitki liflərindən parçalar; kağız iplikdən parçalar:– digərləri
+code=54 | Kimyəvi saplar (filamentlər)
+    COVERS: Kimyəvi (sintetik və süni) elementar saplar — filament sapları, monosaplar, zolaqlar və onlardan toxunma parçalar.
+    EXCLUDES: kimyəvi ştapel liflər və onlardan sap/parça (kəsik liflər, jqut) → see 55
+    EXCLUDES: kimyəvi liflərin xammal polimerləri (ilkin formada plastik/qatran) → see 39
+    EXCLUDES: en kəsiyi 1 mm-dən böyük monosap, eni 5 mm-dən böyük zolaq (plastik) → see 39
+    EXCLUDES: ip, kanat, tros, qaytan (56.07) → see 5607
+    EXCLUDES: hörmə qaytanlar, örtük materialları və digər 58-ci qrup məmulatları → see 58
+    EXCLUDES: hazır tekstil məmulatları (çarşab, örtük, ipbağı və s.) → see 63
+    EXCLUDES: dərmanlı və ya pərakəndə satış üçün qablaşdırılmış tənziflər/sarğılar → see 3005
+    e.g.: Kimyəvi saplardan hazırlanmış tikiş sapları, pə…– mil içlikli sap: – – – – poliefir sapları, pambıq lifləri ilə sarılmış; Pərakəndə satış üçün qablaşdırılmamış, sintetik…oxeşməli (burulmuş) və ya bireşməli saplar:– – digərləri:– – – digərləri; Sintetik kompleks saplardan parçalar, 5404 mal…aşdırılmış poliefir saplardan ibarət olan digər parçalar:– – çap olunmuş; Süni kompleks saplardan parçalar, 5405 mal mövq…istehsal edilən parçalar daxil olmaqla:– digər parçalar:– – çap olunmuş
+code=55 | Kimyəvi ştapel lifləri
+    COVERS: Kimyəvi (süni və sintetik) ştapel liflər və filament jqutu, onlardan tikiş sapı, adi sap və toxunma parçalar.
+    EXCLUDES: Kimyəvi filamentlər (fasiləsiz sap) və onlardan sap/parça → see 54
+    EXCLUDES: Vata, keçə, toxunmayan materiallar; kanat, ip, kəndir → see 56
+    EXCLUDES: Tibbi/pərakəndə satış üçün sarğı və tənzif (bandaj) → see 3005
+    EXCLUDES: Trikotaj (hörülmüş) parçalar → see 60
+    EXCLUDES: Hazır tekstil məmulatları (geyim, ev tekstili) → see 63
+    EXCLUDES: Köhnə/işlənmiş cır-cındır (əski) → see 63
+    e.g.: Sintetik saplardan burmalar:– neylon və ya digər poliamidlərdən; Sintetik liflərdən iplik (tikiş saplarından baş…digər ipliklər:– – əsasən və ya yalnız pambıq lifləri ilə qarışdırılmış; Sintetik liflərdən digər parçalar:– poliefir li…yalnız viskoz liflərlə qarışdırılmış:– – – ağardılmamış və ya ağardılmış; Süni liflərdən parçalar:– digərləri:– – çap olunmuş
+code=56 | Pambıq yun, keçə, qeyri-toxunma materiallar; kanat
+    COVERS: Tekstil pambıq, keçə/fetr və toxunmamış materiallar; xüsusi saplar (metallaşdırılmış, qaytanlı, sinel); qaytan, kəndir, ip, kanat və onların məmulatları; torlar.
+    EXCLUDES: tekstil sadəcə daşıyıcı-baza kimi olan hopdurulmuş pambıq/keçə/toxunmamış material (ətriyyat-kosmetika, sabun/yuyucu, cilalayıcı, parça yumşaldıcı) → see 33-38
+    EXCLUDES: 5811 mövqeyindəki sırınmış tekstil məmulatlar → see 5811
+    EXCLUDES: keçə/toxunmamış material əsaslı abraziv toz və ya dənə → see 6805
+    EXCLUDES: keçə/toxunmamış material əsaslı aqlomerasiya olunmuş qarğadüzü (slyuda) → see 6814
+    EXCLUDES: keçə/toxunmamış material əsaslı metallik folqa → see XIV/XV bölmə
+    EXCLUDES: gigiyenik bezlər, tamponlar, uşaq bələkləri və əskiləri → see 9619
+    EXCLUDES: trikotaj və ya toxuma yolu ilə hazırlanmış tor parça → see 6002-6006
+    EXCLUDES: saç torları → see 6505
+    EXCLUDES: idman torları, balıqtutma sağanaqlı torları → see 95
+    e.g.: Toxuculuq materiallarından pambıq və ondan alın…dan hazırlanan digər məmulatlar:– – pambıq liflərindən:– – – hiqroskopik; Toxunmamış materiallar, hopdurulmuş və ya hopdu…sıxlığı 70 q/m2-dan çox, lakin 150 q/m2-dan çox olmayan:– – – digərləri; Ciyə, kəndir, kanat və troslar, hörülmüş və ya…ən digər toxuculuq liflər:– – qablaşdırma üçün şpaqat və ya kəndir (viş); Saplardan və ya iplikdən, 5404 və 5405 mal mövq…a trosdan, başqa yerdə adı çəkilməyən və ya təsnif olunmayan məmulatlar.
+code=57 | Xalçalar və toxuculuq döşəmə örtükləri
+    COVERS: Xalçalar və digər tekstil döşəmə örtükləri — istismarda üz (görünən) səthini tekstil material təşkil edən döşəmə örtükləri.
+    EXCLUDES: Döşəmə örtüklərinin altlıqları (karkas altlıqları, alt qatları) → see 59
+    EXCLUDES: Tekstil əsaslı linoleum və oxşar döşəmə örtükləri (əsası hopdurulmuş/örtülmüş tekstil) → see 5904
+    EXCLUDES: Plastikdən süni ot / qazon və plastik döşəmə örtükləri → see 3918
+    EXCLUDES: Döşəmə örtüyü olmayan tuftinq tekstil parçaları → see 5802
+    EXCLUDES: Səyahət yorğanları, adyallar (döşəmə örtüyü deyil) → see 6301
+    EXCLUDES: Tibbi cihaz və avadanlıqlar (şpris, iynə, kateter) → see 9018
+    e.g.: İlməli xalçalar və ya digər toxunma döşəmə örtü…ntıları ipliyindən ibarət olan, daraqağzı tullantıları istisna edilməklə; Toxunma xalçalar və digər toxuculuq döşəmə örtü…vlu, hazır:– – kimyəvi toxuculuq materiallardan:– – – aksminter xalçalar; Xalçalar və digər toxuculuq döşəmə örtükləri, t…n:– neylondan və ya digər poliamidlərdən:– – çap olunmuş:– – – digərləri; Digər xalçalar və toxuculuq döşəmə örtükləri, hazır və ya hazır olmayan:– digər toxuculuq materiallardan:– – digərləri
+code=58 | Xüsusi parçalar; tikmə; krujeva; qobelen
+    COVERS: Xüsusi toxunuş parçalar: xovlu və sinel parçalar, mahrama, hörmə toxunuşlu (qaz) parça, tül və digər tor parçalar, dantel, əl toxuması qobelenlər, ensiz parçalar, etiketlər, hörük və bəzək lentləri, metallik saplı parçalar, naxış tikmələri (tikmə) və köbələnmiş parçalar.
+    EXCLUDES: hopdurulmuş, örtüklü, üzlənmiş və ya laminatlanmış tekstil parçalar (rezinləşmiş, plastik örtüklü, muşamba tipli) → see 59
+    EXCLUDES: trikotaj (hörmə) toxunuşlu parçalar → see 60
+    EXCLUDES: hazır tekstil məmulatları, geyimlər və digər tikilmiş əşyalar → see 63
+    EXCLUDES: tibbi məqsədli tənzif (bint, sarğı üçün), medikamentli və ya pərakəndə satış üçün → see 3005
+    EXCLUDES: süni xəz → see 4304
+    e.g.: Xovlu və sineldən parçalar, 5802 və 5806 mal mövqelərindəki parçalardan başqa:– yundan və ya heyvanların zərif tükündən; Hörmə toxunuşlu parçalar, 5806 mal mövqeyində təsnif edilən ensiz parçalardan başqa:– pambıq ipliyindən; Ensiz parçalar, 5807 mal mövqeyində təsnif edil…parçalar (boldyuk):– digər parçalar:– –digər toxuculuq materiallarından; Köbəli aralıq qatla və ya 5810 mal mövqeyində g…llarından ibarət olan parçalardan sırınmış tikədə toxuculuq materialları
+code=59 | Hopdurulmuş və örtülmüş toxuculuq materialları
+    COVERS: Hopdurulmuş, örtülmüş, təkrarlanmış (plastmas/rezin/qatran/yağ) tekstil parçalar və texniki təyinatlı tekstil məmulatları.
+    EXCLUDES: Hopdurma və ya örtüyü adi gözlə görünməyən parçalar → see 50-55/58/60
+    EXCLUDES: Rezinlə örtülü/təkrarlanmış tekstildən konveyer və ötürücü qayışlar → see 4010
+    EXCLUDES: Dərman maddələri ilə hopdurulmuş və ya pərakəndə tibbi satış üçün olan yapışqan lentlər, sarğılar → see 3005
+    EXCLUDES: Tibbi/cərrahi alət və cihazlar (şpris, iynə, kateter, zond) → see 9018
+    EXCLUDES: Vatalanmış, sırıqlı tikədə tekstil məmulatlar → see 5811
+    EXCLUDES: Geyim və tikili tekstil məmulatlar → see 61-63
+    e.g.: Kitab cildlərin hazırlanması və ya analoji məqs…n istifadə olunan qatranlanmış və ya nişastalanmış toxuculuq materiallar; 5902 mal mövqeyində göstərilmiş materiallardan…q materiallar:– digərləri:– – örtüklü və ya təkrarlanmış:– – – digərləri; Lampalar, kerosinkalar, alışqanlar, şamlar və a…torları üçün boruşəkilli trikotaj kətan, hopdurulmuş və ya hopdurulmamış; Bu qrupun 7-ci qeydində adı çəkilən texniki məq…dlər üçün toxuculuq materialları və məmulatlar:– digərləri:– – digərləri
+code=60 | Trikotaj polotno
+    COVERS: Toxunma (trikotaj) və hörmə (krujeva üsulu ilə) parçalar - metrlik/top halında, hazır məmulat deyil.
+    EXCLUDES: Əllə hörülmüş krujeva (əl işi kruжева) → see 5804
+    EXCLUDES: Trikotaj/hörmə yarlıqlar, emblemlər, nişanlar → see 5807
+    EXCLUDES: Hopdurulmuş, örtüklü və ya laminasiyalı trikotaj parçalar (xovlu olanlar istisna - onlar 6001-də qalır) → see 5903
+    EXCLUDES: Tikişli (naxışlı) trikotaj parçalar → see 5810
+    EXCLUDES: Tibbi/pərakəndə satış üçün bintlər və sarğılar → see 3005
+    EXCLUDES: Hazır trikotaj geyim (koftalar, corablar, hazır məmulatlar) → see 6101
+    e.g.: Trikotaj xovlu parçalar maşın və ya əllə toxunmuş, uzunxovlu və tiftikli parçalar daxil olmaqla:– uzunxovlu parça; Əsas toxunuşlu parçalar (güləbətin hazırlamaq ü…aj parçalardan başqa:– pambıq ipliyindən:– – müxtəlif rəngli ipliklərdən; Əsas toxunuşlu parçalar (güləbətin hazırlamaq ü…başqa:– digərləri:– – yun iplikdən və ya zərif heyvan tükü ipliklərindən; Maşın və ya əl toxunuşlu digər trikotaj parçalar:– digərləri
+code=61 | Trikotaj geyim və geyim ləvazimatı
+    COVERS: Trikotaj (maşınla və ya əllə toxunmuş) hazır geyim əşyaları və geyim ləvazimatları.
+    EXCLUDES: büstqalter, korset, korselet, portupey və analoji məmulatlar → see 6212
+    EXCLUDES: işlənmiş (köhnə) geyim və digər işlənmiş məmulatlar → see 6309
+    EXCLUDES: ortopedik ləvazimatlar, cərrahiyyə kəmərləri, bandajlar və analoji tibbi məmulatlar → see 9021
+    EXCLUDES: toxunmayan (tikilmiş, parçadan) geyim əşyaları → see 62
+    EXCLUDES: toxunma parça (top halında, hazır məmulat deyil) → see 60
+    EXCLUDES: ayaqqabı (altlığı bərkidilmiş) → see 64
+    EXCLUDES: baş geyimləri (papaqlar, şapkalar) → see 65
+    EXCLUDES: təbii və ya süni xəzli geyim (yalnız bəzək kimi olan xəz istisna) → see 4303
+    e.g.: Palto, yarımpalto, bürüncəklər (çiyinlik), plaş…yindən:– – palto, yarımpalto, bürüncəklər, plaşlar və analoji məmulatlar; Qadın və ya qızlar üçün maşın və ya əl toxunuşl…çiyin qayışlarla kombinezonlar, brici və şortlar:– – sintetik saplardan; Maşın və ya əl toxunuşlu trikotaj sviterlər, pu…tlar:– digər toxuculuq materiallarından:– – kətan və ya rami liflərindən; Maşın və ya əl toxunuşlu digər trikotaj hazır d…toxunuşlu trikotaj geyim hissələri və ya geyim ləvazimatları:– hissələr
+code=62 | Trikotaj olmayan geyim və geyim ləvazimatı
+    COVERS: İstənilən tekstil parçadan (vatadan başqa) hazır geyim və geyim aksesuarları — TRİKOTAJ OLMAYAN, yəni toxunma/hörmə üsulu ilə hazırlanmayanlar (yeganə istisna 6212 mal mövqeyi).
+    EXCLUDES: trikotaj (maşınla və ya əllə toxunmuş/hörmə) geyimlər → see 61
+    EXCLUDES: istifadə olunmuş (köhnə, geyilmiş) geyimlər və digər köhnə tekstil məmulatları → see 6309
+    EXCLUDES: ortopedik ləvazimatlar, cərrahiyyə kəmərləri, bandajlar və analoji məmulatlar → see 9021
+    EXCLUDES: vatadan (wadding) hazırlanmış məmulatlar → see 56
+    EXCLUDES: baş geyimləri (papaqlar, körpə papaqları) → see 65
+    EXCLUDES: ayaqqabı → see 64
+    EXCLUDES: uşaq bezləri (pampers) və bez altlıqları → see 9619
+    EXCLUDES: kağızdan, sellüloz vatadan hazırlanmış geyim/dəsmal → see 4818
+    e.g.: Palto, yarımpalto, bürüncəklər (çiyinlik), plaş…loji məmulatlar:– – yun ipliyindən və ya zərif heyvan tükü ipliklərindən; Qadın və qızlar üçün kostyumlar, komplektlər, j…şortlar (çimərlik paltarından başqa):– kostyumlar:– – sintetik saplardan; Kişi və ya oğlan üçün digər maykalar, alt fufay…lar:– gecə köynəkləri və pijamaları:– – digər toxuculuq materiallarından; Digər hazır geyim ləvazimatları; 6212 mal mövqe…dilənlərdən başqa geyim hissələri və ya geyim ləvazimatları: – hissələri
+code=63 | Digər hazır toxuculuq məmulatları; köhnə paltar
+    COVERS: Digər hazır tekstil məmulatları; dəstlər; işlənmiş geyim və işlənmiş tekstil məmulatları; əski-cındır. I yarımqrup yalnız istənilən tekstil parçasından HAZIR (tikilmiş) məmulatlara aiddir.
+    EXCLUDES: parça, top halında toxunmuş və ya trikotaj mahud (hazır məmulat deyil) → see 50-60
+    EXCLUDES: 56-62-ci qrupların malları (döşəmə örtükləri, xüsusi parçalar, trikotaj parça, geyim) → see 56-62
+    EXCLUDES: xalçalar və digər döşəmə örtükləri → see 57
+    EXCLUDES: gobelenlər və xüsusi toxunmuş bəzək parçaları (əldə toxunmuş qobelen 5805) → see 58
+    EXCLUDES: geyim və geyim ləvazimatları (yeni) → see 61-62
+    EXCLUDES: yorğan, döşək, uyku kisəsi, doldurulmuş yataq örtükləri → see 9404
+    EXCLUDES: ayaqqabı (yeni) → see 64
+    EXCLUDES: baş geyimləri (yeni) → see 65
+    e.g.: Ədyallar və yol pledləri:– elektrik ədyallar; Yataq, stol, tualet və mətbəx ağları:– digər stol ağları:– – digər toxuculuq materiallarından:– – – digəri; Qablaşdırma kisə və paketlər:– kimyəvi toxuculu…rdən və ya analoji formalardan:– – – – maşın və ya əl toxunuşlu trikotaj; Əski-üskü, istifadə olunmuş və ya təzələri, viş…sdan məmulatlar, istifadə olunmuş toxuculuq materiallarından:– digərləri
+code=64 | Ayaqqabılar və bənzər məmulatlar
+    COVERS: Ayaqqabı, getrlər və analoji məmulatlar; onların detalları — altlığı və üstü olan hər növ ayaq geyimi.
+    EXCLUDES: ayaq pəncələri üçün birdəfəlik, altlıqsız yüngül örtüklər (kağız, plastmas plyonka) → see material üzrə
+    EXCLUDES: altlıqsız, tikilmiş/yapışdırılmış xarici altlığı olmayan tekstil ayaqqabı (corab tipli) → see XI bölmə
+    EXCLUDES: istifadə olunmuş (köhnə) ayaqqabı → see 6309
+    EXCLUDES: asbestdən məmulatlar → see 6812
+    EXCLUDES: ortopedik ayaqqabı və digər ortopedik ləvazimatlar və onların hissələri → see 9021
+    EXCLUDES: oyuncaq ayaqqabı; buz/roliki konkiləri bərkidilmiş çəkmələr; baldır qoruyucuları və analoji qoruyucu idman ləvazimatları → see 95
+    EXCLUDES: yalnız corab/uzunboğaz corab (bütün pəncəni örtən trikotaj) → see 61
+    e.g.: Sukeçirməyən altlıqlı, rezin və ya plastmassa ü…analoji üsulla bərkidilməmiş ayaqqabı:– qoruyucu metal burunlu ayaqqabı; Altlığı rezindən, plastmassadan, təbii dəri və…yən, içliyinin uzunluğu:– – – – – 24 sm və ya çox:– – – – – – qadın üçün; Altlığı rezindən, plastmassadan, təbii dəri və…– qadın və ya kişi ayaqqabısı olması müəyyən edilə bilməyən ayaqqabılar; Ayaqqabı hissələri (əsas içliyə bərkidilmiş və…ar və analoji məmulatlar ,və onların detalları:– digərləri:– – digərləri
+code=65 | Baş geyimləri və onların hissələri
+    COVERS: Baş geyimləri (şlyapa, papaq, kepka, dəbilqə) və onların yarımfabrikatları ilə hissə/furnituru.
+    EXCLUDES: İşlənmiş (köhnə) baş geyimləri → see 6309
+    EXCLUDES: Asbestdən baş geyimləri → see 6812
+    EXCLUDES: Kuklalar üçün şlyapalar, oyuncaq baş geyimləri və karnaval məmulatları → see 9505
+    EXCLUDES: Saç toru, saç bağı və digər saç bəzək əşyaları (baş geyimi deyil) → see 9615
+    EXCLUDES: Xəz və ya toxuculuqdan istilik qulaqlıqları baş geyimi kimi deyil, ayrı aksesuar isə → see 6117
+    e.g.: Şlyapa formaları, fetrdən şlyapa və qalpaq qəli…z; fetrdən yastı və silindrik biçmələr (uzununa kəsikli daxil edilməklə); Digər baş geyimləri, astarlı və ya astarsız, bəzəkli və ya bəzəksiz:– qoruyucu baş geyimləri:– – plastmassadan; Digər baş geyimləri, astarlı və ya astarsız, bə…– digərləri:– – – – təbii xəzdən:– – – – – tülkü və ya şimal tülküsünün; Baş geyimləri üçün lentlər, astarlar, çexollar, karkaslar, günlüklər və bağlar
+code=66 | Çətirlər, əl ağacları və qamçılar
+    COVERS: Çətirlər, günəş qoruyucu çətirlər, əl ağacları, oturacaq-ağaclar, qamçılar, atçılıq qamçıları və bunların hissələri.
+    EXCLUDES: ölçü əl ağacları, ölçmə çubuqları → see 9017
+    EXCLUDES: qoltuqağacları və qoltuqağacı çubuqları (əlil üçün) → see 9021
+    EXCLUDES: odlu silahlı, qılınclı və ya qurğuşun tökülmüş əl ağacları (silah) → see 93
+    EXCLUDES: oyuncaq çətirlər, karnaval çətirləri və idman ağacları (qolf, xokkey, xizək çubuqları) → see 95
+    EXCLUDES: çətir formasında olmayan çimərlik çadırları → see 6306
+    e.g.: Çətirlər və gün çətirləri (çəlik-çətir, bağ çət…ə analoji çətirlər daxil olmaqla):– bağ çətirləri və ya analoji çətirlər; Çətirlər və gün çətirləri (çəlik-çətir, bağ çət…digərləri:– – digərləri:– – – örtüyü toxunma tekstil materialından olan; 6601 və ya 6602 mal mövqelərində təsnif edilən…ir karkasları, millər üzərində qurulmuş çətir karkasları daxil edilməklə; 6601 və ya 6602 mal mövqelərində təsnif edilən…üçün hissələr, bəzək detalları və ləvazimatlar:– digərləri:– – digərləri
+code=67 | Emal olunmuş lələk və tük; süni güllər
+    COVERS: Emal edilmiş quş tükü/pərğu və onlardan məmulatlar; süni çiçəklər/yarpaqlar/barlar; insan saçından məmulatlar (parik və s.).
+    EXCLUDES: insan tükündən süzgəc/filtr parçaları → see 5911
+    EXCLUDES: krujeva, naxış tikməsi və ya digər tekstildən güllü ornamentlər → see XI bölmə
+    EXCLUDES: ayaqqabı → see 64
+    EXCLUDES: baş geyimləri və ya saç torları → see 65
+    EXCLUDES: oyuncaqlar, idman inventarı, karnaval məmulatları → see 95
+    EXCLUDES: quş tükündən süpürgələr, pudra yastıqçaları, saçdan əl ələkləri → see 96
+    e.g.: Dərilər və quşların başqa lələkli və ya pərğulu…övqeyinin məmulatlarından və lələklərin emal olunmuş özəklərindən başqa); Süni güllər, yarpaqlar və barlar və onların his…üllərdən, yarpaqlardan və ya barlardan məmulatlar:– digər materiallardan; İnsan tükündən və ya heyvan tükündən və ya toxu…tükündən məmulatlar:– sintetik toxuculuq materiallarından:– – digərləri; İnsan tükündən və ya heyvan tükündən və ya toxu…və ya təsnif olunmamış insan tükündən məmulatlar:– digər materiallardan
+code=68 | Daş, gips, sement, asbestdən məmulatlar
+    COVERS: Daşdan, gipsdən, sementdən, asbestdən, slyudadan (qarğadüzü) və analoji mineral materiallardan məmulatlar.
+    EXCLUDES: 25-ci qrupun xam və ilkin emallı təbii daş, gips, sement xammalı → see 25
+    EXCLUDES: hopdurulmuş və ya örtülmüş kağız və karton (bitumlu, slyuda/qrafit tozlu) → see 4811
+    EXCLUDES: hopdurulmuş və ya örtülmüş tekstil parçaları → see 59
+    EXCLUDES: 82-ci qrupun alətləri və onların hissələri → see 82
+    EXCLUDES: elektrik izolyatorları və izolyasiya materiallarından armatura → see 8546
+    EXCLUDES: diş borları (stomatoloji frezalar) → see 9018
+    EXCLUDES: tibbi alət və cihazlar (şpris/şprits, iynə, kateter, zond) → see 9018
+    EXCLUDES: keramika məmulatları → see 69
+    EXCLUDES: 94-cü qrupun məmulatları (mebel, işıqlandırıcılar, yığma tikililər) → see 94
+    EXCLUDES: 95-ci qrupun məmulatları (oyuncaqlar, idman inventarı) → see 95
+    EXCLUDES: 96-cı qrupun məmulatları (düymələr, qrifel karandaşları, qrifel lövhələri) → see 96
+    EXCLUDES: 91-ci qrupun məmulatları (saatlar və korpusları) → see 91
+    EXCLUDES: 97-ci qrupun sənət əsərləri → see 97
+    e.g.: Dördtin daşlar (brusçatka), bordyur (haşiyə) daşları, təbii daşlardan döşənmə üçün plitələr (şistdən başqa); Toxunma material, kağız, karton və ya başqa əsa…şqa üsulla işlənmiş, və ya işlənməmiş:– yalnız toxunma material əsasında; Asbest sementdən, sellüloz lifləri ilə qarışıq…olmayan:– – digər vərəqələr, panellər, lövhəciklər və analoji məmulatlar; Daşdan və ya digər mineral maddələrdən məmulatl…yerdə adı çəkilməyən və daxil edilməyən:– digər məmulatlar:– – digərləri
+code=69 | Keramika məmulatları
+    COVERS: Keramika məmulatları — yalnız formaya salındıqdan sonra yandırılmış (bişirilmiş) qeyri-üzvi, qeyri-metal materiallardan olan məmulatlar.
+    EXCLUDES: formaya salındıqdan sonra 800°C-dən aşağı temperaturda qızdırılmış (əsl mənada yandırılmamış) məmulatlar → see —
+    EXCLUDES: 2844 mal mövqeyinin (radioaktiv elementlər və izotoplar) malları → see 2844
+    EXCLUDES: dəyirman daşları, cilalama daşları və 6804 mal mövqeyinin abraziv məmulatları → see 6804
+    EXCLUDES: bijuteriya və 71-ci qrupun məmulatları → see 71
+    EXCLUDES: 8113 mal mövqeyinin metal-keramikası (kermetlər) → see 8113
+    EXCLUDES: 82-ci qrupun alət və dəmir-dəyanət məmulatları (keramik tiyəli bıçaqlar da daxil) → see 82
+    EXCLUDES: elektrik izolyatorları (8546) və izolyasiya materiallarından armatura (8547) → see 8546
+    EXCLUDES: süni dişlər → see 9021
+    EXCLUDES: saatlar və saat korpusları (91-ci qrup) → see 91
+    EXCLUDES: mebel, lampalar, işıqlandırıcı avadanlıq, yığma tikinti konstruksiyaları (94-cü qrup) → see 94
+    EXCLUDES: oyuncaqlar, oyunlar və idman inventarı (95-ci qrup) → see 95
+    EXCLUDES: düymələr (9606) və tənbəki çubuqları/qəlyanlar (9614) → see 9606
+    EXCLUDES: sənət əsərləri, antikvar (97-ci qrup) → see 97
+    EXCLUDES: şüşə və şüşə məmulatları (keramika deyil) → see 70
+    EXCLUDES: tibbi cihaz və alətlər (şpris, iynə, kateter, termometr) → see 9018
+    e.g.: Kərpiclər, bloklar, lövhəciklər və silisli daş…dan keramika məmulatları (məsələn, kizelqur, tripolit və ya diatomitdən); Keramika boruları, izolyasiya boruları, suyu kənara axıdan borular və boru fitinqləri; Laborator, kimyəvi və ya digər texniki məqsədlə…texniki məqsədlər üçün nəzərdə tutulmuş keramik məmulatlar:– – digərləri; Digər keramika məmulatları:– digərləri
+code=70 | Şüşə və şüşədən məmulatlar
+    COVERS: Şüşə və şüşədən məmulatlar: xam şüşə, vərəq şüşə, güzgülər, taralar və qab-qacaq, şüşə lifi və digər şüşə məmulatları.
+    EXCLUDES: Şüşəvari emallar, minalar, şüşə frittası, toz/qranul/lopa şəklində şüşə → see 3207
+    EXCLUDES: Bijuteriya (imitasiya zərgərlik məmulatları) → see 71
+    EXCLUDES: Lifli-optik kabellər → see 8544
+    EXCLUDES: Şüşə elektrik izolyatorları → see 8546
+    EXCLUDES: İzolyasiya materialından armatur → see 8547
+    EXCLUDES: Nəqliyyat vasitələri üçün çərçivəyə salınmış ön/arxa/yan şüşələr (qr.86-88) → see 8708
+    EXCLUDES: Optik liflər və optik emal olunmuş optik elementlər → see 9001
+    EXCLUDES: Dərialtı inyeksiya şprisləri (şpris), tibbi iynələr, kateterlər → see 9018
+    EXCLUDES: Süni (protez) gözlər, termometrlər, barometrlər, hidrometrlər → see 90
+    EXCLUDES: Lampalar, işıqlandırıcı avadanlıq, işıqlı tablolar → see 9405
+    EXCLUDES: Oyuncaqlar, oyunlar, idman inventarı, yolka bəzəkləri → see 95
+    EXCLUDES: Düymələr, yığılmış vakuum tutumları (termoslar), pulverizatorlar → see 96
+    e.g.: Şüşə sınıqları, şüşə skrap və digər şüşə tullan…ı; bloklarda şüşə:– şüşə sınıqları, şüşə skrap və digər şüşə tullantılar; Şüşədən çoxqatlı izolyasiya məmulatları:– digər…a vakuumlaşdırılmış aralıq layla ayrılmış iki təbəqə şüşədən ibarət olan; Süfrə və mətbəx üçün şüşə qablar, tualet və dəf…adan hazırlananlardan başqa:– – digəri:– – – digəri:– – – – əllə yığılma; Şüşədən digər məmulatlar:– digərləri:– – digərləri
+code=71 | Mirvari, qiymətli daşlar və metallar; zərgərlik
+    COVERS: Təbii/becərilmiş mirvari, qiymətli və azqiymətli daşlar (təbii, süni, rekonstruksiya olunmuş), qiymətli metallar (qızıl, gümüş, platin qrupu) və üzərinə qiymətli metal çəkilmiş metallar; həmçinin zərgərlik, bijuteriya, sikkə.
+    EXCLUDES: qiymətli metalların amalqamları və ya kolloid qiymətli metallar → see 2843
+    EXCLUDES: steril cərrahi tikiş materialları, diş plombu və 30-cu qrupun digər malları → see 30
+    EXCLUDES: tibbi alət və cihazlar (şpris/şpris, iynə/iynə, kateter/kateter, cərrahi alətlər) → see 9018
+    EXCLUDES: 32-ci qrupun malları (lüstrlər, cilalar) → see 32
+    EXCLUDES: daşıyıcılar əsasında katalizatorlar → see 3815
+    EXCLUDES: 4202/4203 mal mövqeyinin məmulatları (çanta, dəri məmulatlar) → see 4202
+    EXCLUDES: xəz məmulatlar (4303/4304) → see 4303
+    EXCLUDES: tekstil materiallar və tekstil məmulatlar (XI bölmə) → see 63
+    EXCLUDES: ayaqqabı, baş geyimləri (64/65-ci qrup) → see 64
+    EXCLUDES: çətir, çəlik və 66-cı qrupun məmulatları → see 66
+    EXCLUDES: qiymətli daş tozu ilə abraziv məmulatlar və işlək hissəsi daşdan olan 82-ci qrup alətləri → see 82
+    EXCLUDES: elmi cihazlar, saatlar, musiqi alətləri (90/91/92-ci qrup) → see 90
+    EXCLUDES: silah və hissələri → see 93
+    EXCLUDES: heykəllərin orijinalları, kolleksiya əşyaları, əntiq əşyalar (mirvari/daş istisna) → see 97
+    EXCLUDES: süni (imitasiya) mirvari — plastik/şüşə/mum → see 3926
+    EXCLUDES: düymələr və 96-cı qrupun məmulatları → see 9606
+    e.g.: Təbii və ya yetişdirilmiş mirvari, emal olunmuş…ün müvəqqəti düzülmüş, təbii və ya yetişdirilmiş mirvari:– təbii mirvari; Gümüş (qızıl və ya platinlə qalvanik örtüklü gü…ya yarımişlənmiş, və ya toz şəklində:– digəri:– – yarımişlənmiş şəkildə; Qiymətli metalların və ya qiymətli metallarla q…la, lakin digər qiymətli metallar tərkibli tullantılar istisna olunmaqla; Sikkələr:– digərləri
+code=72 | Qara metallar (çuqun, dəmir, polad)
+    COVERS: Qara metallar: çuqun, ferroərintilər, dəmir/polad qranul-toz, tullantı-qırıntı və ilkin/yarımfabrikat, yastı prokat, çubuq, künclük, məftil (hazır məmulatlar deyil).
+    EXCLUDES: dəmir/poladdan hazır məmulatlar (boru, tros, tor, mismar, konstruksiya, tökmə hissə və s.) → see 73
+    EXCLUDES: əl alətləri, kəsici alətlər (fayl, mişar, bıçaq) → see 82
+    EXCLUDES: qiymətli metalla örtülmüş yastı məmulatlar → see 71
+    EXCLUDES: dəmir filizi, şlak, kül, tullantı (metal bərpası üçün olsa da) → see 26
+    EXCLUDES: radioaktiv dəmir tozu (izotoplar) → see 28.44
+    EXCLUDES: dərman kimi qablaşdırılmış dəmir tozu/preparatı → see 30.03/30.04
+    EXCLUDES: izolyasiyalı elektrik məftili/lenti (o cümlədən emallı) → see 85.44
+    EXCLUDES: cərrahi tikiş üçün steril polad tel → see 30.06
+    EXCLUDES: qüsurlu kiçik yastıq kürəcikləri (podşipnik) → see 73.26
+    e.g.: Poladlıq və güzgü çuqunlar, külçə, qəlib və ya…olmayaraq manqan olan:– – – tərkibində 1 kütlə % və ya az silisium olan; Dəmirdən və ya aşqarlanmamış poladdan, eni 600…stı prokat:– plastmassa ilə boyanmış,laklanmış və ya örtülmüş:– – digəri; Korroziyayadavamlı poladdan yastı prokat, eni 6…ən çox, lakin 3 mm-dən az:– – – tərkibində 2,5 kütlə %-dən az nikel olan; Digər aşqarlanmış poladlardan məftillər:– digəri:– – digəri
+code=73 | Qara metallardan məmulatlar
+    COVERS: Qara metallardan (dəmir, çuqun, polad) hazırlanmış hazır məmulatlar: borular və birləşdirici hissələr, konstruksiyalar, çənlər/balonlar, kanat/tor/məftil məmulatları, bərkidicilər, məişət və sanitar əşyalar.
+    EXCLUDES: İlkin formada və yarımfabrikat çuqun/polad, prokat, kütük, məftil-çubuq, təbəqə, künc/profil (hazır məmulat deyil) → see 72
+    EXCLUDES: Əl alətləri, kəsici alətlər, bıçaq-çəngəl-qaşıq dəstləri → see 82
+    EXCLUDES: Kilidlər, mebel/qapı furniturası, seyflər və digər əlvan-metal xırda məmulatları → see 83
+    EXCLUDES: Maşın və mexaniki qurğular, onların hissələri (nasos, klapan/kran daxil olmaqla) → see 84
+    EXCLUDES: Elektrik maşınları, cihazları və hissələri (izolyasiyalı kabel daxil) → see 85
+    EXCLUDES: Tibbi, cərrahi və stomatoloji alət və cihazlar (şpris, kateter, tibbi iynə) → see 9018
+    EXCLUDES: Mebel (metal masa, stul, şkaf) və yığma binalar → see 94
+    e.g.: Qara metallardan şpuntlu konstruksiyalar, burğu…usi qaynaq edilmiş profillər, qara metallardan:– şpuntlu konstruksiyalar; Borular və ya borucuqlar üçün fitinqlər (məsələ…an:– – yivlə təchiz olunmuş dirsəklər, otvodlar və sqonlar:– – – sqonlar; Vintlər, boltlar, qaykalar, böyük vintlər, buru…lardan:– yivli təchiz edilmiş məmulatlar:– – burma qarmaqlar və halqalar; Qara metallardan digər məmulatlar:– digərləri:– – qara metallardan digər məmulatlar:– – – digərləri
+code=74 | Mis və ondan məmulatlar
+    COVERS: Mis və mis məmulatları: xam mis, saflaşdırılmış mis, mis ərintiləri, tədarük formaları (çubuq, məftil, lövhə, folqa, boru) və hazır mis məmulatları.
+    EXCLUDES: İzolyasiyalı elektrik naqilləri və kabelləri (emallanmış naqil daxil) → see 8544
+    EXCLUDES: 15 kütlə%-dən çox fosfor olan mis fosfidi (fosforlu mis) → see 2853
+    EXCLUDES: Mis şlakı, külü və qalıqları → see 2620
+    EXCLUDES: Cərrahi tikiş üçün steril nazik bürünc məftil → see 3006
+    EXCLUDES: Misdən alət, bıçaq, qaşıq-çəngəl (əl alətləri, kəsici məmulatlar) → see 8211
+    EXCLUDES: Mis tərkibli maşın, aparat və mexaniki/istilik avadanlığı → see 8419
+    e.g.: Mis şteyni; sementasiya misi (çökdürülmüş mis); Mis məftillər:– saflaşdırılmış misdən:– – en kəsiyinin maksimal ölçüsü 6 mm-dən çox olan; Mis borular və borucuqlar:– mis ərintilərindən:– – mis və sink əsasında ərintilərdən (latundan):– – – düz; Misdən olan digər məmulatlar:– digərləri:– – digərləri:– – – digərləri
+code=75 | Nikel və ondan məmulatlar
+    COVERS: Nikel və nikeldən məmulatlar: nikel şteyni və metallurgiya aralıq məhsulları, emal olunmamış nikel, tullantı və qırıntı, tozlar, çubuqlar/profillər/məftil, lövhə/vərəq/folqa, borular və digər nikel məmulatları.
+    EXCLUDES: nikel filizləri və konsentratları → see 2604
+    EXCLUDES: nikel istehsalının şlakı, külü və qalıqları → see 2620
+    EXCLUDES: nikel duzları və qeyri-üzvi birləşmələri (nikel-sulfat, nikel-xlorid, nikel-oksid kimyəvi reaktiv) → see 2827
+    EXCLUDES: təmizlənmiş ferro-nikel (polad sənayesi üçün lehimləyici) → see 7202
+    EXCLUDES: XV bölmə qeyd 1-də sadalanan ümumi məmulatlar (metal qırıntı hazırlanması üçün deyil), məs. sürtkü tozları → see 8311
+    EXCLUDES: nikeldən əl alətləri, kəsici alətlər, çəngəl-qaşıq → see 8201
+    EXCLUDES: nikeldən müxtəlif adi metal məmulatları (asma qıfıllar, furnitur, zınqırovlar) → see 8302
+    EXCLUDES: maşın və mexanizm hissələri şəklinə salınmış nikel məmulatları → see 8487
+    EXCLUDES: kran, ventil, klapanlı boru birləşdiriciləri → see 8481
+    e.g.: Nikel şteyni, nikel oksidləri aqlomeratları və nikel metallurgiyasının digər aralıq məhsulları:– nikel şteyni; Nikel tozları və pulcuqları; Nikel plitələr, vərəqlər, zolaqlar və ya lentlər və folqalar:– aşqarlanmamış nikeldən; Nikeldən olan digər məmulatlar:– digərləri
+code=76 | Alüminium və ondan məmulatlar
+    COVERS: Alüminium və ondan hazırlanan məmulatlar (emal olunmamış alüminium, tullantı və qırıntı, toz və pulcuqlar, yarımfabrikatlar və hazır məmulatlar).
+    EXCLUDES: Ferroalüminium və digər ferroərintilər → see 7202
+    EXCLUDES: İzolyasiyalı elektrik naqilləri və kabelləri (emallanmış və ya anodlanmış naqil daxil), alüminiumdan olsa belə → see 8544
+    EXCLUDES: Alüminium tozu/pulcuqları boya, rəng kimi hazırlanmış → see 3212
+    EXCLUDES: Alüminiumdan alət və avadanlıqlar (Ç.82) və dəmir-dəyməz avadanlıq (Ç.83) → see 82
+    EXCLUDES: Alüminium hissələr maşın, cihaz və ya nəqliyyat vasitəsinin tanınan hissəsi kimi → see 84
+    EXCLUDES: Yığma tikililər (prefabrik binalar) → see 9406
+    EXCLUDES: Bir və ya bir neçə nəqliyyat növü ilə daşınma üçün xüsusi hazırlanmış konteynerlər → see 8609
+    e.g.: Emal olunmamış alüminium:– aşqarlanmamış alüminium; Qalınlığı 0,2 mm-dən çox olan alüminium plitələ…şqarlanmamış alüminiumdan:– – – digərləri, qalınlığı:– – – – 3 mm-dən az; Alüminium boruları və borucuqları:– alüminium ərintilərindən:– – digərləri:– – – ekstrudiyadan sonra emal edilməmiş; Alüminiumdan digər məmulatlar:– digərləri:– – digərləri:– – – digərləri
+code=78 | Qurğuşun və ondan məmulatlar
+    COVERS: Qurğuşun və ondan hazırlanan məmulatlar (emal olunmamış qurğuşun, tullantı və qırıntı, yastı məmulatlar, toz, məftil, boru və digər qurğuşun məmulatları).
+    EXCLUDES: Qurğuşun filizi və konsentratları → see 2607
+    EXCLUDES: Qurğuşunun hazırlanmasından alınan şlak, kül və qalıqlar (o cümlədən qurğuşun matte) → see 2620
+    EXCLUDES: Boya/piqment kimi hazırlanmış qurğuşun tozu və pulcuqları (bağlayıcı ilə süspenziya, pasta) → see 3206
+    EXCLUDES: Qurğuşundan alət və dəst (əl alətləri) → see 8202
+    EXCLUDES: Qurğuşundan xırdavat / kilid, furnitur → see 8302
+    EXCLUDES: Krandan, ventildən ibarət boru birləşmələri (armaturları) → see 8481
+    EXCLUDES: Qurğuşun qılaflı izolyasiyalı elektrik kabelləri → see 8544
+    EXCLUDES: Qurğuşun akkumulyatorları və onların qurğuşun plastinaları → see 8507
+    e.g.: Qurğuşun, emal olunmamış:– saflaşdırılmış qurğuşun; Qurğuşun, emal olunmamış:– digəri:– – digəri:– – – digəri; Qurğuşun plitələr, təbəqələr, zolaqlar və ya le…:– plitələr, təbəqələr, zolaqlar və ya lentlər və folqalar:– – digərləri; Qurğuşundan digər məmulatlar:– digərləri
+code=79 | Sink və ondan məmulatlar
+    COVERS: Sink və sinkdən məmulatlar: emal olunmamış sink, tullantı və qırıntı, toz/ovuntu/lopa, yarımfabrikatlar (çubuq, məftil, profil, lövhə, folqa) və digər sinkdən məmulatlar.
+    EXCLUDES: Sink tərkibli şlak, kül və qalıqlar (o cümlədən sink oksidli soba tozu / baghouse tozu) → see 2620
+    EXCLUDES: Sink birləşmələri (sink oksidi, sink sulfat və s. kimyəvi maddələr) → see 2817
+    EXCLUDES: Boya kimi hazırlanmış sink tozu/ovuntusu (bağlayıcı və ya həlledici ilə süspansiya, pasta) → see 3206
+    EXCLUDES: Sink əsaslı bərk lehim/qaynaq çubuqları flüs örtüklü → see 8311
+    EXCLUDES: Sinkdən alətlər, bıçaq məmulatları və dəmir məmulatları (qr.82) və qr.83 məmulatları → see 82
+    EXCLUDES: Krandan/klapandan ibarət sink boru bağlantıları → see 8481
+    EXCLUDES: Sink boru/lövhədən hazırlanmış maşın hissələri kimi müəyyən məmulatlar → see 84
+    e.g.: Emal olunmamış sink:– aşqarlanmamış sink:– – tərkibində 99,99 kütlə % və ya çox sink olan; Emal olunmamış sink:– aşqarlanmamış sink:– – tə…– tərkibində 97,5 kütlə % və ya çox, lakin 98,5 kütlə %-dən az sink olan; Sink tozları, ovuntuları və pulcuqları:– digərləri; Sinkdən olan digər məmulatlar
+code=80 | Qalay və ondan məmulatlar
+    COVERS: Qalay və qalaydan hazırlanan məmulatlar (XV bölmə, əlvan metal).
+    EXCLUDES: Digər əlvan (adi) metallar və məmulatları — volfram, molibden, tantal, maqnezium, kobalt, vismut, titan, sirkonium, sürmə, manqan və s. → see 81
+    EXCLUDES: Qalay istehsalının şlakı, külü və qalıqları → see 2620
+    EXCLUDES: Qalaydan alətlər, bıçaq məmulatları, xırda dəmirçilik məmulatları (82/83 qrupu) → see 82
+    EXCLUDES: Kranlı, ventilli, klapanlı qalay boru fitinqləri → see 8481
+    EXCLUDES: Konkret maşın/qurğu hissəsinə çevrilmiş qalay borular və məmulatlar → see 8487
+    e.g.: Emal olunmamış qalay:– aşqarlanmamış qalay; Qalay tullantıları və qırıntıları; Qalay çubuqları, profillər və məftillər; Qalaydan digər məmulatlar:– digərləri
+code=81 | Digər adi metallar; metal-keramika
+    COVERS: Digər adi (əlvan) metallar — volfram, molibden, tantal, maqnezium, kobalt, bismut, titan, sirkonium, sürmə, manqan, berillium və s. — metallokeramika (kermetlər) və onlardan hazırlanmış məmulatlar (tullantı və qırıntılar daxil).
+    EXCLUDES: ferrosplavlar (ferrovolfram, ferromolibden, ferrotitan, ferromanqan, silikomanqan) → see 72
+    EXCLUDES: bu metalların filizləri və konsentratları (volframit, şeelit, molibdenit, tantalit/niobit) → see 26
+    EXCLUDES: bu metalların karbidləri, oksidləri, duzları və kimyəvi birləşmələri → see 28
+    EXCLUDES: nadir torpaq metalları, skandium, ittrium, qələvi və qələvi-torpaq metalları, civə → see 2805
+    EXCLUDES: işlək tili/səthi olan alətlər, kəsici uclar → see 82
+    EXCLUDES: adi metaldan sair məmulatlar (qapaqlar, zəncirlər, bərkidicilər) → see 83
+    EXCLUDES: maşın, cihaz və nəqliyyat vasitəsi hissələri → see 84
+    EXCLUDES: pirofor ərintilər (dəmirlə mişmetal, alışqan çaxmaqları) → see 3606
+    e.g.: Volfram və ondan hazırlanan məmulatlar, tullantılar və qırıntılar daxil olmaqla:– tozlar; Kobalt şteyni və kobalt metallurgiyasının digər…lar, tullantılar və qırıntılar daxil olmaqla:– tullantılar və qırıntılar; Berillium, xrom, germanium, vanadium, qallium,…tılar və qırıntılar daxil olmaqla:– berillium:– – emal olunmamış; tozlar; Metalkeramika və ondan olan məmulatlar, tullantılar və qırıntılar daxil olmaqla:– digəri
+code=82 | Alətlər, bıçaq məmulatları, çəngəl-qaşıq
+    COVERS: Qiymətsiz metaldan əl alətləri, kəsici məmulatlar (bıçaqlar, ülgüclər, qayçılar), qaşıq-çəngəl və yeməkxana ləvazimatı — işlək hissəsi (tiyə, kəsici səth) qiymətsiz metal, metal-karbid/metal-keramika, altlıqlı qiymətli daş və ya altlıqlı abraziv olan məmulatlar.
+    EXCLUDES: ümumi təyinatlı hissələr (vint, bolt, qayka, yay, zəncir, boru bağlayıcıları) → see 73
+    EXCLUDES: işlək hissəsi qiymətsiz metal / metal-karbid / metal-keramika / altlıqlı daş və ya abraziv olmayan alətlər (plastik, keramika, ağac tiyəli) → see 84
+    EXCLUDES: dəzgaha, skamyaya, divara və ya döşəməyə bərkidilmək üçün nəzərdə tutulmuş alət və maşınlar → see 84
+    EXCLUDES: elektrik üzqırxan və saç qırxma maşınlarının başlıq, ülgüc və kəsici lövhələri → see 8510
+    EXCLUDES: öz mühərriki olan əlaltı elektrik/pnevmatik alətlər → see 8467
+    EXCLUDES: tibbi/cərrahi alətlər (skalpel, cərrahi bıçaq, cərrahi qayçı) → see 9018
+    e.g.: Əl alətləri: süngü və çalov kürəkləri, kərkilər…təsərrüfatında istifadə olunan digər alətlər:– süngü və çalov kürəkləri; Əl alətləri (almaz şüşəkəsənlər daxil olmaqla),…östərilmiş iki və ya daha çox məmulatlardan ibarət dəstlər:– – digərləri; Əl alətləri üçün əvəzlənən alətlər, mexaniki öt…, işlək hissəsi:– – – – metalkeramikadan:– – – – – metalların emalı üçün; Qaşıqlar, çəngəllər, çömçələr, kəfkirlər, tortl…və ya yeməkxana ləvazimatları:– digərləri:– – digərləri:– – – digərləri
+code=83 | Adi metallardan müxtəlif məmulatlar
+    COVERS: Qiymətsiz metallardan hazırlanmış müxtəlif məmulatlar: qıfıllar və açarlar, mebel/qapı furniturası, seyflər, dəftərxana ləvazimatı, zınqırovlar, çərçivələr, çevik borular, bağlayıcılar, tıxaclar/qapaqlar, lövhələr və qaynaq elektrodları.
+    EXCLUDES: qara metaldan yaylar, zəncirlər, mismarlar, vintlər, boltlar, qaykalar (bu qrup məmulatlarının hissəsi kimi belə) → see 7320
+    EXCLUDES: əl alətləri, kəsici alətlər, bıçaqlar → see 82
+    EXCLUDES: elektrik zınqırovları və siqnal cihazları → see 8531
+    EXCLUDES: qapaq üçün mənzil/yaşayış binası tipli polad təhlükəsizlik qapıları → see 7308
+    EXCLUDES: döşəmədə dayanan büro mebeli → see 9403
+    EXCLUDES: işıqlı lövhələr və işıqlı işarələr → see 9405
+    EXCLUDES: slayderli asma qıfıllar (zəncirbənd/zip) — paltar bağlayıcısı deyil → see 9607
+    e.g.: Asma və taxma qıfıllar (açarla, kod kombinasiya…istənilən məmulatlar üçün qiymətsiz metallardan açarlar:– asma qıfıllar; Mebellər, qapılar, pilləkənlər, pəncərələr, pər…və analoji digər detallar:– – binalarda istifadə olunan:– – – digərləri; Zənglər, qonq və qeyri-elektrik analoji məmulat…tsiz metallardan güzgülər:– heykəlciklər və digər bəzəklər:– – digərləri; Qiymətsiz metallardan və ya metal karbidlərində…ə çubuqlar, toz üfürmə ilə metalizasiya üçün istifadə edilən:– digərləri
+code=84 | Nüvə reaktorları, qazanlar, avadanlıq və mexaniki qurğular
+    COVERS: Nüvə reaktorları, qazanlar, mühərriklər, maşınlar, mexaniki qurğular və onların hissələri (əsasən qeyri-elektrik; elektrik maşınları 85-ci qrupda).
+    EXCLUDES: elektrik maşınları, avadanlığı və onların hissələri → see 85
+    EXCLUDES: ölçmə, yoxlama, dəqiq, optik və tibbi cihazlar (mikroskop, manometr, şpris/iynə/kateter) → see 90
+    EXCLUDES: tozsoranlar → see 8508
+    EXCLUDES: elektromexaniki məişət cihazları (öz mühərriki olan) → see 8509
+    EXCLUDES: rəqəmsal (foto/video) kameralar → see 8525
+    EXCLUDES: abraziv/itiləyici daşlar və 68-ci qrupun məmulatları → see 68
+    EXCLUDES: keramikadan avadanlıq və istənilən materialdan maşınların keramika hissələri → see 69
+    EXCLUDES: laborator şüşə qablar; texniki şüşədən avadanlıq → see 7017
+    EXCLUDES: qeyri-mexaniki məişət soba/qızdırıcıları (qara metaldan) → see 7321
+    EXCLUDES: XVII bölmənin nəqliyyat vasitələri üçün radiatorlar → see 8708
+    EXCLUDES: əl ilə işləyən (mühərriksiz) mexaniki döşəmə süpürgələri → see 9603
+    EXCLUDES: nəqliyyat vasitələri (avtomobil, lokomotiv, təyyarə, gəmi) → see 87
+    e.g.: Nüvə reaktorları; nüvə reaktorları üçün şüalanm…ər); izotopların ayrılması üçün avadanlıq və qurğular:– nüvə reaktorları; Maye və ya tozların atılması, çilənməsi və ya t…oji atıcı qurğular:– – digər maşınlar:– – – sıxılmış hava ilə işləyənlər; Metalkəsən dəzgahlar (xətti quruluşlu aqreqat d…zgahları daxil edilməklə) başqa:– konsol-frezer dəzgahları:– – digərləri; Bu qrupun başqa yerində adı çəkilməyən və ya tə…rik detalları olmayan avadanlıqların hissələri:– digərləri:– – digərləri
+code=85 | Elektrik maşınları və avadanlığı
+    COVERS: Elektrik maşınları, avadanlıqları və onların hissələri; səs/görüntü yazma-oxuma aparatları; rabitə aparatları; elektron komponentlər.
+    EXCLUDES: elektrik qızdırıcılı ədyal, döşək, yastıq, geyim, ayaqqabı, qulaqlıq → see 61/62/63
+    EXCLUDES: 7011 mövqeyinin şüşə məmulatları (lampa/elektron boru üçün şüşə kolbalar) → see 7011
+    EXCLUDES: yarımkeçirici cihazların/EŞT-nin istehsalı üçün maşın və aparatlar → see 8486
+    EXCLUDES: səhiyyə, cərrahiyə, stomatologiya, baytarlıqda istifadə olunan vakuum aparatları → see 9018
+    EXCLUDES: elektrik qızdırıcılı mebel → see 94
+    EXCLUDES: elektrikli tibbi/cərrahi/diaqnostik cihaz və alətlər (EKQ, elektrodiaqnostika, endoskop və s.) → see 9018
+    EXCLUDES: rentgen aparatları → see 9022
+    e.g.: Elektrik mühərrikləri və generatorları (elektri…x olmayan mühərriklər:– – gücü 18 Vt-dan çox olmayan sinxron mühərriklər; İnersiyasız və ya akkumulyasiya edici elektrik…ik su qızdırıcıları, batırılma elektrik qızdırıcı cihazlar:– – digərləri; Yalnız və ya əsasən 8525-8528 mal mövqelərində…muş hissələr:– digərləri:– – digərləri:– – – digərləri:– – – – digərləri; İlkin elementlərin, ilkin batareya və elektrik…danlıq və ya aparaturaların elektrik hissələri:– digərləri:– – digərləri
+code=86 | Dəmir yolu lokomotivləri, vaqonlar və avadanlıq
+    COVERS: Dəmiryol və tramvay lokomotivləri, hərəkət tərkibi (vaqonlar, sisternlər) və onların hissələri; dəmiryol/tramvay yolu qurğuları və mexaniki siqnalizasiya avadanlığı; nəqliyyat konteynerləri.
+    EXCLUDES: Ağac və ya betondan dəmiryol/tramvay şpalları, hava yastıqlı qatarlar üçün istiqamətləndirici yol seksiyaları → see 4406
+    EXCLUDES: Dəmiryol/tramvay yolu üçün qara metaldan yığılmamış yol tikinti materialları (relslər, çarpazlar, oxlar, örtük lövhələri) → see 7302
+    EXCLUDES: Elektrik siqnalizasiya, təhlükəsizlik və ya hərəkətin idarəetmə avadanlığı → see 8530
+    EXCLUDES: Həm avtomobil, həm relslə hərəkət edən traktorlar/avtobuslar (yalnız təkərləri dəyişməklə), yol nəqliyyat vasitələri → see 8701
+    EXCLUDES: Yol-rels qoşquları (əsasən yol qoşqusu kimi istifadə üçün, xüsusi vaqonlarla daşınan) → see 8716
+    EXCLUDES: Overhead kabellər üçün pilonlar və portallar → see 7308
+    e.g.: Dəmiryol lokomotivləri, xarici elektrik enerji mənbəyi ilə ,və ya akkumulyatorlu:– xarici elektrik enerji mənbəyi ilə; Özügetməyən dəmiryol və ya tramvay yük vaqonlar…ldan vaqonlar, 8606 10 000 0 alt yarımmövqeyinə daxil edilənlərdən başqa; Dəmiryol lokomotivlərinin və ya motorlu tramvay…ın hissələri:– – pnevmatik əyləclər və onların hissələri:– – – digərləri; Konteynerlər (maye və ya qazların daşınması üçü…daşınmaq üçün xüsusi olaraq təyin olunmuş və təchiz olunmuş:– digərləri
+code=87 | Yer nəqliyyatı vasitələri (dəmir yolundan başqa)
+    COVERS: Yol nəqliyyat vasitələri (relslərdən başqa): traktorlar, avtomobillər, avtobuslar, yük maşınları, motosikletlər, velosipedlər, qoşqular və onların hissələri.
+    EXCLUDES: yalnız relslər üzərində hərəkət üçün dəmiryol və tramvay hərəkət tərkibi → see 86
+    EXCLUDES: qaldırma, qazma, hamarlama və s. maşının ayrılmaz hissəsini təşkil edən özühərəkət bazalar/şassilər (buldozer, ekskavator, avtoyükləyici, özühərəkət kran) → see 84
+    EXCLUDES: hava yastıqlı nəqliyyat vasitələri (hoverkraft) → see 89
+    EXCLUDES: təkərli oyuncaqlar və oyuncaq nəqliyyat vasitələri (ikitəkərli uşaq velosipedlərindən başqa) → see 9503
+    e.g.: Traktorlar (8709 mal mövqeyindəki traktorlardan başqa):– yanaşı gedən sürücü tərəfindən idarə olunan traktorlar; Əsasən adamların daşınması üçün nəzərdə tutulmu…– – – məxsusi olaraq tibbi məqsədlər üçün nəzərdə tutulmuş avtomobillər; 8701-8705 mal mövqelərindəki motorlu nəqliyyat…– – radiatorlar və onların hissələri:– – – digərləri:– – – – radiatorlar; Yedəklər və yarımyedəklər; digər özüyeriməyən nəqliyyat vasitələri; onların hissələri:– hissələr:– – digər hissələr
+code=88 | Uçuş və kosmik aparatları
+    COVERS: Uçuş aparatları, kosmik aparatlar və bunların hissələri: təyyarələr, vertolyotlar, planerlər, aerostatlar, paraşütlar, pilotsuz uçuş aparatları (dronlar) və onlara aid hissələr.
+    EXCLUDES: Əylənmək üçün uçan oyuncaqlar (oyuncaq təyyarələr, oyuncaq dronlar, oyuncaq şarlar və uçurtmalar) → see 9503
+    EXCLUDES: Nümayiş, dekorasiya və ya maket məqsədli miqyaslı uçuş aparatı modelləri → see 9023
+    EXCLUDES: Uçuş aparatının mühərrikləri (porşenli, turboreaktiv, turbovintli mühərriklər) → see 8407
+    EXCLUDES: İdarə olunan raketlər və hərbi raketlər → see 9306
+    e.g.: Aerostat və dirijabllar; planerlər, deltaplanla…suz uçuş aparatları:– Aerostat və dirijabllar; planerlər və deltaplanlar; Digər uçuş aparatları (məsələn, vertolyotlar, t…paratın kütləsi 90 000 kq-dan çox olan, lakin 120 000 kq-dan çox olmayan; 8801 və ya 8802 mal mövqelərində göstərilmiş uçuş aparatların hissələri:– digərləri:– – hava ilanlarının; Uçuş aparatları üçün start avadanlıqları; göyər…uçuş heyəti üçün yerüstü trenajorlar və onların hissələri:– – digərləri
+code=89 | Gəmilər, qayıqlar və üzən qurğular
+    COVERS: Gəmilər, qayıqlar və üzən konstruksiyalar (üzən vasitələr və onların gövdələri).
+    EXCLUDES: suüstü lövhələr (vindserf) → see 9506
+    EXCLUDES: qurtarıcı kəmərlər və qurtarıcı jiletlər → see 6307
+    EXCLUDES: dalğıc zəngləri (xarici qurğu ilə endirilib-qaldırılan metal kamera) → see 8479
+    EXCLUDES: amfibiya avtomobilləri və hava-yastıqlı nəqliyyat vasitələri (əsasən quru üçün) → see 8703
+    EXCLUDES: gəmi mühərrikləri, maşınlar və avadanlıq (üzən vasitənin hissəsi kimi ayrıca təqdim olunmayan) → see 84
+    e.g.: Kruiz, ekskursiya gəmiləri, bərələr, yük gəmilə…əzərdə tutulmuş analoji üzən vasitələr; bütün tip bərələr:– – dəniz üçün; İstirahət və ya idman üçün yaxtalar və digər üz…vasitələr; avarlı qayıqlar və kanoe: – hava ilə doldurulan:– – digərləri; Üzən mayaklar, yanğın gəmiləri, torpaqazan, üzə…a işləyən qazma və ya istismar platformaları:– torpaqazan:– – dəniz üçün; Sökülmə üçün nəzərdə tutulmuş gəmilər və digər üzən konstruksiyalar
+code=90 | Optik, foto, ölçü və tibbi cihazlar
+    COVERS: Optik, foto, kino, ölçü, nəzarət, dəqiqlik, tibbi və cərrahi alət və aparatlar; onların hissə və ləvazimatları.
+    EXCLUDES: maşın/qurğularda işlədilən yumşaq rezindən (bərk rezindən başqa) texniki məmulatlar (qasketlar, halqalar, membranlar) → see 4016
+    EXCLUDES: dəridən və ya kompozisiya dəridən texniki məmulatlar; tekstil materialdan texniki məmulatlar → see 4205
+    EXCLUDES: təsiri yalnız elastikliyə əsaslanan tekstil saxlayıcı kəmərlər və bandajlar (hamiləlik, döş, qarın bandajları, əzələ/oynaq fiksatorları) — ortopedik xüsusi konstruksiya olmadıqda → see 6212
+    EXCLUDES: odadavamlı keramika məmulatları; laborator/kimyəvi/texniki keramika qablar → see 6909
+    EXCLUDES: optik emal olunmamış şüşə güzgülər; optik element olmayan metal güzgülər → see 7009
+    EXCLUDES: laborator, gigiyenik və ya əczaçılıq şüşə qabları və digər 7007/7008/7011/7014/7015/7017 şüşə malları → see 7017
+    EXCLUDES: qiymətsiz metaldan ümumi təyinatlı hissələr (vint, bolt, yay, boru birləşmələri) və ya plastikdən analoqları — implant üçün xüsusi olanlardan başqa → see 7318
+    EXCLUDES: ölçü cihazlı nasoslar; tərəzi daşları və çəki-nəzarət avadanlığı; qaldırıcı-yükləyici avadanlıq; kağız kəsən maşınlar → see 8413
+    EXCLUDES: hesablayıcı maşınlar; klapanlar və armatur; yarımkeçirici üzərinə sxem proyeksiya aparatları → see 8470
+    EXCLUDES: velosiped/avtomobil projektor və fənərləri; portativ elektrik fənərləri; televiziya, rəqəmsal kameralar və videokameralar; radar və radionaviqasiya aparaturası → see 8525
+    EXCLUDES: 9405 mal mövqeyinin projektor və fənərləri; işıqlandırma cihazları → see 9405
+    EXCLUDES: 95-ci qrupun məmulatları (oyuncaqlar, idman avadanlığı, oyuncaq eynəklər, karnaval əşyaları) → see 9503
+    EXCLUDES: təkayaqlı, ikiayaqlı və üçayaqlı ştativlər və analoji dayaqlar → see 9620
+    EXCLUDES: dərmanlar, tibbi sarğılar, plastırlar, steril tikiş materialları və digər əczaçılıq malları (alət deyil) → see 3006
+    e.g.: Optik liflər və lifli-optik burmalar; lifli-opt…, lifli-optik burmalar və kabellər:– – təsvirin ötürülməsi üçün kabellər; Geodezik və ya topoqrafik (fotoqrammetrik cihaz…ya nivelirləmədə istifadə olunan cihaz və alətlər; hidroqrafik cihazlar; Areometrlər və mayeyə batırıldıqda işləyən anal…hazların biri-biri ilə istənilən birləşmələri:– hissələr və ləvazimatlar; Maşın, cihaz, alət və ya 90-cı qrupun aparatura…sələri və ləvazimatları (başqa yerdə adı çəkilməyən və təsnif edilməyən)
+code=91 | Saatlar və onların hissələri
+    COVERS: Saatlar (qol, cib, divar, budilnik, xüsusi saatlar), saat mexanizmləri və bunların hissələri.
+    EXCLUDES: saat şüşələri və saat ağırlıqları (yükləri) → see 70
+    EXCLUDES: saat zəncirləri → see 7113
+    EXCLUDES: qiymətsiz metaldan ümumi təyinatlı hissələr (vint, boltlar) — yaylar istisna → see 7318
+    EXCLUDES: kürəciklər və kürəcikli diyirlənmə yastıqları → see 8482
+    EXCLUDES: ankersiz işləyən yaylı və ya ağırlıqlı mühərriklər (musiqi qutuları üçün və s.) → see 8412
+    EXCLUDES: hələ yığılmamış 85-ci qrup elektron məmulatları → see 85
+    EXCLUDES: saat tipli mexanizmi və ya sinxron mühərriki olmayan elektron/elektrik taymerlər və rele → see 9031
+    e.g.: Öz üzərində və ya özü ilə daşınması üçün nəzərd…ılmış saniyəölçəni olan və ya olmayan:– – yalnız mexaniki indikasiya ilə; Öz üzərində və ya özü ilə daşınması üçün nəzərd…utulmamış saatlar, digərləri:– zəngli saatlar:– – elektriklə işə salınan; Komplektləşdirilmış saat mexanizmləri, yığılmam…mamış və ya qismən yığılmış (saat mexanizmləri dəstləri):– – – digərləri; Digər bütün növlərdən olan saat hissələri:– digərləri
+code=92 | Musiqi alətləri və onların ləvazimatı
+    COVERS: Musiqi alətləri; onların hissələri və ləvazimatları (fortepiano, simli, nəfəs, zərb, elektro alətlər, musiqi qutuları, metronomlar, simlər).
+    EXCLUDES: Qiymətsiz metaldan ümumi təyinatlı hissələr (vint, bolt, yay, mismar) və ya plastmasdan analoji mallar → see XV / 39
+    EXCLUDES: Alətlə birləşməmiş mikrofonlar, gücləndiricilər, reproduktorlar (dinamiklər), baş telefonları, açarlar, stroboskoplar və digər köməkçi aparatura → see 85 / 90
+    EXCLUDES: Oyuncaq musiqi alətləri və qurğuları → see 9503
+    EXCLUDES: Musiqi alətlərinin təmizlənməsi üçün fırçalar → see 9603
+    EXCLUDES: Ştativlər, üçayaqlar, monopodlar və analoji dayaqlar → see 9620
+    EXCLUDES: Kolleksiya əşyaları və antikvar musiqi alətləri → see 9705 / 9706
+    EXCLUDES: Musiqi mexanizmi qoyulmuş, lakin funksiyası sırf məişət/dekorativ olan əşyalar (saatlar, vazalar, keramik fiqurlar, təbrik kartları) → see müvafiq öz mal mövqeyi
+    e.g.: Fortepiano, avtomatik fortepianolar daxil olmaqla; klavesinlər və digər klavişli simli alətlər:– pianino:– – təzələri; Digər nəfəsli musiqi alətləri (məsələn, borulu…ka orqanı və mexaniki şarmankadan başqa:– digərləri:– – dodaq qarmonları; Səsin elektrikin köməyi ilə alındığı və ya gücl…i (məsələn, orqanlar, gitaralar, akkordeonlar):– digərləri:– – digərləri; Musiqi alətlərin hissələri (məsələn, musiqi san…növ trubalar:– digərləri:– – digərləri:– – – digərləri:– – – – digərləri
+code=93 | Silah və döyüş sursatı
+    COVERS: Silahlar və döyüş sursatı; onların hissələri və ləvazimatı (odlu silah, hərbi silah, patron, mərmi, bomba, soyuq silah).
+    EXCLUDES: Zərbə kapsulları, detonatorlar, siqnal raketləri (pirotexniki və partlayıcı məmulatlar) → see 36
+    EXCLUDES: Qiymətsiz metaldan ümumi təyinatlı hissələr (vint, bolt, yay) və ya plastmasdan analoji hissələr → see 39
+    EXCLUDES: Özügedən zirehli döyüş nəqliyyat vasitələri (tank, zirehli maşın) → see 8710
+    EXCLUDES: Silahda istifadəyə yararlı, silaha quraşdırılmamış teleskopik nişangahlar və digər optik qurğular → see 9013
+    EXCLUDES: Yaylar, oxlar, qılıncoynatma rapiraları və oyuncaq silahlar → see 95
+    EXCLUDES: Kolleksiya və ya əntiq əşyaları → see 9705
+    EXCLUDES: Silah qutuları, çexolları (dəri və ya toxuculuq) → see 4202
+    e.g.: Hərbi silah, revolverlərdən, tapançalardan və 9…başqa:– artilleriya silahı (məsələn, toplar, qaubisalar və minaatanlar); Digər odlu silahlar və partlayıcı maddələrin qü…ov silahları və ya hədəfə atəş açmaq üçün vintovkalar (yivli), digərləri; Bombalar, qumbaralar, torpedalar, minalar, rake…və onların hissələri; pnevmatik silahlar üçün gülləciklər:– – patronlar; Qılınclar, xəncərlər, şpaqalar, qəmələr, süngül…dalanan silahların hissələri, onlar üçün qınlar və çexollar (futlyarlar)
+code=94 | Mebel; yataq ləvazimatı; işıqlandırma cihazları
+    COVERS: Mebel; yataq ləvazimatı (döşək, yastıq, yorğan); işıqlandırıcı avadanlıq və lampalar; işıqlı lövhələr; yığma tikililər.
+    EXCLUDES: Hava və ya su ilə doldurulan döşəklər, yastıqlar, divan yastıqları → see 39/40/63
+    EXCLUDES: Döşəməyə/yerə qoyulan güzgülər (psişe, fırlanan güzgü) → see 7009
+    EXCLUDES: Qiymətli metaldan/mirvari/qaş məmulatları → see 71
+    EXCLUDES: Qiymətsiz metaldan ümumi təyinatlı hissələr, plastmasdan analoji hissələr, seyflər → see XV/39/8303
+    EXCLUDES: Soyuducu/dondurucu avadanlığının hissəsi olan mebel → see 8418
+    EXCLUDES: Tikiş maşınları üçün xüsusi mebel → see 8452
+    EXCLUDES: Lampalar, işıq mənbələri (közərmə/LED lampa) və onların hissələri → see 85
+    EXCLUDES: Audio/video aparaturasının (səsgücləndirici, mediapleyer, televizor) hissəsi olan mebel → see 8518/8522/8529
+    EXCLUDES: Velosiped/motosiklet aksesuarları, yəhər → see 8714
+    EXCLUDES: Stomatoloji avadanlıqla təchiz olunmuş stomatoloji kreslolar, tüpürcək qabları → see 9018
+    EXCLUDES: Tibbi alət və cihazlar (şpris/şprits, iynə, kateter, endoskop) → see 9018
+    EXCLUDES: Saatlar, saat korpusları və 91-ci qrup məmulatları → see 91
+    EXCLUDES: Oyuncaq mebel/lampa, bilyard masaları, dekorativ fənərlər (çin fənəri) → see 9503/9504/9505
+    EXCLUDES: Təkayaqlı/ikiayaqlı ştativlər, üçayaqlar (tripod) → see 9620
+    e.g.: Oturmaq üçün mebel (9402 mal mövqeyində göstəri…nun hissələri:– hava nəqliyyat vasitələrində istifadə olunan oturacaqlar; Digər mebellər və onların hissələri:– müəssisəl…şkaflar; sənədlərin saxlanması üçün şkaflar, kartoteka və digər şkaflar; Başqa yerdə adı çəkilməmiş və ya təsnif olunmam…arından başqa:– – digər materiallardan:– – – digərləri:– – – – digərləri; Yığma tikinti konstruksiyaları:– digərləri:– – digər materiallardan
+code=95 | Oyuncaqlar, oyunlar və idman ləvazimatı
+    COVERS: Oyuncaqlar, oyunlar, əyləncə və idman ləvazimatı; onların hissə və ləvazimatları.
+    EXCLUDES: şamlar → see 3406
+    EXCLUDES: fişənglər və pirotexnika məmulatları → see 3604
+    EXCLUDES: balıq ovu üçün ölçüyə kəsilmiş, lakin tilov ipinə çevrilməmiş iplik, monosap, şnur və simlər → see 4206
+    EXCLUDES: idman çantaları və digər qablar → see 4202
+    EXCLUDES: tekstildən maskarad geyimi, idman geyimi və xüsusi geyim əşyaları → see 61
+    EXCLUDES: tekstil bayraqları, flaqduklar və yelkənlər → see 63
+    EXCLUDES: idman ayaqqabısı (konkisi bərkidilmiş çəkmələrdən başqa) və idman baş geyimləri → see 64
+    EXCLUDES: çəliklər, qırmanclar, at miniciliyi qamçıları → see 6602
+    EXCLUDES: kuklalar üçün quraşdırılmamış şüşə gözlər → see 7018
+    EXCLUDES: qiymətsiz metaldan ümumi təyinatlı hissələr və plastmasdan analoji məmulatlar → see 39
+    EXCLUDES: zənglər, qonqlar və analoji məmulatlar → see 8306
+    EXCLUDES: maye nasosları, filtr avadanlığı, elektrik mühərrikləri, transformatorlar, yazı daşıyıcıları, uzaqdanidarə aparaturası → see 8413
+    EXCLUDES: idman nəqliyyat vasitələri (bobsley, toboqqan istisna) → see 87
+    EXCLUDES: iki təkərli uşaq velosipedləri → see 8712
+    EXCLUDES: pilotsuz uçuş aparatı (dron) → see 8806
+    EXCLUDES: idman qayıqları (kanoe, skif) → see 89
+    EXCLUDES: idman/açıq hava üçün eynəklər və qoruyucu eynəklər → see 9004
+    EXCLUDES: ov heyvan və quşlarını çağıran düdüklər və fitlər → see 9208
+    EXCLUDES: silahlar və 93-cü qrupun digər məmulatları → see 93
+    EXCLUDES: hər növ elektrik girlyandaları (işıqlı zəncirlər) → see 9405
+    EXCLUDES: təkayaqlı, ikiayaqlı ştativlər, üçayaqlar → see 9620
+    EXCLUDES: raketka telləri, çadırlar, kempinq ləvazimatı, əlcəklər → see 39
+    EXCLUDES: süfrə/mətbəx qabları, tualet ləvazimatları, geyim, ağ (praktiki funksiyalı əşyalar) → see 63
+    e.g.: Üçtəkərli velosipedlər, samokatlar, pedallı avt…dallı avtomobillər və təkərli analoji oyuncaqlar; kuklalar üçün arabalar; Video oyunlar üçün konsollar və avadanlıqlar, ə…oyuncaqlar, boulinq üçün avtomatik avadanlıqdan başqa:– – digər oyunlar; Bədən tərbiyəsi, gimnastika, yüngül atletika, i…rı və uşaqlar üçün hovuzlar:– stolüstü tennis üçün inventar və avadanlıq; Karusellər, yelləncəklər, tirlər və digər attra…lar; səyyar sirklər və səyyar heyvanxanalar; səyyar teatrlar:– digərləri
+code=96 | Müxtəlif hazır məmulatlar
+    COVERS: Müxtəlif hazır məmulatlar: oyma materialları və məmulatları, süpürgə/fırça, ələk, düymə/zəncirbənd, qələm/karandaş, möhür/lent, alışqan, qəlyan, daraq, termos, gigiyenik məmulatlar və s.
+    EXCLUDES: Kosmetik və ya gigiyenik məqsədli karandaşlar (qaş karandaşı və s.) → see 33
+    EXCLUDES: Çətir və çəlik hissələri → see 66
+    EXCLUDES: Bijuteriya → see 7117
+    EXCLUDES: Qiymətsiz metaldan ümumi təyinatlı hissələr / plastikdən analoji məmulatlar → see 39
+    EXCLUDES: Bıçaq və 82-ci qrupun kəsici/əl alətləri (dəstəkləri oyma materialdan olsa da) → see 82
+    EXCLUDES: Eynək çərçivələri → see 9003
+    EXCLUDES: Reysfederlər və riyazi rəsm qələmləri → see 9017
+    EXCLUDES: Stomatoloji, terapevtik, cərrahi və baytarlıq üçün ixtisaslaşdırılmış fırçalar → see 9018
+    EXCLUDES: Tibbi alət və cihazlar (şpris, iynə, kateter və s.) → see 9018
+    EXCLUDES: Saat korpusları və 91-ci qrup məmulatları → see 91
+    EXCLUDES: Musiqi alətləri, onların hissə və ləvazimatları → see 92
+    EXCLUDES: Silahlar və onların hissələri → see 93
+    EXCLUDES: Mebel, lampalar və işıqlandırıcı avadanlıq → see 94
+    EXCLUDES: Oyuncaqlar, oyunlar, idman inventarı → see 95
+    EXCLUDES: Sənət əsərləri, kolleksiya və əntiq əşyaları → see 97
+    e.g.: Emal olunmuş və oyma üçün yararlı fil sümüyü, s…latlar daxil olmaqla):– emal olunmuş fil sümüyü və ondan olan məmulatlar; Zəncirbəndlər və onların hissələri:– hissələri:…dan, dişcikləri qiymətsiz metallardan olan ensiz lentlər daxil edilməklə; Siqaret alışqanları və digər alışqanlar, mexani…aq daşları və fitillərdən başqa:– cib qaz alışqanları, təkrar doldurulan; Qadınlar üçün gigiyenik bezlər və tamponlar, uş…ləri və analoji məmulatlar, istənilən materialdan:– digər materiallardan
+code=97 | İncəsənət əsərləri və antikvariat
+    COVERS: İncəsənət əsərləri, kolleksiya predmetləri və antikvariat: əllə çəkilmiş rəsm və heykəllər, orijinal qravürlər, markalar, elmi/tarixi kolleksiyalar və 100 ildən çox yaşı olan antikvar əşyalar.
+    EXCLUDES: Söndürülməmiş (istifadə olunmamış) cari poçt və ya dövlət rüsumu markaları, gerbli kağız (poçt ləvazimatı) → see 4907
+    EXCLUDES: Boyanmış kətandan teatr dekorasiyaları, studiya arxa fonları (9706-ya düşənlər istisna) → see 5907
+    EXCLUDES: Təbii və ya becərilmiş mirvari, qiymətli və ya azqiymətli daşlar → see 7101
+    EXCLUDES: Kütləvi (seriyalı) reproduksiyalar, tökmələr, kommersiya xarakterli adi sənətkarlıq məmulatları (rəssam yaratsa belə) → see 6913
+    EXCLUDES: Sənaye, memarlıq və ya mühəndislik məqsədli əllə çəkilmiş planlar, layihələr, model/moda/zərgərlik eskizləri → see 4906
+    e.g.: Tamamilə əl ilə yerinə yetirilmiş şəkillər, rəs…ollajlar və analoji dekorativ təsvirlər:– şəkillər, rəsmlər və pastellər; Qravüra, estamp və litoqrafiyaların orijinalları; Poçt markaları və ya dövlət rüsumu markaları, p…olunmuş və ya istifadə olunmamış, 4907 mal mövqeyinin mallarından başqa; Yaşı 100 ildən yuxarı olan antikvariat
+code=99 | Xidmətlər
+    e.g.: Tarla işləri; Təmizləyici vasitələrin topdansatışı üzrə xidmətlər; Fərdi qəza və xəstəlik sığortası üzrə xidmətlər; Toxunulmazlıq hüququ olan təşkilat və orqanlar  tərəfindən göstərilən xidmətlər
+
+===== BROKER RESPONSE =====
+{"criterion":"The item is a heating pad, which is not related to any of the branches that cover animals, food products, plants, textiles, metals, or other specific materials.","choice":null,"confidence":0.0,"decisive":false,"question":"Is the heating pad made of rubber or another material?"}

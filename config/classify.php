@@ -65,11 +65,10 @@ return [
         // essence on error/disabled, so it never blocks a classification.
         'use_brief' => (bool) env('CLASSIFY_BROKER_USE_BRIEF', true),
         'brief_model' => (string) env('CLASSIFY_BROKER_BRIEF_MODEL', 'openai/gpt-4o'),
-        // When the fast base brief is UNSURE (an unfamiliar brand / garbled term:
-        // confidence < brief_search_below) it escalates to a search-capable model that
-        // looks the item up on the web before describing it. Only the uncertain items
-        // pay for search; a blank model disables the escalation.
-        'brief_search_model' => (string) env('CLASSIFY_BROKER_BRIEF_SEARCH_MODEL', 'deepseek/deepseek-v4-flash:online'),
+        // (Disabled) The base brief could escalate to a WEB-SEARCH model for unfamiliar
+        // brands. The flow no longer searches the web at the input — a blank model keeps
+        // the brief to its single search-free pass. Set a `:online` model to re-enable.
+        'brief_search_model' => (string) env('CLASSIFY_BROKER_BRIEF_SEARCH_MODEL', ''),
         'brief_search_below' => (float) env('CLASSIFY_BROKER_BRIEF_SEARCH_BELOW', 0.55),
         // Bump when the brief prompt changes materially — old cached briefs (keyed by
         // this version) are then ignored and re-generated instead of served stale.
@@ -86,17 +85,16 @@ return [
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):
-    // a reasoning model that IDENTIFIES the item — with web search for unfamiliar
-    // brands/drugs — then codes it. A different METHOD (it can reach knowledge neither
-    // retrieval nor descent has), so its vote is a genuinely independent third opinion
-    // in the majority (2-of-3) consensus. Enable via CLASSIFY_MECHANISMS.
+    // a reasoning model that IDENTIFIES the item from its own knowledge, then codes it.
+    // A different METHOD from retrieval/descent, so its vote is a genuinely independent
+    // third opinion in the 2-of-3 heading consensus. No web search. Enable via
+    // CLASSIFY_MECHANISMS.
     'direct' => [
-        // A thinking DeepSeek WITH web search (the `:online` suffix = OpenRouter's web
-        // plugin, ~$0.005/search). Cracks real-but-obscure names (drugs, brands) that
-        // cold recall misses. Every item searches — set CLASSIFY_DIRECT_MODEL to a
-        // plain model (no `:online`) to disable search if latency/cost bites.
-        'model' => (string) env('CLASSIFY_DIRECT_MODEL', 'deepseek/deepseek-v4-flash:online'),
-        // Web search + reasoning is slow — this call gets a long HTTP timeout of its own.
+        // A search-free reasoning model, deliberately a DIFFERENT family from the
+        // DeepSeek broker/vector so its errors decorrelate for the 2-of-3 vote. No
+        // `:online` suffix — this mechanism does NOT search the web.
+        'model' => (string) env('CLASSIFY_DIRECT_MODEL', 'openai/gpt-oss-120b'),
+        // Reasoning can be slow — this call gets a long HTTP timeout of its own.
         'timeout' => (int) env('CLASSIFY_DIRECT_TIMEOUT', 180),
     ],
 

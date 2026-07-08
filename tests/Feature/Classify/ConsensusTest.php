@@ -8,8 +8,8 @@ use App\Services\Classify\Consensus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-// The consensus policy: mechanisms auto-resolve only on full agreement; any
-// divergence (differing codes, or a partial answer) goes to a human.
+// The consensus policy: mechanisms auto-resolve when >=2 agree on the 4-digit
+// heading; any divergence (differing headings, or a partial answer) goes to a human.
 class ConsensusTest extends TestCase
 {
     use RefreshDatabase;
@@ -66,17 +66,19 @@ class ConsensusTest extends TestCase
 
         $this->assertSame('agreed', $d['resolution']);
         $this->assertSame('C1', $d['final_code']);
-        $this->assertSame(1, $d['final_catalog_id']);
+        $this->assertNull($d['final_catalog_id']); // resolved at the heading, not a catalog leaf
     }
 
-    public function test_review_when_agreed_code_but_not_all_confident(): void
+    public function test_heading_agreement_resolves_regardless_of_per_mechanism_confidence(): void
     {
+        // The old 'review' state is gone — a shared heading is 'agreed' even if one
+        // mechanism was not individually confident.
         $d = (new Consensus)->resolve(collect([
             $this->makeResult('C1', 'auto_confirmed'),
             $this->makeResult('C1', 'needs_review'),
         ]));
 
-        $this->assertSame('review', $d['resolution']);
+        $this->assertSame('agreed', $d['resolution']);
         $this->assertSame('C1', $d['final_code']);
     }
 
