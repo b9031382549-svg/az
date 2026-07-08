@@ -1,11 +1,10 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
-    // In 4-digit ("heading") mode the whole view reads as if we had collected 4-digit
-    // codes: relabel the tabs (converge/diverge), truncate every displayed code.
-    $tabs = $heading
-        ? ['open' => __('Diverge'), 'agreed' => __('Converge'), 'waiting' => __('Waiting'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')]
-        : ['open' => __('Needs attention'), 'waiting' => __('Waiting'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
-    $cd = fn ($c) => $heading && $c !== null && $c !== '' ? mb_substr((string) $c, 0, $digits) : $c;
+    // Everything resolves at the 4-digit HS heading now — one view, no full/heading toggle.
+    $tabs = ['open' => __('Needs attention'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
+    // Codes render as stored (the final answer is a 4-digit heading; mechanism traces
+    // keep their full code, labelled with the heading name).
+    $cd = fn ($c) => $c;
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
     $resBadge = fn ($s) => match ($s) {
         'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
@@ -38,28 +37,6 @@
       <a href="{{ route('review.export', ['batch' => $batch, 'filter' => $filter]) }}"
          class="btn btn-ghost btn-sm" title="{{ __('Export the current view (upload + status filter) to Excel') }}">⬇ {{ __('Export Excel') }}</a>
     </div>
-  </div>
-
-  {{-- Global code-detail mode: switches the WHOLE view (diagram, counts, tabs and
-       every code) between the full 10-digit code and the 4-digit HS heading. Pure
-       re-projection of the stored data — no re-classification, no LLM. --}}
-  <div class="mb-5 flex items-center gap-3 flex-wrap">
-    <span class="kicker">{{ __('Code detail') }}</span>
-    <div class="inline-flex rounded-lg border hair overflow-hidden text-sm shadow-sm">
-      <button wire:click="setCodeMode('full')"
-              class="px-3.5 py-1.5 flex items-center gap-1.5 transition {{ ! $heading ? 'bg-ink text-paper' : 'bg-surface text-muted hover:text-ink' }}">
-        {{ __('Full code') }} <span class="opacity-60 tnum text-xs">10</span>
-      </button>
-      <button wire:click="setCodeMode('heading')"
-              class="px-3.5 py-1.5 flex items-center gap-1.5 transition border-l hair {{ $heading ? 'bg-ink text-paper' : 'bg-surface text-muted hover:text-ink' }}">
-        {{ __('Heading') }} <span class="opacity-60 tnum text-xs">4</span>
-      </button>
-    </div>
-    <span class="text-sm text-muted">
-      {{ $heading
-          ? __('Reading everything at the 4-digit HS heading — as if the codes were collected 4-digit.')
-          : __('Reading the full 10-digit code.') }}
-    </span>
   </div>
 
   {{-- Distribution report --}}
@@ -135,7 +112,7 @@
         <div>
           <p class="kicker mb-2">{{ __('Mechanism consensus') }}</p>
           <div class="space-y-1.5">
-            @foreach([[__('Found'),$cs['found'] ?? 0,'bg-ledger'],[__('Waiting'),$cs['waiting'] ?? 0,'bg-line/70'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
+            @foreach([[__('Found'),$cs['found'] ?? 0,'bg-ledger'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
               <div class="flex items-center gap-2 text-sm">
                 <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
                 <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$csTotal*100 }}%"></span></span>
@@ -148,7 +125,7 @@
                stored per-mechanism codes (no LLM). At 4 digits it shows how many
                "conflicts" are just last-digit disagreements inside one heading. --}}
           <div class="mt-4 pt-3 border-t hair">
-            <p class="kicker mb-1.5">{{ $heading ? __('Convergence at 4-digit heading') : __('Convergence at full code') }}</p>
+            <p class="kicker mb-1.5">{{ __('Convergence at 4-digit heading') }}</p>
             <div class="flex items-center gap-4 text-sm">
               <span class="text-ledger">✓ {{ __('converge') }} <span class="tnum font-medium">{{ $agreement['converge'] }}</span></span>
               <span class="text-stamp">✕ {{ __('diverge') }} <span class="tnum font-medium">{{ $agreement['diverge'] }}</span></span>
@@ -205,25 +182,17 @@
       @php
         $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
         $allowed = $item->allowedCodes();
-        $adj = $item->adjudications->sortByDesc('id')->first();
-        // The AI-proposal framing belongs to the full-code view; the 4-digit view reads
-        // the recomputed heading-level resolution (converge/diverge) instead.
-        $aiProposed = ! $heading && $adj && $adj->verdict === 'resolved' && in_array($item->resolution, ['conflict','review'], true);
-        // The async AI judge was dispatched but hasn't returned a verdict yet — show
-        // "waiting", not "conflict" (it's still in progress, don't alarm the reviewer).
-        $waiting = ! $heading && ! $adj && $item->adjudicated_at !== null && in_array($item->resolution, ['conflict','review'], true);
-        // Pre-select the judge's answer when the item isn't final yet, so accepting it is one click.
-        $default = (string) ($item->final_code ?? ($aiProposed ? $adj->winning_code : ($allowed[0] ?? '')));
-        $vres = $heading ? ($vmap[$item->id] ?? $item->resolution) : $item->resolution;
-        $badgeLabel = $waiting ? __('Waiting') : ($aiProposed ? __('AI proposed') : __(str_replace('_',' ', $vres)));
-        $badgeClass = $waiting ? 'bg-line/50 text-muted' : ($aiProposed ? 'bg-ink/10 text-ink' : $resBadge($vres));
+        $adj = $item->adjudications->sortByDesc('id')->first(); // legacy trace, if this item was judged
+        $default = (string) ($item->final_code ?? ($allowed[0] ?? ''));
+        $badgeLabel = __(str_replace('_', ' ', $item->resolution));
+        $badgeClass = $resBadge($item->resolution);
       @endphp
       <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
             <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
-            <span class="font-mono text-sm">{{ $cd($item->final_code) ?? ($aiProposed ? $cd($adj->winning_code) : __('—')) }}</span>
+            <span class="font-mono text-sm">{{ $item->final_code ?? __('—') }}</span>
             @if(mb_strlen((string) $item->final_code) === 4)<span class="px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted" title="{{ __('resolved at the 4-digit heading; exact code left to a human') }}">{{ __('heading') }}</span>@endif
             @if($batch === 'all' && $item->batch)
               <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
@@ -234,9 +203,6 @@
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->finalCode->localizedName(), 110) }}</p>
           @elseif(($nlen = mb_strlen((string) $item->final_code)) > 0 && $nlen < 10 && isset($headingNames[(string) $item->final_code]))
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span></p>
-          @endif
-          @if($waiting)
-            <p class="text-muted text-sm mt-0.5">⏳ {{ __('AI judge is deciding — refresh in a moment') }}</p>
           @endif
 
           {{-- Per-mechanism answers --}}

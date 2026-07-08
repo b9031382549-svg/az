@@ -33,14 +33,10 @@ class ReviewQueue extends Component
 
     /** Resolution display metadata for the report donut + legend. */
     private const RESOLUTION_META = [
-        // "Found" = one bucket for agreed + ai_resolved + ai_proposed (the classifier
-        // produced an answer). The individual three still render in heading mode.
+        // "Found" = one bucket for agreed + ai_resolved (the classifier produced an
+        // answer, via consensus or the web-search resolver).
         'found' => ['label' => 'Found', 'color' => '#3f6b4f'],
-        'agreed' => ['label' => 'Agreed', 'color' => '#3f6b4f'],
-        'ai_resolved' => ['label' => 'AI resolved', 'color' => '#3a6ea5'],
-        'ai_proposed' => ['label' => 'AI proposed', 'color' => '#6b93c0'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
-        'waiting' => ['label' => 'Waiting', 'color' => '#8a94a6'],
         'review' => ['label' => 'Review', 'color' => '#c2872b'],
         'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
         'blocked_on_fact' => ['label' => 'Blocked (fact)', 'color' => '#7c5cbf'],
@@ -55,20 +51,10 @@ class ReviewQueue extends Component
     #[Url]
     public string $batch = 'all';
 
-    /** Code granularity for the agreement report: 'full' (10-digit) or 'heading' (4-digit). */
-    #[Url]
-    public string $codeMode = 'full';
-
     public function setFilter(string $filter): void
     {
         $this->filter = $filter;
         $this->resetPage();
-    }
-
-    public function setCodeMode(string $mode): void
-    {
-        $this->codeMode = $mode === 'heading' ? 'heading' : 'full';
-        $this->resetPage(); // heading mode filters a different item set
     }
 
     public function updatedBatch(): void
@@ -172,76 +158,29 @@ class ReviewQueue extends Component
 
     public function render()
     {
-        $heading = $this->codeMode === 'heading';
-        $n = $heading ? 4 : 10;
-
+        // Everything now resolves at the 4-digit HS heading — there is no full-code /
+        // heading toggle any more, and no async judge. "Found" = auto-resolved (cache /
+        // 2-of-3 consensus / web-search); "Needs attention" = a genuine conflict/review
+        // a human must decide.
         $scoped = fn () => ClassificationItem::query()
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
-        // In 4-digit ("heading") mode the WHOLE view is recomputed at the HS heading
-        // from the stored per-mechanism codes — no LLM: resolutions, counts, the donut
-        // and the codes all read "as if we had collected 4-digit codes". Human/terminal
-        // decisions are kept; everything else becomes agreed (converge) / conflict
-        // (diverge) / no_match at 4 digits.
-        $vmap = $heading ? $this->virtualResolutions($n) : [];
+        $q = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
+        match ($this->filter) {
+            'found' => $q->whereIn('resolution', ['agreed', 'ai_resolved']),
+            'open' => $q->whereIn('resolution', self::OPEN),
+            'all' => $q,
+            default => $q->where('resolution', $this->filter),
+        };
+        $items = $q->latest()->paginate(15);
 
-        if ($heading) {
-            $counts = collect($vmap)->countBy();
-            $rawCounts = $counts;
-            $itemsQuery = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
-            if ($this->filter === 'open') {
-                $ids = array_keys(array_filter($vmap, fn ($r) => in_array($r, self::OPEN, true)));
-                $itemsQuery->whereIn('id', $ids ?: [0]);
-            } elseif (! in_array($this->filter, ['all', 'open'], true)) {
-                $ids = array_keys(array_filter($vmap, fn ($r) => $r === $this->filter));
-                $itemsQuery->whereIn('id', $ids ?: [0]);
-            } else {
-                $itemsQuery->whereIn('id', array_keys($vmap) ?: [0]);
-            }
-            $items = $itemsQuery->latest()->paginate(15);
-        } else {
-            // Divergent (conflict/review) items split three ways so the page isn't a
-            // wall of "conflict" while the ASYNC judge is still catching up:
-            //   waiting     — the judge was dispatched (adjudicated_at) but has not
-            //                 returned a verdict yet — in progress, NOT a real conflict
-            //   ai_proposed — the judge resolved it → surfaced under "Found"
-            //   (remainder) — a genuine conflict/review for a human
-            $resolved = fn ($a) => $a->where('verdict', 'resolved');
-            $awaitingJudge = fn ($q) => $q->whereIn('resolution', ['conflict', 'review'])
-                ->whereNotNull('adjudicated_at')->whereDoesntHave('adjudications');
-            // Genuine = neither proposed (has a resolved verdict) nor waiting (dispatched, no verdict yet).
-            $genuine = fn ($q) => $q->whereDoesntHave('adjudications', $resolved)
-                ->where(fn ($w) => $w->whereNull('adjudicated_at')->orWhereHas('adjudications'));
+        $rawCounts = $scoped()->selectRaw('resolution, count(*) as c')->groupBy('resolution')->pluck('c', 'resolution');
 
-            $q = $scoped()->with(['finalCode', 'translation', 'results', 'adjudications']);
-            match ($this->filter) {
-                'found' => $q->where(function ($w) use ($resolved) {
-                    $w->whereIn('resolution', ['agreed', 'ai_resolved'])
-                        ->orWhere(fn ($o) => $o->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved));
-                }),
-                'waiting' => $awaitingJudge($q),
-                'ai_proposed' => $q->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved),
-                'open' => $genuine($q->whereIn('resolution', self::OPEN)),
-                'conflict', 'review' => $genuine($q->where('resolution', $this->filter)),
-                'all' => $q,
-                default => $q->where('resolution', $this->filter),
-            };
-            $items = $q->latest()->paginate(15);
-
-            $rawCounts = $scoped()->selectRaw('resolution, count(*) as c')->groupBy('resolution')->pluck('c', 'resolution');
-            $bucket = fn (callable $where) => $scoped()->tap($where)->selectRaw('resolution, count(*) as c')->groupBy('resolution')->pluck('c', 'resolution');
-            $waiting = $bucket($awaitingJudge);
-            $proposed = $bucket(fn ($q) => $q->whereIn('resolution', ['conflict', 'review'])->whereHas('adjudications', $resolved));
-
-            // Carve waiting + ai_proposed out of conflict/review; collapse agreed +
-            // ai_resolved + ai_proposed into "Found". rawCounts keeps the split for
-            // the bulk-action math.
-            $counts = $rawCounts->map(fn ($c, $res) => $c - (int) ($waiting[$res] ?? 0) - (int) ($proposed[$res] ?? 0));
-            $counts['waiting'] = (int) $waiting->sum();
-            $counts['ai_proposed'] = (int) $proposed->sum();
-            $counts['found'] = (int) ($counts['agreed'] ?? 0) + (int) ($counts['ai_resolved'] ?? 0) + (int) ($counts['ai_proposed'] ?? 0);
-            $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved', 'ai_proposed'], true))->filter(fn ($v) => $v !== 0);
-        }
+        // Collapse agreed + ai_resolved into one "Found" bucket for the tabs/donut.
+        $counts = collect($rawCounts);
+        $counts['found'] = (int) ($rawCounts['agreed'] ?? 0) + (int) ($rawCounts['ai_resolved'] ?? 0);
+        $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved'], true))
+            ->filter(fn ($v) => $v !== 0);
 
         // Localized catalog names for the candidate dropdowns.
         $codes = $items->getCollection()
@@ -283,15 +222,11 @@ class ReviewQueue extends Component
             'openCount' => $openCount,
             'batches' => $this->batchOptions(),
             'report' => $this->report($scoped, $counts),
-            // Same resolution-aware buckets as the counts, so the convergence widget
-            // agrees with the conflict number (reuse the heading vmap; compute at 10
-            // digits for full mode).
-            'agreement' => $this->agreement($n, $heading ? $vmap : $this->virtualResolutions($n)),
+            // Convergence at the 4-digit heading — same resolution-aware buckets as the
+            // counts, so the widget agrees with the conflict number.
+            'agreement' => $this->agreement(4, $this->virtualResolutions(4)),
             'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($rawCounts[$r] ?? 0)),
             'catalogNames' => $catalogNames,
-            'heading' => $heading,
-            'digits' => $n,
-            'vmap' => $vmap,
             'goldByItem' => $goldByItem,
             'headingNames' => $headingNames,
         ]);

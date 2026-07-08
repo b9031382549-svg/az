@@ -136,6 +136,28 @@
           </div>
         </div>
 
+        {{-- The three votes, LABELLED and shown up front — so the (dis)agreement on the
+             heading is obvious without opening the trace. --}}
+        <div class="mt-3 rounded-lg border hair p-3 space-y-1.5 text-xs">
+          <p class="kicker mb-1">{{ __('What each mechanism proposed') }}</p>
+          @foreach($mechResults as $res)
+            @php
+              $mh = mb_substr((string) $res->matched_code, 0, 4);
+              $isWinner = $consensus['agreed'] && $mh === (string) $consensus['heading'];
+            @endphp
+            <div class="flex items-start gap-2 {{ $isWinner ? 'text-ink' : 'text-muted' }}">
+              <span class="uppercase tracking-wide text-faint w-16 shrink-0">{{ $mechLabel($res->mechanism) }}</span>
+              @if($res->matched_code)
+                <span class="font-mono shrink-0 {{ $isWinner ? 'font-medium' : '' }}">{{ $res->matched_code }}</span>
+                <span class="px-1 rounded bg-line/40 text-faint shrink-0" title="{{ __('heading') }}">{{ $mh }}</span>
+                <span class="flex-1 min-w-0 break-words">{{ \Illuminate\Support\Str::limit($anyName($res->matched_code) ?: $rt($mh), 90) }}</span>
+              @else
+                <span class="text-faint">{{ __('abstained — no match') }}</span>
+              @endif
+            </div>
+          @endforeach
+        </div>
+
         {{-- The three mechanisms, each vote + deep trace --}}
         <details class="mt-3 group">
           <summary class="cursor-pointer text-xs text-muted hover:text-ink select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1">
