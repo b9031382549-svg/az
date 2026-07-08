@@ -208,4 +208,23 @@ return [
         'holdout_pct' => (int) env('CLASSIFY_ADJUDICATOR_HOLDOUT_PCT', 10),
         'timeout' => (int) env('CLASSIFY_ADJUDICATOR_TIMEOUT', 90), // per judge call (s)
     ],
+
+    // Search resolver — the LAST resort when the 3 mechanisms diverge (Consensus →
+    // 'conflict'). A thinking model WITH web search (`:online`) IDENTIFIES the item
+    // (looking up unfamiliar brands/drugs online), then returns just the 4-DIGIT HS
+    // HEADING it belongs to plus a self-reported confidence. If it is confident enough
+    // (>= min_confidence) and the heading is real, the item resolves to that heading
+    // ('ai_resolved'); otherwise it stays 'conflict' for a human, with the search
+    // attempt recorded as a trace. Fires once per conflict item (single-fire claim on
+    // classification_items.search_resolved_at). Disabled by default — enable on prod.
+    'search_resolver' => [
+        'enabled' => (bool) env('CLASSIFY_SEARCH_RESOLVER_ENABLED', false),
+        // A thinking DeepSeek with web search (the `:online` suffix = OpenRouter's web
+        // plugin) — the same kind of call the old search-augmented direct used.
+        'model' => (string) env('CLASSIFY_SEARCH_RESOLVER_MODEL', 'deepseek/deepseek-v4-flash:online'),
+        // Confidence the model must self-report for its heading to be taken as correct.
+        'min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_MIN_CONF', 0.8),
+        'timeout' => (int) env('CLASSIFY_SEARCH_RESOLVER_TIMEOUT', 180), // web search + reasoning is slow
+        'prompt_version' => (string) env('CLASSIFY_SEARCH_RESOLVER_VERSION', 's1'),
+    ],
 ];

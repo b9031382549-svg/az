@@ -67,6 +67,23 @@
             @if($res->explanation)<p><span class="text-faint">{{ __('Reason') }}:</span> {{ $res->explanation }}</p>@endif
           </div>
 
+        @elseif($res->mechanism === 'search')
+          {{-- SEARCH RESOLVER: the last resort when the three mechanisms diverged — a
+               thinking model looked the item up on the web and named a 4-digit heading. --}}
+          <div class="space-y-2 text-sm">
+            <p class="text-muted">{{ __('The three mechanisms diverged, so a web-search resolver identified the item and named the 4-digit heading it belongs to. It only settles the conflict when confident; otherwise a human reviews.') }}</p>
+            <div>
+              <span class="text-faint">{{ __('Heading') }}:</span>
+              @if($res->matched_code)
+                <span class="font-mono">{{ $res->matched_code }}</span>
+                <span class="text-muted">{{ \Illuminate\Support\Str::limit($t['heading_name'] ?? $nm($res->matched_code), 80) }}</span>
+              @else
+                <span class="text-muted">{{ __('could not confidently identify the item') }}</span>
+              @endif
+            </div>
+            @if($res->explanation)<p><span class="text-faint">{{ __('Reason') }}:</span> {{ $res->explanation }}</p>@endif
+          </div>
+
         @elseif(!$t)
           {{-- Pre-trace item: light view from stored data. --}}
           <p class="text-muted text-sm mb-2">{{ __('Detailed trace was not captured for this item (classified before the decision-flow feature). Showing what was stored:') }}</p>

@@ -17,6 +17,7 @@ class ClassificationItem extends Model
     {
         return [
             'confirmed_at' => 'datetime',
+            'search_resolved_at' => 'datetime',
         ];
     }
 

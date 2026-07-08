@@ -2,6 +2,7 @@
 
 namespace App\Services\Classify;
 
+use App\Jobs\SearchResolveJob;
 use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
 use Illuminate\Support\Collection;
@@ -19,9 +20,14 @@ use Illuminate\Support\Collection;
  *   pending          — not every enabled mechanism has reported yet
  *   agreed           — >=2 mechanisms share the same 4-digit heading (auto, confident)
  *   conflict         — no heading reached a 2-mechanism agreement (divergent / too few)
+ *   ai_resolved      — a divergent item the SEARCH resolver settled at a 4-digit heading
  *   no_match         — no mechanism produced a code
  *   confirmed/rejected — set by a human in the review queue (never overwritten here)
  *   blocked_on_fact  — set by the broker mechanism (Phase 7)
+ *
+ * When the mechanisms diverge ('conflict') a web-search resolver is dispatched once
+ * (SearchResolveJob) — a confident hit flips the item to 'ai_resolved', otherwise it
+ * stays 'conflict' for a human.
  */
 class Consensus
 {
@@ -37,6 +43,13 @@ class Consensus
         $item->refresh();
 
         if (in_array($item->resolution, self::HUMAN_DECIDED, true)) {
+            return;
+        }
+
+        // Once the search resolver has claimed a conflict, leave the item alone — a late
+        // finalize() (e.g. a mechanism's failed() path) must not recompute 'conflict'
+        // over an item the resolver already settled to 'ai_resolved'.
+        if ($item->search_resolved_at !== null) {
             return;
         }
 
@@ -59,6 +72,29 @@ class Consensus
         }
 
         $item->update($this->resolve($authResults));
+
+        $this->maybeSearchResolve($item);
+    }
+
+    /**
+     * Hand a DIVERGENT ('conflict') item to the web-search resolver — a side effect kept
+     * out of the pure resolve(). Dispatched at most once per item: finalize() runs on
+     * every mechanism completion and on the failed() path, so the search_resolved_at
+     * atomic claim is the single-fire guard.
+     */
+    private function maybeSearchResolve(ClassificationItem $item): void
+    {
+        if ($item->resolution !== 'conflict' || ! (bool) config('classify.search_resolver.enabled', false)) {
+            return;
+        }
+
+        $claimed = ClassificationItem::whereKey($item->id)
+            ->whereNull('search_resolved_at')
+            ->update(['search_resolved_at' => now()]);
+
+        if ($claimed === 1) {
+            SearchResolveJob::dispatch($item->id);
+        }
     }
 
     /**

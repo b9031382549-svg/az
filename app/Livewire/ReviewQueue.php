@@ -341,9 +341,17 @@ class ReviewQueue extends Component
             ->withCount(['adjudications', 'adjudications as resolved_adj_count' => $resolved])
             ->get(['id', 'resolution', 'final_code', 'adjudicated_at']);
 
-        // Mechanism codes, to test 4-digit convergence for the still-open items.
+        // Mechanism codes, to test 4-digit convergence for the still-open items. Count
+        // ONLY the authoritative voting mechanisms (same filter Consensus uses) — the
+        // post-consensus 'search' resolver and 'cache' write trace rows too, and must not
+        // be counted as extra votes here or the widget diverges from the real consensus.
+        $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
+        $shadow = (array) config('classify.mechanisms.shadow', []);
+        $authoritative = array_values(array_diff($enabled, $shadow)) ?: $enabled;
+
         $codes = ClassificationResult::query()
             ->whereIn('classification_item_id', $items->pluck('id'))
+            ->whereIn('mechanism', $authoritative)
             ->get(['classification_item_id as item', 'matched_code as code'])
             ->groupBy('item');
 
