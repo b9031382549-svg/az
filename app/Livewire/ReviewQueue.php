@@ -266,8 +266,11 @@ class ReviewQueue extends Component
         $goldByItem = $goldKeys->map(fn ($key) => $goldRows->get($key, collect()))->all();
 
         // Names for partial results (a 4-digit heading or the "99" service level has no
-        // exact catalog row) — resolved from the rubricator.
-        $headingCodes = $items->getCollection()->pluck('final_code')
+        // exact catalog row) — resolved from the rubricator. Cover both the item's final
+        // code AND any 4-digit code shown in the per-mechanism trace rows (the search
+        // resolver / cache write a bare 4-digit heading), so no code is left unlabeled.
+        $headingCodes = $items->getCollection()
+            ->flatMap(fn ($it) => collect([$it->final_code])->merge($it->results->pluck('matched_code')))
             ->filter(fn ($c) => ($n = mb_strlen((string) $c)) > 0 && $n < 10)->unique()->values();
         $headingNames = RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
             ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);

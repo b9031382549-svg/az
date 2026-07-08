@@ -246,8 +246,15 @@
               <div class="flex items-start gap-2 text-xs">
                 <span class="uppercase tracking-wide text-faint w-16 shrink-0">{{ $res->mechanism }}</span>
                 <span class="font-mono shrink-0 {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $cd($res->matched_code) ?? __('no match') }}</span>
-                @if($res->matched_code && isset($catalogNames[(string) $res->matched_code]))
-                  <span class="text-faint flex-1 min-w-0 break-words">· {{ \Illuminate\Support\Str::limit($catalogNames[(string) $res->matched_code], 140) }}</span>
+                @php
+                  // Full 10-digit codes get their catalog name; a bare 4-digit heading
+                  // (the search resolver / cache) gets its official rubricator name.
+                  $resName = $res->matched_code
+                    ? ($catalogNames[(string) $res->matched_code] ?? ($headingNames[(string) $res->matched_code] ?? null))
+                    : null;
+                @endphp
+                @if($resName)
+                  <span class="text-faint flex-1 min-w-0 break-words">· {{ \Illuminate\Support\Str::limit($resName, 140) }}</span>
                 @endif
               </div>
             @endforeach
