@@ -3,19 +3,20 @@
 namespace App\Services\Export;
 
 use App\Models\ClassificationItem;
+use App\Models\RubricatorNode;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 /**
  * Builds an .xlsx of classification results: the item (good/service) and its
- * assigned classifier code in the adjacent column, plus context.
+ * assigned classifier code in the adjacent column, plus context. Everything is
+ * written in the CURRENT UI language only — the item name, the matched code name,
+ * the headers and the labels.
  */
 class ClassificationExporter
 {
-    private const HEADERS = ['#', 'Item', 'Item (EN)', 'Item (RU)', 'Code', 'Kind', 'Matched name', 'Confidence', 'Status', 'Upload', 'Date'];
-
-    private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 46, 'D' => 46, 'E' => 16, 'F' => 10, 'G' => 46, 'H' => 11, 'I' => 14, 'J' => 24, 'K' => 16];
+    private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 16, 'D' => 10, 'E' => 46, 'F' => 11, 'G' => 14, 'H' => 24, 'I' => 16];
 
     /**
      * @param  Collection<int, ClassificationItem>  $rows
@@ -27,32 +28,39 @@ class ClassificationExporter
         $sheet = $ss->getActiveSheet();
         $sheet->setTitle('Classifications');
 
-        $sheet->fromArray(self::HEADERS, null, 'A1');
-        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
-        // Force the Code column to text so leading zeros (e.g. 0207606100) survive.
-        $sheet->getStyle('E')->getNumberFormat()->setFormatCode('@');
+        $headers = ['#', __('Item'), __('Code'), __('Kind'), __('Matched name'), __('Confidence'), __('Status'), __('Upload'), __('Date')];
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
+        // Force the Code column to text so leading zeros (e.g. 0207) survive.
+        $sheet->getStyle('C')->getNumberFormat()->setFormatCode('@');
 
         foreach (self::WIDTHS as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
 
+        // A 4-digit heading (or "99") answer has no catalog leaf — resolve its name from
+        // the rubricator, in the current locale (localizedTitle()).
+        $headingNames = RubricatorNode::whereIn('code', $rows->pluck('final_code')
+            ->filter(fn ($c) => ($n = mb_strlen((string) $c)) > 0 && $n < 10)->unique())
+            ->get(['code', 'title', 'title_en', 'title_ru'])
+            ->mapWithKeys(fn ($node) => [(string) $node->code => $node->localizedTitle()]);
+
         $i = 2;
         foreach ($rows->values() as $n => $row) {
-            // Free-text fields are written as EXPLICIT strings so a value that
-            // starts with =, +, -, @ can't be interpreted as an Excel formula
-            // (CSV/spreadsheet formula injection).
+            // Free-text fields are written as EXPLICIT strings so a value that starts with
+            // =, +, -, @ can't be interpreted as an Excel formula (formula injection).
             $confidence = $row->finalConfidence();
+            $codeName = $row->finalCode?->localizedName() ?: ($headingNames[(string) $row->final_code] ?? '');
+
             $sheet->setCellValue("A{$i}", $n + 1);
-            $sheet->setCellValueExplicit("B{$i}", (string) $row->source_text, DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("C{$i}", (string) ($row->translation?->en ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("D{$i}", (string) ($row->translation?->ru ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("E{$i}", (string) ($row->final_code ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("F{$i}", (string) ($row->kind ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("G{$i}", (string) ($row->finalCode?->localizedName() ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValue("H{$i}", $confidence !== null ? round((float) $confidence, 3) : null);
-            $sheet->setCellValue("I{$i}", str_replace('_', ' ', (string) $row->resolution));
-            $sheet->setCellValueExplicit("J{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValue("K{$i}", optional($row->created_at)->format('Y-m-d H:i'));
+            $sheet->setCellValueExplicit("B{$i}", $row->localizedSourceText(), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("C{$i}", (string) ($row->final_code ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("D{$i}", $row->kind ? __($row->kind) : '', DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("E{$i}", (string) $codeName, DataType::TYPE_STRING);
+            $sheet->setCellValue("F{$i}", $confidence !== null ? round((float) $confidence, 3) : null);
+            $sheet->setCellValueExplicit("G{$i}", __(str_replace('_', ' ', (string) $row->resolution)), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("H{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValue("I{$i}", optional($row->created_at)->format('Y-m-d H:i'));
             $i++;
         }
 
