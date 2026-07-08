@@ -2,9 +2,6 @@
   @php
     // Everything resolves at the 4-digit HS heading now — one view, no full/heading toggle.
     $tabs = ['open' => __('Needs attention'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
-    // Codes render as stored (the final answer is a 4-digit heading; mechanism traces
-    // keep their full code, labelled with the heading name).
-    $cd = fn ($c) => $c;
     $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
     $resBadge = fn ($s) => match ($s) {
         'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
@@ -186,19 +183,6 @@
               </div>
             @endforeach
           </div>
-
-          {{-- Mechanism convergence at the CURRENT granularity — recomputed from the
-               stored per-mechanism codes (no LLM). At 4 digits it shows how many
-               "conflicts" are just last-digit disagreements inside one heading. --}}
-          <div class="mt-4 pt-3 border-t hair">
-            <p class="kicker mb-1.5">{{ __('Convergence at 4-digit heading') }}</p>
-            <div class="flex items-center gap-4 text-sm">
-              <span class="text-ledger">✓ {{ __('converge') }} <span class="tnum font-medium">{{ $agreement['converge'] }}</span></span>
-              <span class="text-stamp">✕ {{ __('diverge') }} <span class="tnum font-medium">{{ $agreement['diverge'] }}</span></span>
-              @if($agreement['no_code'])<span class="text-faint">— {{ __('no code') }} <span class="tnum">{{ $agreement['no_code'] }}</span></span>@endif
-              <span class="text-faint ml-auto">{{ __('of') }} {{ $agreement['total'] }}</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -248,10 +232,12 @@
       @php
         $editable = in_array($item->resolution, ['agreed','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
         $allowed = $item->allowedCodes();
-        // Confirmable codes: the item's own 4-digit heading answer first, then each
-        // mechanism's alternative pick (for a correction).
-        $options = collect([$item->final_code])->filter()->merge($allowed)->map(fn ($c) => (string) $c)->unique()->values();
-        $default = (string) ($item->final_code ?? ($allowed[0] ?? ''));
+        // Correct-code options — 4-digit HS headings only (the item's own answer + each
+        // mechanism's proposed heading), de-duplicated and sorted by number.
+        $options = collect([$item->final_code])->filter()->merge($allowed)
+            ->map(fn ($c) => (string) mb_substr((string) $c, 0, 4))
+            ->filter()->unique()->sortBy(fn ($c) => (int) $c)->values();
+        $default = (string) ($item->final_code ?? ($options->first() ?? ''));
         $badgeLabel = __(str_replace('_', ' ', $item->resolution));
         $badgeClass = $resBadge($item->resolution);
       @endphp
@@ -273,47 +259,42 @@
             <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span></p>
           @endif
 
-          {{-- Per-mechanism answers --}}
-          <div class="flex flex-col gap-1 mt-2">
-            @foreach($item->results as $res)
-              @php $isFinal = $item->final_code && (string) $res->matched_code === (string) $item->final_code; @endphp
-              <div class="flex items-start gap-2 text-xs">
-                <span class="uppercase tracking-wide text-faint w-16 shrink-0">{{ $res->mechanism }}</span>
-                <span class="font-mono shrink-0 {{ $isFinal ? 'text-ink font-medium' : 'text-muted' }}">{{ $cd($res->matched_code) ?? __('no match') }}</span>
-                @php
-                  // Full 10-digit codes get their catalog name; a bare 4-digit heading
-                  // (the search resolver / cache) gets its official rubricator name.
-                  $resName = $res->matched_code
-                    ? ($catalogNames[(string) $res->matched_code] ?? ($headingNames[(string) $res->matched_code] ?? null))
-                    : null;
-                @endphp
-                @if($resName)
-                  <span class="text-faint flex-1 min-w-0 break-words">· {{ \Illuminate\Support\Str::limit($resName, 140) }}</span>
-                @endif
-              </div>
-            @endforeach
+          {{-- Decision source — the pipeline that produced the answer: memory (cache) →
+               local ai (the on-box models) → web research. The step that RESOLVED it is
+               highlighted; a step that was tried but passed the item on is struck through;
+               a step never reached is faint. --}}
+          @php
+            $cacheRow  = $item->results->firstWhere('mechanism', 'cache');
+            $mechRan   = $item->results->whereIn('mechanism', ['vector', 'broker', 'direct'])->isNotEmpty();
+            $searchRow = $item->results->firstWhere('mechanism', 'search');
 
-            {{-- Reference ("gold") labels — a hint for the reviewer only. NEVER shown
-                 to the classifier/adjudicator. --}}
-            @foreach($goldByItem[$item->id] ?? [] as $gl)
-              @php
-                $gShow = $gl->is_service ? __('service') : $cd($gl->code ?? $gl->heading);
-                $gMatch = $gl->is_service
-                    ? ($item->kind !== null ? (($item->kind === 'service') === (bool) $gl->is_service) : null)
-                    : ($item->final_code ? (($gl->code && (string) $item->final_code === (string) $gl->code) || (! $gl->code && $gl->heading && mb_substr((string) $item->final_code, 0, 4) === $gl->heading)) : null);
-                $disputed = data_get($gl->meta, 'crosscheck') === 'disagree';
-              @endphp
-              <div class="flex items-start gap-2 text-xs mt-1" title="{{ __('Reference label — never shown to the AI') }}">
-                <span class="uppercase tracking-wide text-faint w-16 shrink-0">📋 {{ $gl->source }}</span>
-                <span class="font-mono shrink-0 text-muted">{{ $gShow }}</span>
-                @if($gMatch === true)<span class="text-ledger shrink-0">✓</span>@elseif($gMatch === false)<span class="text-stamp shrink-0">✕</span>@endif
-                <span class="text-faint flex-1 min-w-0 break-words">
-                  @if($gl->source === 'fedor' && $gl->tier)· {{ $gl->tier }}@endif
-                  @if($disputed) · {{ __('disputed') }}@if(data_get($gl->meta, 'gpt_heading')) (gpt {{ data_get($gl->meta, 'gpt_heading') }})@endif @endif
-                  @if($gl->category) · {{ \Illuminate\Support\Str::limit($gl->category, 54) }}@endif
-                </span>
-              </div>
-            @endforeach
+            $sMemory = $cacheRow !== null ? 'ok' : 'fail';
+            $sLocal = match (true) {
+                $cacheRow !== null => 'skip',                                                          // memory already answered
+                $item->final_code && $item->resolution !== 'ai_resolved' && $mechRan => 'ok',           // consensus resolved
+                $mechRan => 'fail',                                                                     // ran, no consensus
+                default => 'skip',
+            };
+            $sWeb = match (true) {
+                $sMemory === 'ok' || $sLocal === 'ok' => 'skip',                                        // resolved earlier
+                $item->resolution === 'ai_resolved' => 'ok',                                            // web search resolved
+                $searchRow !== null => 'fail',                                                          // searched, not confident
+                default => 'skip',                                                                      // never reached
+            };
+            $chipClass = fn ($st) => match ($st) {
+                'ok' => 'bg-ledger/12 text-ledger font-medium',
+                'fail' => 'text-faint line-through',
+                default => 'text-faint/50',
+            };
+            $flow = [['memory', $sMemory], ['local ai', $sLocal], ['web research', $sWeb]];
+          @endphp
+          <div class="flex flex-col gap-1 mt-2">
+            <div class="flex items-center gap-1.5 flex-wrap text-xs">
+              @foreach($flow as $i => [$label, $state])
+                @if($i > 0)<span class="text-faint/50">→</span>@endif
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded {{ $chipClass($state) }}">{{ $state === 'ok' ? '✓' : ($state === 'fail' ? '✕' : '·') }} {{ __($label) }}</span>
+              @endforeach
+            </div>
           </div>
 
           <a href="{{ route('review.decision', $item->id) }}" target="_blank"
@@ -326,7 +307,7 @@
               <select x-model="code"
                       class="w-full px-2.5 py-1.5 rounded-lg text-xs border hair bg-surface focus:border-ink outline-none mb-2">
                 @foreach($options as $c)
-                  @php $optName = $catalogNames[$c] ?? ($headingNames[$c] ?? ''); @endphp
+                  @php $optName = $headingNames[$c] ?? ''; @endphp
                   <option value="{{ $c }}">{{ $c }} · {{ \Illuminate\Support\Str::limit($optName, 44) }}{{ (string) $c === (string) $item->final_code ? '  ← final' : '' }}</option>
                 @endforeach
               </select>

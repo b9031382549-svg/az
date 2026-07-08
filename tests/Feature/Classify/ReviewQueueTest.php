@@ -5,7 +5,6 @@ namespace Tests\Feature\Classify;
 use App\Livewire\ReviewQueue;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
-use App\Models\GoldLabel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -180,16 +179,33 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $c->viewData('items')->total());
     }
 
-    public function test_review_card_shows_the_gold_reference_hint(): void
+    public function test_card_shows_the_decision_source_pipeline(): void
     {
-        GoldLabel::create(['source' => 'fedor', 'name' => 'diamar', 'name_key' => GoldLabel::keyFor('diamar'), 'heading' => '3304', 'is_service' => false, 'tier' => 'claude', 'category' => 'cosmetic guess', 'meta' => ['crosscheck' => 'disagree', 'gpt_heading' => '2106']]);
-        ClassificationItem::create(['batch' => 'b', 'source_text' => 'diamar', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+        // A cache hit: all three sources are shown; memory resolved it.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '1104']);
+        $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
-        $this->actingComponent()
-            ->call('setFilter', 'all')
-            ->assertSee('📋')
-            ->assertSee('3304')
-            ->assertSee('disputed');
+        $this->actingComponent()->call('setFilter', 'all')
+            ->assertSee('memory')
+            ->assertSee('local ai')
+            ->assertSee('web research')
+            ->assertDontSee('vector')   // individual mechanisms no longer shown on the card
+            ->assertDontSee('broker');
+    }
+
+    public function test_dropdown_confirms_a_4digit_heading_correction(): void
+    {
+        // heading 8528 is a real heading (seeded in setUp).
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'tv', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8528723000', 'status' => 'needs_review', 'kind' => 'good', 'candidates' => [['code' => '8528723000']]]);
+
+        // Confirm at the 4-digit heading 8528 (a real heading) — a correction, not the item's own answer.
+        Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class)->call('confirmWith', $item->id, '8528');
+
+        $item->refresh();
+        $this->assertSame('confirmed', $item->resolution);
+        $this->assertSame('8528', $item->final_code);
+        $this->assertNull($item->final_catalog_id);
     }
 
     public function test_agreed_and_ai_resolved_merge_into_found(): void
@@ -206,37 +222,5 @@ class ReviewQueueTest extends TestCase
 
         $c->call('setFilter', 'found');
         $this->assertSame(2, $c->viewData('items')->total());          // the Found filter returns both
-    }
-
-    public function test_convergence_widget_does_not_reopen_a_resolved_item_as_conflict(): void
-    {
-        // A resolved item (has a final code) whose raw mechanisms diverge must NOT be
-        // counted as a conflict by the convergence widget (the old 42-vs-3 bug).
-        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471']);
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8528720000', 'status' => 'auto_confirmed', 'kind' => 'good']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9018390000', 'status' => 'auto_confirmed', 'kind' => 'good']);
-
-        $c = $this->actingComponent();
-
-        $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
-        $this->assertSame(4, $c->viewData('agreement')['n']);        // always the 4-digit heading
-        $this->assertSame(0, $c->viewData('agreement')['diverge']);
-        $this->assertSame(1, $c->viewData('agreement')['converge']);
-    }
-
-    public function test_convergence_widget_keeps_a_cross_heading_conflict_divergent(): void
-    {
-        // Different headings (8471 vs 8528) → a genuine conflict, counted as diverge.
-        $item = ClassificationItem::create([
-            'batch' => 'b', 'source_text' => 'device', 'source_hash' => bin2hex(random_bytes(32)),
-            'resolution' => 'conflict',
-        ]);
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8528720000', 'status' => 'auto_confirmed', 'kind' => 'good']);
-
-        $c = $this->actingComponent();
-
-        $this->assertSame(1, (int) ($c->viewData('counts')['conflict'] ?? 0));
-        $this->assertSame(1, $c->viewData('agreement')['diverge']);
     }
 }

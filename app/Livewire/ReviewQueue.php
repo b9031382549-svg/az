@@ -4,8 +4,6 @@ namespace App\Livewire;
 
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
-use App\Models\ClassificationResult;
-use App\Models\GoldLabel;
 use App\Models\ImportBatch;
 use App\Models\RubricatorNode;
 use App\Support\Audit;
@@ -88,17 +86,31 @@ class ReviewQueue extends Component
             return;
         }
 
-        // Confirm-as-is: the reviewer accepted the item's own answer. Today that answer
-        // is a 4-digit HS heading (or the bare "99" service level) with no exact 10-digit
-        // catalog leaf, so keep final_code/final_catalog_id/kind untouched — a CatalogCode
-        // is only required when CORRECTING to a different, real 10-digit code below.
-        if ($code === (string) $item->final_code) {
+        // A 4-digit HS heading (or the bare "99" service level) is confirmed at the
+        // heading — no exact 10-digit catalog leaf. Accept it whether it is the item's own
+        // answer or a correction to another REAL heading (some active catalog code sits
+        // under it). This is the normal path now that codes are 4-digit.
+        if (mb_strlen($code) < 10) {
+            // The item's OWN answer is trusted as-is (the pipeline produced it); a
+            // CORRECTION to a different heading must be a real heading (some active catalog
+            // code sits under it) or the "99" service level.
+            if ($code !== (string) $item->final_code) {
+                $valid = $code === '99' || CatalogCode::where('position', $code)->where('is_active', true)->exists();
+                if (! $valid) {
+                    return;
+                }
+            }
+            $was = $item->final_code;
             $item->update([
                 'resolution' => 'confirmed',
+                'final_code' => $code,
+                'final_catalog_id' => null,
+                'kind' => $code === '99' ? 'service' : ($item->kind ?? 'good'),
                 'confirmed_by' => auth()->id(),
                 'confirmed_at' => now(),
             ]);
-            Audit::log('classification.confirm', ['id' => $id, 'code' => $code], $item);
+            Audit::log(((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
+                ['id' => $id, 'code' => $code, 'was' => $was], $item);
 
             return;
         }
@@ -211,34 +223,15 @@ class ReviewQueue extends Component
         $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved'], true))
             ->filter(fn ($v) => $v !== 0);
 
-        // Localized catalog names for the candidate dropdowns.
-        $codes = $items->getCollection()
-            ->flatMap(fn ($item) => $item->results
-                ->flatMap(fn ($r) => collect($r->candidates ?? [])->pluck('code')->push($r->matched_code))
-                ->push($item->final_code))
-            ->filter()
-            ->map(fn ($c) => (string) $c)
-            ->unique()
-            ->values();
-
-        $catalogNames = CatalogCode::query()
-            ->whereIn('code', $codes)
-            ->get(['code', 'name', 'name_en', 'name_ru'])
-            ->mapWithKeys(fn ($c) => [(string) $c->code => $c->localizedName()]);
-
-        // Reference ("gold") labels for the items on this page — DISPLAY ONLY, a hint
-        // for the human reviewer. NEVER passed to the classifier/adjudicator.
-        $goldKeys = $items->getCollection()->mapWithKeys(fn ($it) => [$it->id => GoldLabel::keyFor((string) $it->source_text)]);
-        $goldRows = GoldLabel::whereIn('name_key', $goldKeys->values()->unique()->values())->get()->groupBy('name_key');
-        $goldByItem = $goldKeys->map(fn ($key) => $goldRows->get($key, collect()))->all();
-
-        // Names for partial results (a 4-digit heading or the "99" service level has no
-        // exact catalog row) — resolved from the rubricator. Cover both the item's final
-        // code AND any 4-digit code shown in the per-mechanism trace rows (the search
-        // resolver / cache write a bare 4-digit heading), so no code is left unlabeled.
+        // 4-digit heading names for the item answers AND the confirm-dropdown options
+        // (each mechanism's proposed code, trimmed to its heading). All names come from
+        // the rubricator — the answer is always a 4-digit heading now.
         $headingCodes = $items->getCollection()
-            ->flatMap(fn ($it) => collect([$it->final_code])->merge($it->results->pluck('matched_code')))
-            ->filter(fn ($c) => ($n = mb_strlen((string) $c)) > 0 && $n < 10)->unique()->values();
+            ->flatMap(fn ($it) => collect([$it->final_code])
+                ->merge($it->results->flatMap(fn ($r) => collect($r->candidates ?? [])->pluck('code')->push($r->matched_code))))
+            ->filter()
+            ->map(fn ($c) => (string) mb_substr((string) $c, 0, 4))
+            ->unique()->values();
         $headingNames = RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
             ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);
 
@@ -262,103 +255,9 @@ class ReviewQueue extends Component
             'uploadTotal' => $uploadTotal,
             'uploadStart' => ($this->uploadPage - 1) * 5,
             'report' => $this->report($scoped, $counts),
-            // Convergence at the 4-digit heading — same resolution-aware buckets as the
-            // counts, so the widget agrees with the conflict number.
-            'agreement' => $this->agreement(4, $this->virtualResolutions(4)),
             'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($rawCounts[$r] ?? 0)),
-            'catalogNames' => $catalogNames,
-            'goldByItem' => $goldByItem,
             'headingNames' => $headingNames,
         ]);
-    }
-
-    /**
-     * How many items would AGREE (a majority of the mechanisms that ran share the
-     * same code) at a given code granularity — 4 digits (HS heading) vs the full
-     * 10-digit code. Recomputed from the stored per-mechanism results only; no LLM.
-     * Shows how many "conflicts" are just last-digit disagreements within one heading.
-     *
-     * @return array{n:int, converge:int, diverge:int, no_code:int, total:int}
-     */
-    private function agreement(int $n, array $buckets): array
-    {
-        // Tally the SAME resolution-aware buckets the rest of the page uses, so
-        // "diverge" equals the genuine conflict count instead of contradicting it
-        // (a resolved item is converged; only a still-open, code-diverging item counts).
-        $converge = 0;
-        $diverge = 0;
-        $noCode = 0;
-        foreach ($buckets as $b) {
-            if ($b === 'conflict') {
-                $diverge++;
-            } elseif ($b === 'no_match' || $b === 'waiting') {
-                $noCode++;
-            } else {
-                $converge++; // agreed / found / human-decided → settled at this granularity
-            }
-        }
-
-        return ['n' => $n, 'converge' => $converge, 'diverge' => $diverge, 'no_code' => $noCode, 'total' => count($buckets)];
-    }
-
-    /**
-     * Per-item resolution recomputed at a code granularity (4-digit heading). Drives
-     * the whole "as if we collected 4-digit codes" view: counts, tabs, the donut and
-     * which items each tab shows. Human/terminal decisions are kept verbatim;
-     * everything else becomes agreed (majority converges), conflict (diverges) or
-     * no_match at N digits. Stored data only — no LLM.
-     *
-     * @return array<int, string> itemId => resolution
-     */
-    private function virtualResolutions(int $n): array
-    {
-        $items = ClassificationItem::query()
-            ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch))
-            ->where('resolution', '!=', 'pending')
-            ->get(['id', 'resolution', 'final_code']);
-
-        // Mechanism codes, to test 4-digit convergence for the still-open items. Count
-        // ONLY the authoritative voting mechanisms (same filter Consensus uses) — the
-        // post-consensus 'search' resolver and 'cache' write trace rows too, and must not
-        // be counted as extra votes here or the widget diverges from the real consensus.
-        $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
-        $shadow = (array) config('classify.mechanisms.shadow', []);
-        $authoritative = array_values(array_diff($enabled, $shadow)) ?: $enabled;
-
-        $codes = ClassificationResult::query()
-            ->whereIn('classification_item_id', $items->pluck('id'))
-            ->whereIn('mechanism', $authoritative)
-            ->get(['classification_item_id as item', 'matched_code as code'])
-            ->groupBy('item');
-
-        $map = [];
-        foreach ($items as $it) {
-            if (in_array($it->resolution, self::HUMAN_DECIDED, true)) {
-                $map[$it->id] = $it->resolution; // human/terminal decision stands at any granularity
-
-                continue;
-            }
-            // Already RESOLVED (cache / consensus / web-search produced a 4-digit heading
-            // or the "99" service level): it stays found (converge). The widget must NOT
-            // re-open it as a conflict from the raw mechanism spread — the "42 conflicts" bug.
-            if ($it->final_code !== null && $it->final_code !== '') {
-                $map[$it->id] = 'agreed';
-
-                continue;
-            }
-            // Genuinely open: would a majority of mechanisms converge at the 4-digit heading?
-            $rs = $codes->get($it->id, collect());
-            $coded = $rs->filter(fn ($r) => $r->code !== null && $r->code !== '');
-            if ($coded->isEmpty()) {
-                $map[$it->id] = 'no_match';
-
-                continue;
-            }
-            $top = $coded->map(fn ($r) => mb_substr((string) $r->code, 0, $n))->countBy()->max();
-            $map[$it->id] = ($top >= 2 && $top >= intdiv($rs->count(), 2) + 1) ? 'agreed' : 'conflict';
-        }
-
-        return $map;
     }
 
     /**
