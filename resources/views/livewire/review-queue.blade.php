@@ -17,7 +17,6 @@
 
   <div class="mb-6 flex items-end justify-between flex-wrap gap-3">
     <div>
-      <p class="kicker mb-1.5">{{ __('Quality control') }}</p>
       <h1 class="font-display text-4xl">{{ __('Review queue') }}</h1>
     </div>
     <div class="flex items-center gap-3 flex-wrap">
@@ -119,8 +118,7 @@
     $maxCh = max(1, optional($report['chapters']->first())->c ?? 1);
   @endphp
   <div x-data="{open:true}" class="card p-5 mb-5">
-    <button @click="open=!open" class="w-full flex items-center justify-between">
-      <span class="kicker">{{ __('Report') }}{{ $batch !== 'all' ? ' · '.__('this upload') : '' }}</span>
+    <button @click="open=!open" class="w-full flex items-center justify-end">
       <span class="text-faint text-sm" x-text="open ? '▾ hide' : '▸ show'"></span>
     </button>
 
