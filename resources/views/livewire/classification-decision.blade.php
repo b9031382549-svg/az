@@ -247,7 +247,11 @@
       </li>
     @endif
 
-    {{-- ④ HUMAN --}}
+    {{-- ④ HUMAN — shown only when a human is actually part of the story: the item is
+         still open (conflict / no_match / blocked) or a human already confirmed/rejected
+         it. An auto-found item (agreed / ai_resolved) is settled, so this stage is
+         omitted — the decision is already made and the goods are found. --}}
+    @if(! in_array($item->resolution, ['agreed', 'ai_resolved'], true))
     <li class="card p-5">
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-2.5">
@@ -283,6 +287,7 @@
         </div>
       </div>
     </li>
+    @endif
   </ol>
 
   {{-- Reference ("gold") labels — a benchmark hint for the reviewer. This is NEVER

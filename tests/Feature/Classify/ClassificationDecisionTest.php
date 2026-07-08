@@ -115,11 +115,25 @@ class ClassificationDecisionTest extends TestCase
             ->assertSee('Cache')
             ->assertSee('hit')
             ->assertSee('1104')
-            ->assertSee('Human')       // human stage always present
-            ->assertDontSee('AI search'); // no mechanisms ran → AI stage hidden
+            ->assertDontSee('AI search')  // no mechanisms ran → AI stage hidden
+            ->assertDontSee('Human');     // auto-found (agreed) → human stage omitted
     }
 
-    public function test_full_flow_shows_cache_miss_ai_web_and_human_stages(): void
+    public function test_a_conflict_item_shows_the_human_stage(): void
+    {
+        // An unresolved item (no confident answer) DOES need a human → the stage shows.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'garbled xyz', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'needs_review', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '2106909200', 'status' => 'needs_review', 'kind' => 'good']);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('Human')
+            ->assertSee('waiting for a human decision');
+    }
+
+    public function test_full_flow_shows_cache_miss_ai_and_web_stages(): void
     {
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Şpris 20 ml', 'source_hash' => bin2hex(random_bytes(32)), 'kind' => 'good', 'resolution' => 'ai_resolved', 'final_code' => '9018']);
         $item->results()->create(['mechanism' => 'vector', 'matched_code' => '9018390000', 'status' => 'auto_confirmed', 'kind' => 'good']);
@@ -136,7 +150,7 @@ class ClassificationDecisionTest extends TestCase
             ->assertSee('9018390000')->assertSee('2106909200')
             ->assertSee('Web search')->assertSee('resolved') // stage 3: resolved by search
             ->assertSee('9018')
-            ->assertSee('Human');                          // stage 4
+            ->assertDontSee('Human');                      // auto-found (ai_resolved) → no human stage
     }
 
     public function test_renders_light_fallback_without_trace(): void
