@@ -8,6 +8,7 @@ use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\ItemTranslation;
 use App\Models\LlmUsage;
+use App\Services\Classify\AnswerCacheService;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
 use Illuminate\Support\Facades\Queue;
@@ -178,12 +179,18 @@ class Classify extends Component
 
         ClassificationItem::upsert($rows, ['batch', 'source_hash'], ['source_text']);
 
-        $ids = ClassificationItem::where('batch', $batch)->pluck('id');
+        $items = ClassificationItem::where('batch', $batch)->get();
+        $cache = app(AnswerCacheService::class);
 
+        // FIRST step: a verified answer in the cache resolves the item immediately —
+        // no mechanism jobs, no LLM. Only cache MISSES fan out to the AI pipeline.
         $jobs = [];
-        foreach ($ids as $id) {
+        foreach ($items as $item) {
+            if ($cache->apply($item)) {
+                continue;
+            }
             foreach ($enabled as $mechanism) {
-                $jobs[] = new ClassifyMechanismJob((int) $id, (string) $mechanism);
+                $jobs[] = new ClassifyMechanismJob((int) $item->id, (string) $mechanism);
             }
         }
         foreach (array_chunk($jobs, self::DISPATCH_CHUNK) as $chunk) {
@@ -197,7 +204,7 @@ class Classify extends Component
             }
         }
 
-        return $ids->count();
+        return $items->count();
     }
 
     /** Dismiss the progress panel and start a fresh classification. */

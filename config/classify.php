@@ -1,6 +1,15 @@
 <?php
 
 return [
+    // Answer cache — the FIRST step of classification. Before any AI runs, the item's
+    // name is looked up in the `answer_cache` table (verified name → 4-digit answer,
+    // seeded from the Fedor reference). A hit resolves the item immediately, confident,
+    // with NO LLM calls. A miss falls through to the mechanism pipeline. Currently an
+    // exact normalized-name match; semantic (vector) lookup is planned.
+    'cache' => [
+        'enabled' => (bool) env('CLASSIFY_CACHE_ENABLED', true),
+    ],
+
     // Independent search mechanisms run in parallel per item; their results are
     // stored side by side (classification_results) and reconciled into a
     // consensus. 'enabled' is the active set, in priority order. New mechanisms
