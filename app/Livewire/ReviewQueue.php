@@ -11,6 +11,7 @@ use App\Models\RubricatorNode;
 use App\Support\Audit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -386,7 +387,13 @@ class ReviewQueue extends Component
             ->limit(50)
             ->get();
 
-        $labels = ImportBatch::whereIn('key', $rows->pluck('batch'))->pluck('label', 'key');
+        // import_batches.key is a UUID column, so only look up UUID batch keys — a
+        // non-UUID batch (a seed/CLI batch like "gold-ivan") has no import_batches row
+        // and would otherwise make Postgres throw on the whereIn (22P02).
+        $uuidKeys = $rows->pluck('batch')->filter(fn ($b) => Str::isUuid((string) $b))->values();
+        $labels = $uuidKeys->isEmpty()
+            ? collect()
+            : ImportBatch::whereIn('key', $uuidKeys)->pluck('label', 'key');
 
         return $rows->map(fn ($r) => (object) [
             'key' => $r->batch,
