@@ -82,6 +82,27 @@ class ClassificationDecisionTest extends TestCase
             ->assertDontSee('classified before the decision-flow feature');
     }
 
+    public function test_search_resolver_row_shows_its_heading_not_a_legacy_notice(): void
+    {
+        // The search resolver writes a mechanism='search' row; even without a rich step
+        // trace it must render its own branch (heading + reason), not the vector view or
+        // the "classified before the feature" notice.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'RAUNATİN No10', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'ai_resolved', 'final_code' => '3004']);
+        $item->results()->create([
+            'mechanism' => 'search', 'matched_code' => '3004', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95,
+            'explanation' => 'antihypertensive tablets [web: rlsnet.ru]',
+            'trace' => ['heading' => '3004', 'heading_name' => 'Medicaments', 'confidence' => 0.95],
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('web-search resolver')
+            ->assertSee('3004')
+            ->assertSee('[web: rlsnet.ru]')
+            ->assertDontSee('classified before the decision-flow feature');
+    }
+
     public function test_renders_light_fallback_without_trace(): void
     {
         $item = ClassificationItem::create([

@@ -292,5 +292,7 @@
     "review": "проверка",
     "service": "услуга",
     "waiting": "ожидание",
+    "could not confidently identify the item": "не удалось уверенно опознать товар",
+    "The three mechanisms diverged, so a web-search resolver identified the item and named the 4-digit heading it belongs to. It only settles the conflict when confident; otherwise a human reviews.": "Три механизма разошлись, поэтому решатель с веб-поиском опознал товар и назвал 4-значную позицию, к которой он относится. Он разрешает конфликт только при уверенности; иначе товар уходит на проверку человеку.",
     "—": "—"
 }

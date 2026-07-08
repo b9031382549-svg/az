@@ -292,5 +292,7 @@
     "review": "yoxlama",
     "service": "xidmət",
     "waiting": "gözləyir",
+    "could not confidently identify the item": "məhsulu əminliklə tanıya bilmədi",
+    "The three mechanisms diverged, so a web-search resolver identified the item and named the 4-digit heading it belongs to. It only settles the conflict when confident; otherwise a human reviews.": "Üç mexanizm fərqli nəticə verdi, ona görə internet axtarışlı həlledici məhsulu tanıyıb aid olduğu 4 rəqəmli mövqeyi göstərdi. O, yalnız əmin olduqda münaqişəni həll edir; əks halda insan yoxlayır.",
     "—": "—"
 }
