@@ -225,6 +225,20 @@ class ReviewQueueTest extends TestCase
         $c->call('setFilter', 'open')->assertSee('raunatin')->assertDontSee('diamar');
     }
 
+    public function test_heading_mode_does_not_reopen_a_resolved_item_as_conflict(): void
+    {
+        // The bug: an item the judge already resolved (has a final code) whose raw
+        // mechanisms diverge even at 4 digits was being counted as a heading conflict.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471300000']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8528720000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9018390000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        $c = $this->actingComponent()->call('setCodeMode', 'heading');
+
+        $this->assertSame('agreed', $c->viewData('vmap')[$item->id]); // stays "found", not a conflict
+        $this->assertSame(0, (int) ($c->viewData('counts')['conflict'] ?? 0));
+    }
+
     public function test_heading_mode_keeps_a_cross_heading_conflict_divergent(): void
     {
         // Different headings (8471 vs 8528) → still a conflict even at 4 digits.
