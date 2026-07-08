@@ -9,7 +9,7 @@
     $resBadge = fn ($s) => match ($s) {
         'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
         'ai_resolved' => 'bg-ink/10 text-ink',
-        'review', 'blocked_on_fact' => 'bg-amber/15 text-amber',
+        'blocked_on_fact' => 'bg-amber/15 text-amber',
         'conflict' => 'bg-stamp/12 text-stamp',
         default => 'bg-line/40 text-muted',
     };
@@ -246,9 +246,11 @@
   <div class="space-y-3">
     @forelse($items as $item)
       @php
-        $editable = in_array($item->resolution, ['agreed','review','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
+        $editable = in_array($item->resolution, ['agreed','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
         $allowed = $item->allowedCodes();
-        $adj = $item->adjudications->sortByDesc('id')->first(); // legacy trace, if this item was judged
+        // Confirmable codes: the item's own 4-digit heading answer first, then each
+        // mechanism's alternative pick (for a correction).
+        $options = collect([$item->final_code])->filter()->merge($allowed)->map(fn ($c) => (string) $c)->unique()->values();
         $default = (string) ($item->final_code ?? ($allowed[0] ?? ''));
         $badgeLabel = __(str_replace('_', ' ', $item->resolution));
         $badgeClass = $resBadge($item->resolution);
@@ -290,20 +292,6 @@
                 @endif
               </div>
             @endforeach
-            @if($adj)
-              <div class="flex items-start gap-2 text-xs mt-1">
-                <span class="uppercase tracking-wide text-faint w-16 shrink-0">🤖 ai</span>
-                @if($adj->verdict === 'resolved')
-                  <span class="font-mono shrink-0 {{ $item->resolution === 'ai_resolved' ? 'text-ink font-medium' : 'text-muted' }}">{{ $cd($adj->winning_code) }}</span>
-                  <span class="text-faint flex-1 min-w-0 break-words">·
-                    @if($item->resolution === 'ai_resolved'){{ __('resolved by AI') }}@elseif(!$adj->stable){{ __('proposed — samples differed, your call') }}@elseif($adj->holdout){{ __('proposed — holdout, your call') }}@else{{ __('proposed') }}@endif
-                    @if($adj->reason)· {{ \Illuminate\Support\Str::limit($adj->reason, 80) }}@endif
-                  </span>
-                @else
-                  <span class="text-faint flex-1 min-w-0">· {{ __('could not decide — your call') }}</span>
-                @endif
-              </div>
-            @endif
 
             {{-- Reference ("gold") labels — a hint for the reviewer only. NEVER shown
                  to the classifier/adjudicator. --}}
@@ -333,12 +321,13 @@
         </div>
 
         <div class="shrink-0 w-full sm:w-[340px]">
-          @if($editable && count($allowed) > 0)
+          @if($editable && $options->isNotEmpty())
             <div x-data="{ code: @js($default) }">
               <select x-model="code"
                       class="w-full px-2.5 py-1.5 rounded-lg text-xs border hair bg-surface focus:border-ink outline-none mb-2">
-                @foreach($allowed as $c)
-                  <option value="{{ $c }}">{{ $c }} · {{ \Illuminate\Support\Str::limit($catalogNames[$c] ?? '', 44) }}{{ (string) $c === (string) $item->final_code ? '  ← final' : '' }}</option>
+                @foreach($options as $c)
+                  @php $optName = $catalogNames[$c] ?? ($headingNames[$c] ?? ''); @endphp
+                  <option value="{{ $c }}">{{ $c }} · {{ \Illuminate\Support\Str::limit($optName, 44) }}{{ (string) $c === (string) $item->final_code ? '  ← final' : '' }}</option>
                 @endforeach
               </select>
               <div class="flex gap-2 justify-end">

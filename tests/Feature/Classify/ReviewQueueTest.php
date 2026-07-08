@@ -129,6 +129,34 @@ class ReviewQueueTest extends TestCase
         $this->assertContains('gold-ivan', collect($c->viewData('batches'))->pluck('key')->all());
     }
 
+    public function test_confirming_a_4digit_heading_answer_works(): void
+    {
+        // The common case: an auto-resolved item carries a 4-digit heading with no exact
+        // catalog leaf. Confirming it must succeed and preserve the heading.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Şpris', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '9018', 'kind' => 'good']);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)->test(ReviewQueue::class)->call('confirmWith', $item->id, '9018');
+
+        $item->refresh();
+        $this->assertSame('confirmed', $item->resolution);
+        $this->assertSame('9018', $item->final_code);   // heading preserved
+        $this->assertNull($item->final_catalog_id);
+        $this->assertSame($user->id, $item->confirmed_by);
+    }
+
+    public function test_confirm_all_covers_ai_resolved_items(): void
+    {
+        ClassificationItem::create(['batch' => 'up', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '1104']);
+        ClassificationItem::create(['batch' => 'up', 'source_text' => 'b', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '9018']);
+
+        Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class)
+            ->set('batch', 'up')->call('confirmAll');
+
+        // Both the consensus (agreed) AND the web-search (ai_resolved) item get confirmed.
+        $this->assertSame(2, ClassificationItem::where('batch', 'up')->where('resolution', 'confirmed')->count());
+    }
+
     public function test_uploads_table_lists_batches_and_selecting_one_filters_the_items(): void
     {
         ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);

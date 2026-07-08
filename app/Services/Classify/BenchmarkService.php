@@ -80,27 +80,29 @@ class BenchmarkService
         $ourHeading = $ourCode ? mb_substr((string) $ourCode, 0, 4) : null;
         $ourIsService = $item && $item->kind !== null ? $item->kind === 'service' : null;
 
-        $fullMatch = ($ourCode && $g->code) ? $ourCode === $g->code : null;
-        $headingMatch = ($ourHeading && $g->heading) ? $ourHeading === $g->heading : null;
+        // The gold heading: Fedor stores it directly; Ivan gives a full 10-digit code,
+        // so take its first 4 digits — the pipeline no longer emits 10-digit codes, so
+        // BOTH references are now scored at the 4-digit HS heading.
+        $goldHeading = $g->heading ?: ($g->code ? mb_substr((string) $g->code, 0, 4) : null);
+
+        $fullMatch = ($ourCode && $g->code) ? $ourCode === $g->code : null; // informational only
+        $headingMatch = ($ourHeading && $goldHeading) ? $ourHeading === $goldHeading : null;
         $serviceMatch = ($ourIsService !== null && $g->is_service !== null) ? $ourIsService === $g->is_service : null;
 
         // Did we produce a usable answer for THIS reference's granularity?
         $produced = $item !== null && ($g->source === 'fedor' && $g->is_service ? $ourIsService !== null : $ourCode !== null);
 
-        // Does the REFERENCE actually carry the field we'd compare at? A code-less
-        // Ivan row (or a heading-less Fedor good) offers nothing to score against —
-        // it is not a disagreement, just uncomparable.
+        // Does the REFERENCE actually carry the field we'd compare at? A heading-less
+        // row offers nothing to score against — not a disagreement, just uncomparable.
         $comparable = match (true) {
-            $g->source === 'ivan' => $g->code !== null,
             $g->is_service => true,                       // the service flag is always present
-            default => $g->heading !== null,              // Fedor good
+            default => $goldHeading !== null,             // goods (Ivan & Fedor): the 4-digit heading
         };
 
-        // The reference-appropriate "hit".
+        // The reference-appropriate "hit" — the 4-digit heading for goods, the flag for services.
         $hit = match (true) {
-            $g->source === 'ivan' => $fullMatch === true,
             $g->is_service => $serviceMatch === true,     // Fedor service
-            default => $headingMatch === true,            // Fedor good
+            default => $headingMatch === true,            // Ivan & Fedor goods
         };
 
         $status = match (true) {
@@ -116,7 +118,7 @@ class BenchmarkService
             'tier' => $g->tier,
             'name' => $g->name,
             'gold_code' => $g->code,
-            'gold_heading' => $g->heading,
+            'gold_heading' => $goldHeading,
             'gold_service' => $g->is_service,
             'gold_category' => $g->category,
             'item_id' => $item?->id,

@@ -8,6 +8,7 @@ use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\ItemTranslation;
 use App\Models\LlmUsage;
+use App\Models\RubricatorNode;
 use App\Services\Classify\AnswerCacheService;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
@@ -216,30 +217,43 @@ class Classify extends Component
     public function render()
     {
         $progress = null;
+        $headingNames = collect();
 
         if ($this->queued) {
             $batch = $this->queued['batch'];
             $done = ClassificationItem::where('batch', $batch)->where('resolution', '!=', 'pending')->count();
 
+            $rows = ClassificationItem::where('batch', $batch)
+                ->with(['finalCode', 'translation', 'results'])
+                ->latest()
+                ->limit(50)
+                ->get();
+
+            // A 4-digit heading (or "99") answer has no exact catalog leaf — resolve its
+            // display name from the rubricator (same source ReviewQueue uses).
+            $headingCodes = $rows->pluck('final_code')
+                ->filter(fn ($c) => ($n = mb_strlen((string) $c)) > 0 && $n < 10)->unique()->values();
+            $headingNames = RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
+                ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);
+
             $progress = [
                 'done' => $done,
                 'count' => (int) $this->queued['count'],
                 'complete' => $done >= (int) $this->queued['count'],
-                'rows' => ClassificationItem::where('batch', $batch)
-                    ->with(['finalCode', 'translation', 'results'])
-                    ->latest()
-                    ->limit(50)
-                    ->get(),
+                'rows' => $rows,
             ];
         }
 
         return view('livewire.classify', [
             'progress' => $progress,
+            'headingNames' => $headingNames,
             'fileLimit' => self::FILE_LIMIT,
             'stats' => [
                 'total' => ClassificationItem::count(),
-                'auto' => ClassificationItem::where('resolution', 'agreed')->count(),
-                'review' => ClassificationItem::whereIn('resolution', ['review', 'conflict', 'blocked_on_fact'])->count(),
+                // "Found" = the classifier produced an answer: consensus/cache (agreed) +
+                // the web-search resolver (ai_resolved).
+                'auto' => ClassificationItem::whereIn('resolution', ['agreed', 'ai_resolved'])->count(),
+                'review' => ClassificationItem::whereIn('resolution', ['conflict', 'blocked_on_fact'])->count(),
                 'tokensAll' => (int) LlmUsage::sum('total_tokens'),
             ],
         ]);

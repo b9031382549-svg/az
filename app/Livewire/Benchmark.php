@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\CatalogCode;
+use App\Models\RubricatorNode;
 use App\Services\Classify\BenchmarkService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
@@ -60,6 +61,14 @@ class Benchmark extends Component
         $catalogNames = CatalogCode::query()->whereIn('code', $codes)
             ->get(['code', 'name', 'name_en', 'name_ru'])
             ->mapWithKeys(fn ($c) => [(string) $c->code => $c->localizedName()]);
+
+        // A 4-digit heading (our answer, or Ivan's derived heading) has no catalog leaf —
+        // fill its name from the rubricator (keys don't collide: 4-digit vs 10-digit).
+        $headingCodes = $codes->filter(fn ($c) => mb_strlen((string) $c) < 10)->values();
+        $catalogNames = $catalogNames->merge(
+            RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
+                ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()])
+        );
 
         return view('livewire.benchmark', [
             'sources' => $score['sources'],

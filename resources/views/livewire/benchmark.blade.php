@@ -2,12 +2,15 @@
   @php
     $pct = fn ($a, $b) => $b > 0 ? round($a / $b * 100) : null;
     $srcMeta = [
-      'ivan'  => ['label' => 'Ivan',  'sub' => __('full 10-digit code · one model')],
+      'ivan'  => ['label' => 'Ivan',  'sub' => __('10-digit source, scored at the heading · one model')],
       'fedor' => ['label' => 'Fedor', 'sub' => __('4-digit heading + good/service · two models agree')],
     ];
     // Which agreement metrics each reference actually supports.
+    // Heading (4) is the real granularity our classifier produces now; Ivan's full
+    // 10-digit exact match is kept only as a legacy/informational line (structurally
+    // 0 against 4-digit answers) and must NOT lead the card.
     $metricsFor = fn ($s, $a) => $s === 'ivan'
-      ? [[__('Full code'), $a['full_agree'], $a['full_total']], [__('Heading (4)'), $a['heading_agree'], $a['heading_total']]]
+      ? [[__('Heading (4)'), $a['heading_agree'], $a['heading_total']], [__('Exact 10-digit (legacy)'), $a['full_agree'], $a['full_total']]]
       : [[__('Heading (4)'), $a['heading_agree'], $a['heading_total']], [__('Good / service'), $a['service_agree'], $a['service_total']]];
     $statuses = ['disagree' => __('Disagree'), 'agree' => __('Agree'), 'no_code' => __('No code'), 'no_ref' => __('No gold code'), 'unclassified' => __('Not run yet'), 'all' => __('All matched')];
     $stColor = fn ($s) => match ($s) {
@@ -25,7 +28,7 @@
   </div>
 
   <p class="text-sm text-muted mb-5 max-w-[70ch]">
-    {{ __('How well our classifier matches two external reference sets, joined by product name. Each reference is AI-labelled and can itself be wrong — a disagreement is a candidate to check, not proof we erred. Ivan gives the full 10-digit code; Fedor gives the 4-digit heading + good/service (two models agreed).') }}
+    {{ __('How well our classifier matches two external reference sets, joined by product name. Each reference is AI-labelled and can itself be wrong — a disagreement is a candidate to check, not proof we erred. Both are compared at the 4-digit HS heading (our classifier resolves at the heading now): Ivan\'s source is a 10-digit code we trim to its heading; Fedor gives the heading + good/service (two models agreed).') }}
   </p>
 
   {{-- Per-reference score cards --}}

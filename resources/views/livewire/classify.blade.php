@@ -6,8 +6,8 @@
         default => 'bg-line/40 text-muted',
     };
     $statusBadge = fn ($s) => match ($s) {
-        'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
-        'review', 'blocked_on_fact' => 'bg-amber/15 text-amber',
+        'agreed', 'confirmed', 'ai_resolved' => 'bg-ledger/12 text-ledger',
+        'blocked_on_fact' => 'bg-amber/15 text-amber',
         'conflict' => 'bg-stamp/12 text-stamp',
         default => 'bg-line/40 text-muted', // no_match, rejected, pending
     };
@@ -21,7 +21,7 @@
   </div>
 
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    @foreach([[__('Classified'),$stats['total']],[__('Agreed'),$stats['auto']],[__('Needs attention'),$stats['review']],[__('Tokens used'),number_format($stats['tokensAll'],0,'.',' ')]] as [$l,$v])
+    @foreach([[__('Classified'),$stats['total']],[__('Found'),$stats['auto']],[__('Needs attention'),$stats['review']],[__('Tokens used'),number_format($stats['tokensAll'],0,'.',' ')]] as [$l,$v])
       <div class="card-flat p-4"><p class="kicker mb-1.5">{{ $l }}</p><p class="font-display text-2xl tnum">{{ $v }}</p></div>
     @endforeach
   </div>
@@ -114,7 +114,7 @@
                     <td class="px-4 py-3 max-w-[220px]">{{ $r->localizedSourceText() }}</td>
                     <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($r->kind) }}">{{ $r->kind ?? '—' }}</span></td>
                     <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $r->final_code ?? '—' }}</td>
-                    <td class="px-4 py-3 text-muted max-w-[320px]">{{ Str::limit($r->finalCode?->localizedName() ?? '—', 90) }}</td>
+                    <td class="px-4 py-3 text-muted max-w-[320px]">{{ Str::limit($r->finalCode?->localizedName() ?: ($headingNames[(string) $r->final_code] ?? '—'), 90) }}</td>
                     <td class="px-4 py-3 tnum text-right">{{ $r->finalConfidence() !== null ? number_format($r->finalConfidence()*100,0).'%' : '—' }}</td>
                     <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($r->resolution) }}">{{ str_replace('_',' ',$r->resolution) }}</span></td>
                   </tr>
