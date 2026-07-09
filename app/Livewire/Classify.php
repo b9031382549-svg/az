@@ -23,8 +23,8 @@ class Classify extends Component
 {
     use WithFileUploads;
 
-    /** Max items accepted from one manual (textarea) submission. */
-    private const MANUAL_LIMIT = 20;
+    /** Max items accepted from one manual (textarea) submission — same cap as a file. */
+    private const MANUAL_LIMIT = 10000;
 
     /** Max items queued from a single file upload. */
     private const FILE_LIMIT = 10000;
@@ -247,6 +247,7 @@ class Classify extends Component
         return view('livewire.classify', [
             'progress' => $progress,
             'headingNames' => $headingNames,
+            'manualLimit' => self::MANUAL_LIMIT,
             'fileLimit' => self::FILE_LIMIT,
             'stats' => [
                 'total' => ClassificationItem::count(),

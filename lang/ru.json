@@ -354,5 +354,6 @@
     "not found": "не найдено",
     "no consensus": "нет консенсуса",
     "not confident": "не уверен",
-    "good": "товар"
+    "good": "товар",
+    "Items — one per line (max :n)": "Позиции — по одной в строке (макс. :n)"
 }
