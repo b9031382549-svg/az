@@ -355,5 +355,6 @@
     "no consensus": "konsensus yoxdur",
     "not confident": "əmin deyil",
     "good": "mal",
-    "Items — one per line (max :n)": "Maddələr — hər sətirdə bir (maks. :n)"
+    "Items — one per line (max :n)": "Maddələr — hər sətirdə bir (maks. :n)",
+    "A verified name matched this answer exactly": "Yoxlanmış ad bu cavaba dəqiq uyğun gəldi"
 }

@@ -355,5 +355,6 @@
     "no consensus": "нет консенсуса",
     "not confident": "не уверен",
     "good": "товар",
-    "Items — one per line (max :n)": "Позиции — по одной в строке (макс. :n)"
+    "Items — one per line (max :n)": "Позиции — по одной в строке (макс. :n)",
+    "A verified name matched this answer exactly": "Проверенное имя точно совпало с этим ответом"
 }
