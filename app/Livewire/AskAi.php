@@ -14,6 +14,9 @@ class AskAi extends Component
     /** How many past turns to load into the view. */
     private const HISTORY_LIMIT = 100;
 
+    /** How many recent turns to feed the model as conversational context. */
+    private const CONTEXT_TURNS = 5;
+
     public string $question = '';
 
     /** @var array<int, array<string, mixed>> */
@@ -54,7 +57,9 @@ class AskAi extends Component
             return;
         }
 
-        $result = $service->ask($question);
+        // Feed the recent turns as context BEFORE this one is appended, so the
+        // model can resolve follow-ups ("from the previous query").
+        $result = $service->ask($question, $this->recentContext());
         $rows = array_slice($result['rows'], 0, 50);
 
         $message = ChatMessage::create([
@@ -89,6 +94,23 @@ class AskAi extends Component
     public function render()
     {
         return view('livewire.ask-ai');
+    }
+
+    /**
+     * The last few successful turns (oldest→newest) handed to NlSqlService as
+     * conversational context, so follow-ups like "from the previous query"
+     * resolve. Clearing the history empties $messages, which resets context.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function recentContext(): array
+    {
+        return collect($this->messages)
+            ->filter(fn (array $m) => ($m['error'] ?? null) === null
+                && (($m['sql'] ?? null) !== null || ($m['answer'] ?? null) !== null))
+            ->slice(-self::CONTEXT_TURNS)
+            ->values()
+            ->all();
     }
 
     /**

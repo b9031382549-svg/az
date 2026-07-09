@@ -19,9 +19,12 @@ class NlSqlService
      * Translate a natural-language question into SQL, execute it read-only and
      * return the result set together with the SQL and a short explanation.
      *
+     * @param  array<int, array<string, mixed>>  $history  Prior turns (oldest→newest),
+     *                                                     each carrying 'q'/'sql'/'answer'/'explanation', so a follow-up like
+     *                                                     "from the previous query" can build on earlier requests.
      * @return array{question: string, sql: ?string, answer: ?string, explanation: ?string, columns: array<int,string>, rows: array<int,array<string,mixed>>, error: ?string}
      */
-    public function ask(string $question): array
+    public function ask(string $question, array $history = []): array
     {
         $result = [
             'question' => $question,
@@ -34,7 +37,7 @@ class NlSqlService
         ];
 
         try {
-            $generated = $this->generate($question);
+            $generated = $this->generate($question, $history);
             $result['sql'] = $generated['sql'];
             $result['answer'] = $generated['answer'];
             $result['explanation'] = $generated['explanation'];
@@ -68,14 +71,12 @@ class NlSqlService
     }
 
     /**
+     * @param  array<int, array<string, mixed>>  $history
      * @return array{sql: ?string, answer: ?string, explanation: ?string}
      */
-    private function generate(string $question): array
+    private function generate(string $question, array $history): array
     {
-        $messages = [
-            ['role' => 'system', 'content' => $this->systemPrompt()],
-            ['role' => 'user', 'content' => $question],
-        ];
+        $messages = $this->buildMessages($question, $history);
 
         try {
             $response = $this->llm->jsonWithUsage($messages);
@@ -103,6 +104,62 @@ class NlSqlService
         }
 
         return ['sql' => $sql, 'answer' => $answer, 'explanation' => $json['explanation'] ?? null];
+    }
+
+    /**
+     * Build the OpenRouter message list: the system prompt, then the recent
+     * conversation turns (so follow-ups resolve), then the current question.
+     *
+     * @param  array<int, array<string, mixed>>  $history
+     * @return array<int, array{role: string, content: string}>
+     */
+    private function buildMessages(string $question, array $history): array
+    {
+        $messages = [['role' => 'system', 'content' => $this->systemPrompt()]];
+
+        foreach ($history as $turn) {
+            $q = trim((string) ($turn['q'] ?? $turn['question'] ?? ''));
+            $assistant = $this->replayAssistant($turn);
+
+            // Skip turns with no question or nothing to build on (e.g. a past
+            // error), so every user turn keeps its matching assistant reply.
+            if ($q === '' || $assistant === null) {
+                continue;
+            }
+
+            $messages[] = ['role' => 'user', 'content' => $q];
+            $messages[] = ['role' => 'assistant', 'content' => $assistant];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $question];
+
+        return $messages;
+    }
+
+    /**
+     * Re-create what the assistant answered on a past turn, in the same JSON
+     * shape it must reply with, so the model can reference or extend its own
+     * prior SQL. Null when the turn carried neither SQL nor an answer.
+     *
+     * @param  array<string, mixed>  $turn
+     */
+    private function replayAssistant(array $turn): ?string
+    {
+        $pick = fn (string $key): ?string => isset($turn[$key]) && trim((string) $turn[$key]) !== ''
+            ? trim((string) $turn[$key])
+            : null;
+
+        $fields = array_filter([
+            'sql' => $pick('sql'),
+            'answer' => $pick('answer'),
+            'explanation' => $pick('explanation'),
+        ], fn ($v) => $v !== null);
+
+        if (! isset($fields['sql']) && ! isset($fields['answer'])) {
+            return null;
+        }
+
+        return json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     private function systemPrompt(): string
@@ -145,6 +202,11 @@ class NlSqlService
         - Always give aggregate columns clear aliases (e.g. SELECT sum(total_amount) AS turnover).
         - Order results sensibly and keep them reasonably small.
         - TIN values are strings (e.g. 'A_00000001').
+        - The conversation may include earlier turns. When the question refers
+          back to a previous request or its result ("the previous query",
+          "those invoices", "same but by month", "add the TIN column"), start
+          from the most recent prior SQL and adjust it — do NOT ignore the
+          reference and fall back to selecting everything.
 
         Respond with a strict JSON object only:
         {"sql": "<the SQL, or null when no query is needed>", "answer": "<a direct reply when no query is needed, else null>", "explanation": "<one sentence describing what the SQL returns>"}
