@@ -99,8 +99,7 @@
             <span class="transition-transform group-open:rotate-90">▸</span> {{ __('Details') }}
           </summary>
           <div class="mt-2 text-xs text-muted">
-            <p>{{ __('A verified name → answer entry matched exactly. Source') }}: <span class="text-ink">{{ data_get($cache->trace, 'source', 'cache') }}</span> · {{ __('confidence') }} {{ $pct($cache->confidence) }}.</p>
-            @if($cache->explanation)<p class="mt-1">{{ $cache->explanation }}</p>@endif
+            <p>{{ __('A verified name matched this answer exactly') }} · {{ __('confidence') }} {{ $pct($cache->confidence) }}.</p>
           </div>
         </details>
       @endif
@@ -305,11 +304,11 @@
             $disputed = data_get($gl->meta, 'crosscheck') === 'disagree';
           @endphp
           <div class="flex items-start gap-2">
-            <span class="uppercase tracking-wide text-faint w-14 shrink-0">{{ $gl->source }}</span>
+            <span class="text-faint shrink-0">📋</span>
             <span class="font-mono shrink-0">{{ $gShow }}</span>
             @if($gMatch === true)<span class="text-ledger">✓</span>@elseif($gMatch === false)<span class="text-stamp">✕</span>@endif
             <span class="text-muted flex-1 min-w-0 break-words">
-              @if($gl->source === 'fedor' && $gl->tier){{ $gl->tier }}@endif
+              @if($gl->tier){{ $gl->tier }}@endif
               @if($disputed) · {{ __('models disputed') }}@if(data_get($gl->meta, 'gpt_heading')) (gpt {{ data_get($gl->meta, 'gpt_heading') }})@endif @endif
               @if($gl->category) · {{ $gl->category }}@endif
               @if(data_get($gl->meta, 'note'))<span class="text-faint block mt-0.5">{{ \Illuminate\Support\Str::limit(data_get($gl->meta, 'note'), 160) }}</span>@endif
