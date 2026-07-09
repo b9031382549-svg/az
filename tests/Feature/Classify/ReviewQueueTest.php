@@ -179,24 +179,23 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $c->viewData('items')->total());
     }
 
-    public function test_card_shows_the_reached_source_steps_with_outcomes(): void
+    public function test_table_shows_the_deciding_source(): void
     {
-        // Web-search resolved: memory not found → local ai no consensus → web research found.
+        // Web-search resolved → the "Found by" column shows "web research"; no raw mechanisms.
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8528', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8528723000', 'status' => 'auto_confirmed', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'search', 'matched_code' => '8528', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
         $this->actingComponent()->call('setFilter', 'all')
-            ->assertSee('memory')->assertSee('not found')
-            ->assertSee('local ai')->assertSee('no consensus')
-            ->assertSee('web research')->assertSee('found')
-            ->assertDontSee('vector')->assertDontSee('broker'); // no raw mechanism names
+            ->assertSee('Found by')
+            ->assertSee('web research')  // the deciding source
+            ->assertSee('ai resolved')   // status
+            ->assertDontSee('vector')->assertDontSee('broker'); // no raw mechanism names in the table
     }
 
-    public function test_cache_hit_shows_only_the_memory_step(): void
+    public function test_table_shows_memory_as_the_source_for_a_cache_hit(): void
     {
-        // Resolved by the cache — the later steps were never reached, so they aren't listed.
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'c', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '1104']);
         $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'kind' => 'good']);
 

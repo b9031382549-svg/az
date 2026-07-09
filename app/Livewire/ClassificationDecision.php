@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\ConfirmsClassifications;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
@@ -9,17 +10,33 @@ use App\Models\RubricatorNode;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-// Read-only "how was this decided" screen for one item, laid out as the STAGES of the
-// current flow — cache → AI consensus (3 mechanisms) → web-search resolver → human —
-// each showing its input → output up front, with the deep trace collapsible.
+// "How was this decided" screen for one item, laid out as the STAGES of the current
+// flow — cache → AI consensus (3 mechanisms) → web-search resolver → human — each
+// showing its input → output up front, with the deep trace collapsible. The reviewer
+// confirms / rejects / corrects the item here (moved from the review list).
 #[Layout('components.app-layout', ['title' => 'Decision'])]
 class ClassificationDecision extends Component
 {
+    use ConfirmsClassifications;
+
     public ClassificationItem $item;
 
     public function mount(ClassificationItem $item): void
     {
         $this->item = $item->load(['results', 'finalCode', 'translation', 'adjudications', 'confirmedBy']);
+    }
+
+    /** Confirm (or correct to) a code from the decision page. */
+    public function confirmWith(string $code): void
+    {
+        $this->applyConfirm($this->item, $code);
+        $this->item = $this->item->fresh(['results', 'finalCode', 'translation', 'adjudications', 'confirmedBy']);
+    }
+
+    public function reject(): void
+    {
+        $this->applyReject($this->item);
+        $this->item = $this->item->fresh(['results', 'finalCode', 'translation', 'adjudications', 'confirmedBy']);
     }
 
     public function render()
@@ -50,10 +67,12 @@ class ClassificationDecision extends Component
         $rubricCodes = $rubricCodes->filter()->map(fn ($c) => (string) $c)->unique()->values();
 
         // A partial result (4-digit heading or the "99" service level) has no catalog
-        // leaf — resolve its name from the rubricator instead.
-        if (($n = mb_strlen((string) $this->item->final_code)) > 0 && $n < 10) {
-            $rubricCodes = $rubricCodes->push((string) $this->item->final_code)->unique()->values();
-        }
+        // leaf — resolve its name from the rubricator instead. Cover the item's final
+        // code AND the confirm-dropdown options (each allowed code's 4-digit heading).
+        $rubricCodes = $rubricCodes
+            ->merge(collect([$this->item->final_code])->merge($this->item->allowedCodes())
+                ->filter()->map(fn ($c) => (string) mb_substr((string) $c, 0, 4)))
+            ->unique()->values();
 
         $names = CatalogCode::whereIn('code', $codes)
             ->get(['code', 'name', 'name_en', 'name_ru'])

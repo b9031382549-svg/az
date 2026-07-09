@@ -63,6 +63,36 @@
     </div>
   </div>
 
+  {{-- Your decision — confirm the answer, correct it to another 4-digit heading, or
+       reject. (Moved here from the review list; the item name links here.) --}}
+  @php
+    $editable = in_array($item->resolution, ['agreed','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
+    $decOptions = collect([$item->final_code])->filter()->merge($item->allowedCodes())
+        ->map(fn ($c) => (string) mb_substr((string) $c, 0, 4))->filter()->unique()->sortBy(fn ($c) => (int) $c)->values();
+    $decDefault = (string) ($item->final_code ?? ($decOptions->first() ?? ''));
+  @endphp
+  @if($editable && $decOptions->isNotEmpty())
+    <div class="card p-5 mb-5" x-data="{ code: @js($decDefault) }">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="kicker">{{ __('Your decision') }}</span>
+        @if($item->resolution === 'confirmed')<span class="text-ledger text-xs">✓ {{ __('confirmed') }}@if($item->confirmedBy) · {{ optional($item->confirmedBy)->name ?? optional($item->confirmedBy)->email }}@endif</span>@endif
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <select x-model="code" class="field-input sm:max-w-[440px]">
+          @foreach($decOptions as $c)
+            @php $on = $rubricTitles[(string) $c] ?? ''; @endphp
+            <option value="{{ $c }}">{{ $c }} · {{ \Illuminate\Support\Str::limit($on, 60) }}{{ (string) $c === (string) $item->final_code ? '  ← '.__('final') : '' }}</option>
+          @endforeach
+        </select>
+        <div class="flex gap-2 sm:ml-auto">
+          <button wire:click="reject" wire:confirm="{{ __('Reject this item?') }}" class="btn btn-ghost btn-sm">✕ {{ __('Reject') }}</button>
+          <button x-on:click="$wire.confirmWith(code)" class="btn btn-ink btn-sm"
+                  x-text="'✓ ' + (code === @js((string) $item->final_code) ? @js(__('Confirm')) : @js(__('Save fix')))"></button>
+        </div>
+      </div>
+    </div>
+  @endif
+
   {{-- The stages of the flow: cache → AI consensus → web search → human. Each shows
        its input → output up front; the deep trace is collapsible. --}}
   <ol class="space-y-3">

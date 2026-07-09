@@ -2,7 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Models\CatalogCode;
+use App\Livewire\Concerns\ConfirmsClassifications;
 use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\RubricatorNode;
@@ -18,7 +18,7 @@ use Livewire\WithPagination;
 #[Layout('components.app-layout', ['title' => 'Review queue'])]
 class ReviewQueue extends Component
 {
-    use WithPagination;
+    use ConfirmsClassifications, WithPagination;
 
     /** Resolutions that still need a human ("open"). */
     private const OPEN = ['conflict', 'blocked_on_fact'];
@@ -82,69 +82,17 @@ class ReviewQueue extends Component
     public function confirmWith(int $id, string $code): void
     {
         $item = ClassificationItem::with('results')->find($id);
-        if (! $item) {
-            return;
+        if ($item) {
+            $this->applyConfirm($item, $code);
         }
-
-        // A 4-digit HS heading (or the bare "99" service level) is confirmed at the
-        // heading — no exact 10-digit catalog leaf. Accept it whether it is the item's own
-        // answer or a correction to another REAL heading (some active catalog code sits
-        // under it). This is the normal path now that codes are 4-digit.
-        if (mb_strlen($code) < 10) {
-            // The item's OWN answer is trusted as-is (the pipeline produced it); a
-            // CORRECTION to a different heading must be a real heading (some active catalog
-            // code sits under it) or the "99" service level.
-            if ($code !== (string) $item->final_code) {
-                $valid = $code === '99' || CatalogCode::where('position', $code)->where('is_active', true)->exists();
-                if (! $valid) {
-                    return;
-                }
-            }
-            $was = $item->final_code;
-            $item->update([
-                'resolution' => 'confirmed',
-                'final_code' => $code,
-                'final_catalog_id' => null,
-                'kind' => $code === '99' ? 'service' : ($item->kind ?? 'good'),
-                'confirmed_by' => auth()->id(),
-                'confirmed_at' => now(),
-            ]);
-            Audit::log(((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
-                ['id' => $id, 'code' => $code, 'was' => $was], $item);
-
-            return;
-        }
-
-        if (! in_array($code, $item->allowedCodes(), true)) {
-            return;
-        }
-
-        $cand = CatalogCode::where('code', $code)->first();
-        if (! $cand) {
-            return;
-        }
-
-        $was = $item->final_code;
-        $item->update([
-            'final_code' => $cand->code,
-            'final_catalog_id' => $cand->id,
-            'kind' => $cand->kind, // authoritative (99 => service)
-            'resolution' => 'confirmed',
-            'confirmed_by' => auth()->id(),
-            'confirmed_at' => now(),
-        ]);
-
-        Audit::log(
-            ((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
-            ['id' => $id, 'code' => $code, 'was' => $was],
-            $item,
-        );
     }
 
     public function reject(int $id): void
     {
-        ClassificationItem::whereKey($id)->update(['resolution' => 'rejected']);
-        Audit::log('classification.reject', ['id' => $id]);
+        $item = ClassificationItem::find($id);
+        if ($item) {
+            $this->applyReject($item);
+        }
     }
 
     /** Confirm every item in the selected upload that already has an agreed code. */

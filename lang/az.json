@@ -356,5 +356,9 @@
     "not confident": "əmin deyil",
     "good": "mal",
     "Items — one per line (max :n)": "Maddələr — hər sətirdə bir (maks. :n)",
-    "A verified name matched this answer exactly": "Yoxlanmış ad bu cavaba dəqiq uyğun gəldi"
+    "A verified name matched this answer exactly": "Yoxlanmış ad bu cavaba dəqiq uyğun gəldi",
+    "Found by": "Kim tapdı",
+    "Your decision": "Sizin qərarınız",
+    "final": "yekun",
+    "Reject this item?": "Bu maddəni rədd etmək?"
 }

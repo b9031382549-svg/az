@@ -1,18 +1,4 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
-  @php
-    $kindBadge = fn ($k) => match ($k) {
-        'good' => 'bg-ledger/12 text-ledger',
-        'service' => 'bg-amber/15 text-amber',
-        default => 'bg-line/40 text-muted',
-    };
-    $statusBadge = fn ($s) => match ($s) {
-        'agreed', 'confirmed', 'ai_resolved' => 'bg-ledger/12 text-ledger',
-        'blocked_on_fact' => 'bg-amber/15 text-amber',
-        'conflict' => 'bg-stamp/12 text-stamp',
-        default => 'bg-line/40 text-muted', // no_match, rejected, pending
-    };
-  @endphp
-
   <div class="flex items-end justify-between flex-wrap gap-3 mb-6">
     <div>
       <p class="kicker mb-1.5">{{ __('XİF MN · goods & services') }}</p>
@@ -95,33 +81,8 @@
       </p>
 
       @if($progress['rows']->isNotEmpty())
-        <div class="card-flat overflow-hidden mt-4">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-left text-muted border-b hair bg-paper/50">
-                  <th class="font-medium px-4 py-3">{{ __('Item') }}</th>
-                  <th class="font-medium px-4 py-3">{{ __('Kind') }}</th>
-                  <th class="font-medium px-4 py-3">{{ __('Code') }}</th>
-                  <th class="font-medium px-4 py-3">{{ __('Matched name') }}</th>
-                  <th class="font-medium px-4 py-3 text-right">{{ __('Conf.') }}</th>
-                  <th class="font-medium px-4 py-3">{{ __('Status') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                @foreach($progress['rows'] as $r)
-                  <tr wire:key="res-{{ $r->id }}" class="border-b hair last:border-0 align-top">
-                    <td class="px-4 py-3 max-w-[220px]">{{ $r->localizedSourceText() }}</td>
-                    <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($r->kind) }}">{{ $r->kind ?? '—' }}</span></td>
-                    <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $r->final_code ?? '—' }}</td>
-                    <td class="px-4 py-3 text-muted max-w-[320px]">{{ Str::limit($r->finalCode?->localizedName() ?: ($headingNames[(string) $r->final_code] ?? '—'), 90) }}</td>
-                    <td class="px-4 py-3 tnum text-right">{{ $r->finalConfidence() !== null ? number_format($r->finalConfidence()*100,0).'%' : '—' }}</td>
-                    <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($r->resolution) }}">{{ str_replace('_',' ',$r->resolution) }}</span></td>
-                  </tr>
-                @endforeach
-              </tbody>
-            </table>
-          </div>
+        <div class="mt-4">
+          @include('livewire.partials.results-table', ['rows' => $progress['rows'], 'headingNames' => $headingNames])
         </div>
         @if($progress['done'] > $progress['rows']->count())
           <p class="text-faint text-xs mt-2">{{ __('Showing the latest :shown of :total.', ['shown' => $progress['rows']->count(), 'total' => number_format($progress['done'])]) }}</p>

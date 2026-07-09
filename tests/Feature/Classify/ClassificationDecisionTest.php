@@ -153,6 +153,28 @@ class ClassificationDecisionTest extends TestCase
             ->assertDontSee('Human');                      // auto-found (ai_resolved) → no human stage
     }
 
+    public function test_confirm_on_the_decision_page(): void
+    {
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'ai_resolved', 'final_code' => '9018', 'kind' => 'good']);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)->test(ClassificationDecision::class, ['item' => $item])->call('confirmWith', '9018');
+
+        $item->refresh();
+        $this->assertSame('confirmed', $item->resolution);
+        $this->assertSame('9018', $item->final_code);
+        $this->assertSame($user->id, $item->confirmed_by);
+    }
+
+    public function test_reject_on_the_decision_page(): void
+    {
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict']);
+
+        Livewire::actingAs(User::factory()->create())->test(ClassificationDecision::class, ['item' => $item])->call('reject');
+
+        $this->assertSame('rejected', $item->fresh()->resolution);
+    }
+
     public function test_renders_light_fallback_without_trace(): void
     {
         $item = ClassificationItem::create([

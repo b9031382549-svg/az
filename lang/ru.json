@@ -356,5 +356,9 @@
     "not confident": "не уверен",
     "good": "товар",
     "Items — one per line (max :n)": "Позиции — по одной в строке (макс. :n)",
-    "A verified name matched this answer exactly": "Проверенное имя точно совпало с этим ответом"
+    "A verified name matched this answer exactly": "Проверенное имя точно совпало с этим ответом",
+    "Found by": "Кто нашёл",
+    "Your decision": "Ваше решение",
+    "final": "финальный",
+    "Reject this item?": "Отклонить эту позицию?"
 }
