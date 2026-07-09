@@ -27,7 +27,7 @@
   </div>
 
   <div class="card p-6">
-    <label class="field-label">{{ __('Items — one per line (max 20)') }}</label>
+    <label class="field-label">{{ __('Items — one per line (max :n)', ['n' => number_format($manualLimit)]) }}</label>
     <textarea wire:model="input" rows="4" placeholder="{{ __('e.g. Şpris 5ml 23G rezin porşenli') }}"
               class="field-input font-mono text-sm" style="height:auto"></textarea>
     <div class="flex flex-wrap items-center gap-2 mt-3">

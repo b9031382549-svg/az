@@ -354,5 +354,6 @@
     "not found": "tapılmadı",
     "no consensus": "konsensus yoxdur",
     "not confident": "əmin deyil",
-    "good": "mal"
+    "good": "mal",
+    "Items — one per line (max :n)": "Maddələr — hər sətirdə bir (maks. :n)"
 }
