@@ -42,3 +42,7 @@ Thumbs.db
 /docs/
 /ByFedor/
 /system-snapshot-2026-07-08/
+
+# Production DB dumps (huge + sensitive — never commit)
+/prod-db-*.dump
+/*.dump

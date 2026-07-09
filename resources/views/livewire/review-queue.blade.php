@@ -2,18 +2,8 @@
   @php
     // Everything resolves at the 4-digit HS heading now — one view, no full/heading toggle.
     $tabs = ['open' => __('Needs attention'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
-    $kindBadge = fn ($k) => $k === 'service' ? 'bg-amber/15 text-amber' : ($k === 'good' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted');
-    $resBadge = fn ($s) => match ($s) {
-        'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
-        'ai_resolved' => 'bg-ink/10 text-ink',
-        'blocked_on_fact' => 'bg-amber/15 text-amber',
-        'conflict' => 'bg-stamp/12 text-stamp',
-        default => 'bg-line/40 text-muted',
-    };
     $tabCount = fn ($key) => $key === 'all' ? $counts->sum() : ($key === 'open' ? $openCount : ($counts[$key] ?? 0));
   @endphp
-
-  @php $batchLabels = $batches->keyBy('key'); @endphp
 
   <div class="mb-6 flex items-end justify-between flex-wrap gap-3">
     <div>
@@ -210,101 +200,9 @@
     @endforeach
   </div>
 
-  <div class="space-y-3">
-    @forelse($items as $item)
-      @php
-        $editable = in_array($item->resolution, ['agreed','conflict','blocked_on_fact','confirmed','ai_resolved'], true);
-        $allowed = $item->allowedCodes();
-        // Correct-code options — 4-digit HS headings only (the item's own answer + each
-        // mechanism's proposed heading), de-duplicated and sorted by number.
-        $options = collect([$item->final_code])->filter()->merge($allowed)
-            ->map(fn ($c) => (string) mb_substr((string) $c, 0, 4))
-            ->filter()->unique()->sortBy(fn ($c) => (int) $c)->values();
-        $default = (string) ($item->final_code ?? ($options->first() ?? ''));
-        $badgeLabel = __(str_replace('_', ' ', $item->resolution));
-        $badgeClass = $resBadge($item->resolution);
-      @endphp
-      <div wire:key="item-{{ $item->id }}" class="card-flat p-4 flex items-start gap-4 flex-wrap sm:flex-nowrap">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1 flex-wrap">
-            <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
-            <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($item->kind) }}">{{ $item->kind ?? '—' }}</span>
-            <span class="font-mono text-sm">{{ $item->final_code ?? __('—') }}</span>
-            @if(mb_strlen((string) $item->final_code) === 4)<span class="px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted" title="{{ __('resolved at the 4-digit heading; exact code left to a human') }}">{{ __('heading') }}</span>@endif
-            @if($batch === 'all' && $item->batch)
-              <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ \Illuminate\Support\Str::limit(optional($batchLabels->get($item->batch))->label ?? __('Earlier import'), 26) }}</span>
-            @endif
-          </div>
-          <p class="font-medium">{{ $item->localizedSourceText() }}</p>
-          @if($item->finalCode)
-            <p class="text-muted text-sm mt-0.5">{{ Str::limit($item->finalCode->localizedName(), 110) }}</p>
-          @elseif(($nlen = mb_strlen((string) $item->final_code)) > 0 && $nlen < 10 && isset($headingNames[(string) $item->final_code]))
-            <p class="text-muted text-sm mt-0.5">{{ Str::limit($headingNames[(string) $item->final_code], 110) }} <span class="text-faint">· {{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span></p>
-          @endif
-
-          {{-- Decision source — the steps the pipeline ACTUALLY reached, one per line,
-               each with its outcome: memory (cache) → local ai (the on-box models) →
-               web research. A step that was never reached (a later one resolved it first)
-               is not listed at all. The step that resolved the item is the last, green one. --}}
-          @php
-            $cacheRow  = $item->results->firstWhere('mechanism', 'cache');
-            $mechRan   = $item->results->whereIn('mechanism', ['vector', 'broker', 'direct'])->isNotEmpty();
-            $searchRow = $item->results->firstWhere('mechanism', 'search');
-
-            // memory is always tried; each later step is listed only if it was reached.
-            $steps = [['memory', $cacheRow !== null ? 'found' : 'not found', $cacheRow !== null]];
-            if ($cacheRow === null && $mechRan) {
-                $localOk = $item->final_code && $item->resolution !== 'ai_resolved';
-                $steps[] = ['local ai', $localOk ? 'found' : 'no consensus', $localOk];
-                if (! $localOk) {
-                    if ($item->resolution === 'ai_resolved') {
-                        $steps[] = ['web research', 'found', true];
-                    } elseif ($searchRow !== null) {
-                        $steps[] = ['web research', 'not confident', false];
-                    }
-                }
-            }
-          @endphp
-          <div class="flex flex-col gap-0.5 mt-2 text-xs">
-            @foreach($steps as [$label, $outcome, $ok])
-              <div class="flex items-center gap-1.5">
-                <span class="{{ $ok ? 'text-ledger' : 'text-faint' }}">{{ $ok ? '✓' : '✕' }}</span>
-                <span class="{{ $ok ? 'text-ink font-medium' : 'text-muted' }}">{{ __($label) }}</span>
-                <span class="text-faint">— {{ __($outcome) }}</span>
-              </div>
-            @endforeach
-          </div>
-
-          <a href="{{ route('review.decision', $item->id) }}" target="_blank"
-             class="inline-block mt-2 text-xs text-muted hover:text-ink underline decoration-dotted">🔍 {{ __('Decision flow') }}</a>
-        </div>
-
-        <div class="shrink-0 w-full sm:w-[340px]">
-          @if($editable && $options->isNotEmpty())
-            <div x-data="{ code: @js($default) }">
-              <select x-model="code"
-                      class="w-full px-2.5 py-1.5 rounded-lg text-xs border hair bg-surface focus:border-ink outline-none mb-2">
-                @foreach($options as $c)
-                  @php $optName = $headingNames[$c] ?? ''; @endphp
-                  <option value="{{ $c }}">{{ $c }} · {{ \Illuminate\Support\Str::limit($optName, 44) }}{{ (string) $c === (string) $item->final_code ? '  ← final' : '' }}</option>
-                @endforeach
-              </select>
-              <div class="flex gap-2 justify-end">
-                <button wire:click="reject({{ $item->id }})" class="btn btn-ghost btn-sm">✕ {{ __('Reject') }}</button>
-                <button x-on:click="$wire.confirmWith({{ $item->id }}, code)"
-                        class="btn btn-ink btn-sm"
-                        x-text="'✓ ' + (code === @js((string) $item->final_code) ? @js(__('Confirm')) : @js(__('Save fix')))"></button>
-              </div>
-            </div>
-          @else
-            <span class="text-xs text-faint">{{ __(str_replace('_',' ',$item->resolution)) }}</span>
-          @endif
-        </div>
-      </div>
-    @empty
-      <div class="card-flat p-10 text-center text-muted">{{ __('Nothing here. Classify some items first.') }}</div>
-    @endforelse
-  </div>
+  {{-- Results table (shared with the Classify page). Confirm/reject moved to the
+       decision page — the item name links there. --}}
+  @include('livewire.partials.results-table', ['rows' => $items, 'headingNames' => $headingNames])
 
   <div class="mt-5">{{ $items->onEachSide(1)->links() }}</div>
 </section>
