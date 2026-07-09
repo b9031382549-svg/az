@@ -210,21 +210,6 @@
     @endforeach
   </div>
 
-  {{-- Bulk actions for a single upload --}}
-  @if($batch !== 'all')
-    <div class="flex flex-wrap items-center gap-2 mb-5">
-      <span class="text-sm text-muted">{{ __('This upload:') }}</span>
-      <button wire:click="confirmAll" wire:confirm="Confirm all agreed items in this upload?"
-              @disabled($actionableCount === 0)
-              class="btn btn-ghost btn-sm {{ $actionableCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✓ {{ __('Confirm agreed') }}</button>
-      <button wire:click="rejectAll" wire:confirm="Reject all {{ $actionableCount }} open items in this upload?"
-              @disabled($actionableCount === 0)
-              class="btn btn-ghost btn-sm {{ $actionableCount === 0 ? 'opacity-40 cursor-not-allowed' : '' }}">✕ {{ __('Reject all') }} ({{ $actionableCount }})</button>
-      <button wire:click="deleteBatch" wire:confirm="Delete this entire upload and all its items? This cannot be undone."
-              class="btn btn-ghost btn-sm text-stamp ml-auto">🗑 {{ __('Delete upload') }}</button>
-    </div>
-  @endif
-
   <div class="space-y-3">
     @forelse($items as $item)
       @php
