@@ -205,6 +205,19 @@ class ReviewQueueTest extends TestCase
             ->assertDontSee('web research');
     }
 
+    public function test_a_corrected_cache_hit_is_not_still_credited_to_memory(): void
+    {
+        // A cache hit whose code a human later corrected to a different heading keeps its
+        // stale mechanism='cache' row — the "Found by" column must credit the current
+        // answer's real source, not the cache, which never proposed the corrected code.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'confirmed', 'final_code' => '8471', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'kind' => 'good']);
+
+        $this->actingComponent()->call('setFilter', 'all')
+            ->assertSee('8471')          // the human's corrected code is shown
+            ->assertDontSee('memory');   // ...but NOT credited to the cache
+    }
+
     public function test_dropdown_confirms_a_4digit_heading_correction(): void
     {
         // heading 8528 is a real heading (seeded in setUp).

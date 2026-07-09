@@ -12,12 +12,16 @@
       'conflict' => 'bg-stamp/12 text-stamp',
       default => 'bg-line/40 text-muted', // no_match, rejected, pending
   };
-  // The method that produced the final answer: memory (cache) / web research / local ai.
+  // Who produced the answer that stuck: memory (cache) / web research (search) / local ai
+  // (2-of-3 consensus). Credit a source only when ITS own code is still the final one —
+  // otherwise a human correction (which leaves the old cache/search row in place) would be
+  // miscredited to the cache. Anything else with a final code is the consensus fallback.
   $sourceOf = function ($item) {
-      if ($item->results->firstWhere('mechanism', 'cache') !== null) return 'memory';
-      if ($item->final_code && optional($item->results->firstWhere('mechanism', 'search'))->matched_code === (string) $item->final_code) return 'web research';
-      if ($item->final_code !== null && $item->final_code !== '') return 'local ai';
-      return null; // not resolved yet
+      $final = (string) ($item->final_code ?? '');
+      if ($final === '') return null; // not resolved yet
+      if (optional($item->results->firstWhere('mechanism', 'cache'))->matched_code === $final) return 'memory';
+      if (optional($item->results->firstWhere('mechanism', 'search'))->matched_code === $final) return 'web research';
+      return 'local ai';
   };
   $codeName = fn ($item) => $item->finalCode?->localizedName() ?: ($headingNames[(string) $item->final_code] ?? '');
 @endphp
