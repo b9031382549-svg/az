@@ -63,12 +63,21 @@ class SqlGuard
 
     private function assertTablesAllowed(string $scan): void
     {
+        // Names introduced by WITH ... AS (...) are CTEs — query-local, not real
+        // tables. The prompt encourages CTEs, so exempt them; base tables read
+        // inside a CTE still go through FROM/JOIN and are checked below.
+        preg_match_all('/\b([a-zA-Z_][a-zA-Z0-9_$]*)\s+as\s*\(/i', $scan, $cte);
+        $cteNames = array_map('strtolower', $cte[1] ?? []);
+
         preg_match_all('/\b(?:from|join)\s+("?[a-zA-Z_][a-zA-Z0-9_$.]*"?)/i', $scan, $m);
         foreach ($m[1] ?? [] as $ref) {
             $name = strtolower(trim($ref, '"'));
             if (str_contains($name, '.')) {
                 $parts = explode('.', $name);
                 $name = end($parts);
+            }
+            if (in_array($name, $cteNames, true)) {
+                continue; // a reference to a CTE, not a base table
             }
             if (! in_array($name, $this->allowedTables, true)) {
                 throw new SqlGuardException(__('Table not allowed: :name.', ['name' => $name]));
