@@ -168,6 +168,30 @@ class BrokerDescentMechanismTest extends TestCase
         $this->assertNull($result->trace['gate']['review_forced'] ?? null);
     }
 
+    public function test_heading_mode_stops_at_the_4digit_heading(): void
+    {
+        $this->seedTree();
+        config()->set('classify.expand_query', false);
+        config()->set('classify.broker.use_brief', false);
+        config()->set('classify.broker.answer_granularity', 'heading');
+
+        // Same descent as the clean-descent test, but NO leaf-pick response is given:
+        // heading mode must stop at the heading before ever calling leafPick().
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->andReturn(
+            $this->decideResponse('84', 0.9),
+            $this->decideResponse('847130', 0.85),
+        );
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $result = app(BrokerDescentMechanism::class)->classify('noutbuk');
+
+        $this->assertSame('8471', $result->matchedCode); // 4-digit heading, not a full code
+        $this->assertNull($result->catalogId);
+        $this->assertSame('good', $result->kind);
+        $this->assertContains('heading-stop', array_column($result->path, 'by'));
+    }
+
     public function test_undecided_root_fork_abstains(): void
     {
         $this->seedTree();

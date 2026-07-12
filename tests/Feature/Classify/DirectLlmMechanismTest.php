@@ -110,4 +110,40 @@ class DirectLlmMechanismTest extends TestCase
         $this->assertNull($r->matchedCode);
         $this->assertSame('no_match', $r->status);
     }
+
+    public function test_heading_mode_returns_a_4digit_heading(): void
+    {
+        config()->set('classify.direct.granularity', 'heading');
+        $this->seedCode(); // 9018390000 → active position 9018
+        $this->mockComplete('reasoning...\n{"heading":"9018","kind":"good","confidence":0.9,"reason":"medical needle"}');
+
+        $r = app(DirectLlmMechanism::class)->classify('kəpənək iynə');
+
+        $this->assertSame('9018', $r->matchedCode); // heading, NOT a full 10-digit code
+        $this->assertSame('good', $r->kind);
+        $this->assertSame('auto_confirmed', $r->status);
+    }
+
+    public function test_heading_mode_flags_a_service(): void
+    {
+        config()->set('classify.direct.granularity', 'heading');
+        $this->mockComplete('{"heading":null,"kind":"service","confidence":0.9,"reason":"repair work"}');
+
+        $r = app(DirectLlmMechanism::class)->classify('kondisioner təmiri');
+
+        $this->assertSame('99', $r->matchedCode);
+        $this->assertSame('service', $r->kind);
+    }
+
+    public function test_heading_mode_abstains_on_a_nonexistent_heading(): void
+    {
+        config()->set('classify.direct.granularity', 'heading');
+        // 9999 is not a real active catalog position → not trusted.
+        $this->mockComplete('{"heading":"9999","kind":"good","confidence":0.95,"reason":"x"}');
+
+        $r = app(DirectLlmMechanism::class)->classify('x');
+
+        $this->assertNull($r->matchedCode);
+        $this->assertSame('no_match', $r->status);
+    }
 }

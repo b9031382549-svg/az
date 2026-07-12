@@ -46,3 +46,6 @@ Thumbs.db
 # Production DB dumps (huge + sensitive — never commit)
 /prod-db-*.dump
 /*.dump
+
+# Downloaded reference/training data (multi-GB — real customs HS datasets, never commit)
+/research-data/

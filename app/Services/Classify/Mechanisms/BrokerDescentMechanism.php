@@ -166,6 +166,15 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             return $this->fallback($text, null, $path, $usage, $confidences, $model, 'No rubric reached.', $trace);
         }
 
+        // 4-digit mode: the descent already fixed the heading — stop here instead of
+        // chasing a full leaf code. The leaf only refines digits 5-10 (discarded by the
+        // 4-digit consensus) and can abstain when the leaf/fallback fails; stopping keeps
+        // those as correct heading votes.
+        if ((string) config('classify.broker.answer_granularity', 'code') === 'heading'
+            && mb_strlen((string) $node->code) >= 4) {
+            return $this->headingResult(mb_substr((string) $node->code, 0, 4), $path, $usage, $confidences, $model, $trace);
+        }
+
         $leaves = $this->leavesUnder($node);
         if ($leaves->isEmpty() || $leaves->count() > (int) config('classify.broker.leaf_direct_max', 20)) {
             // Too many (or zero) direct leaves — narrow via retrieval on the prefix.
@@ -282,6 +291,39 @@ final class BrokerDescentMechanism implements ClassifierMechanism
 
         return ($this->brief['decisive_axis'] ?? null) === 'material'
             && ($this->brief['material']['basis'] ?? 'unknown') !== 'stated';
+    }
+
+    /**
+     * 4-digit heading answer (broker.answer_granularity=heading): stop at the deepest
+     * confident rubric heading instead of descending to a full leaf code. Kind comes
+     * from the catalog for that heading (99 => service); the semantic-backing
+     * auto-confirm gate needs a specific code, so a heading vote stays needs_review.
+     *
+     * @param  array<int, array<string, mixed>>  $path
+     * @param  array<string, int>  $usage
+     * @param  array<int, float>  $confidences
+     * @param  array<string, mixed>  $trace
+     */
+    private function headingResult(string $heading, array $path, array $usage, array $confidences, string $model, array $trace): MechanismResult
+    {
+        $kind = CatalogCode::where('position', $heading)->where('is_active', true)->value('kind');
+        $confidence = $confidences !== [] ? round(min($confidences), 3) : null;
+        $path[] = ['code' => $heading, 'by' => 'heading-stop'];
+        $trace['steps'][] = ['type' => 'heading', 'chosen' => $heading, 'note' => 'stopped at 4-digit heading'];
+        $trace['gate'] = ['confidence' => $confidence, 'granularity' => 'heading', 'status' => 'needs_review'];
+
+        return new MechanismResult(
+            matchedCode: $heading,
+            catalogId: null,
+            kind: $kind,
+            confidence: $confidence,
+            status: 'needs_review',
+            path: $path,
+            explanation: 'Broker stopped at 4-digit heading '.$heading.'.',
+            model: $model,
+            usage: $usage,
+            trace: $trace,
+        );
     }
 
     /**

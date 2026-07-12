@@ -73,6 +73,12 @@ return [
         // Bump when the brief prompt changes materially — old cached briefs (keyed by
         // this version) are then ignored and re-generated instead of served stale.
         'brief_prompt_version' => (string) env('CLASSIFY_BROKER_BRIEF_VERSION', 'b5'),
+        // Answer granularity. 'code' descends all the way to a full leaf code.
+        // 'heading' stops at the deepest confident 4-digit heading — the top-down
+        // descent already fixes the first 4 digits, so chasing a leaf only refines
+        // digits 5-10 (which the 4-digit consensus discards) and can abstain when the
+        // leaf/fallback fails. Stopping at the heading keeps those as correct votes.
+        'answer_granularity' => (string) env('CLASSIFY_BROKER_ANSWER_GRANULARITY', 'code'),
     ],
 
     // Vector (retrieval) mechanism. use_brief_query: seed retrieval with the shared
@@ -96,6 +102,12 @@ return [
         'model' => (string) env('CLASSIFY_DIRECT_MODEL', 'openai/gpt-oss-120b'),
         // Reasoning can be slow — this call gets a long HTTP timeout of its own.
         'timeout' => (int) env('CLASSIFY_DIRECT_TIMEOUT', 180),
+        // Vote granularity. 'code' = recall a full 10-digit code and snap it to the
+        // catalog (abstains when the recalled subheading has no row — a model cannot
+        // memorise the ~11.6k national codes, so this abstains ~half the time).
+        // 'heading' = recall only the 4-digit HS heading + good/service — far more
+        // reliably recalled, all the 2-of-3 consensus needs, and lets it flag services.
+        'granularity' => (string) env('CLASSIFY_DIRECT_GRANULARITY', 'code'),
     ],
 
     // How many fused candidates to hand the LLM re-ranker.
