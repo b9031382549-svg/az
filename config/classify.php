@@ -10,6 +10,19 @@ return [
         'enabled' => (bool) env('CLASSIFY_CACHE_ENABLED', true),
     ],
 
+    // Precedent-backed retrieval — a THIRD candidate source in CatalogRetriever,
+    // alongside catalog-semantic and lexical. The nearest real-customs precedents
+    // (product description → HS, translated to short Azerbaijani) vote by HS6
+    // heading; the winning headings map to catalog candidate codes and fuse (RRF)
+    // with the other sources. Grounded in how real products were actually
+    // classified, complementing the catalog's legal definitions. OFF until the
+    // `precedents` table is embedded and the accuracy gain is measured.
+    'precedents' => [
+        'enabled' => (bool) env('CLASSIFY_PRECEDENTS_ENABLED', false),
+        'top_k' => (int) env('CLASSIFY_PRECEDENTS_TOP_K', 40),       // nearest precedents fetched per query
+        'per_heading' => (int) env('CLASSIFY_PRECEDENTS_PER_HEADING', 4), // catalog codes expanded per winning HS6
+    ],
+
     // Independent search mechanisms run in parallel per item; their results are
     // stored side by side (classification_results) and reconciled into a
     // consensus. 'enabled' is the active set, in priority order. New mechanisms

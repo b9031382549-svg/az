@@ -8,7 +8,18 @@ use Illuminate\Support\Facades\DB;
 
 class CatalogRetriever
 {
-    public function __construct(private readonly OllamaEmbedder $embedder) {}
+    private readonly bool $precedentsEnabled;
+
+    private readonly int $precedentTopK;
+
+    private readonly int $precedentPerHeading;
+
+    public function __construct(private readonly OllamaEmbedder $embedder)
+    {
+        $this->precedentsEnabled = (bool) config('classify.precedents.enabled', false);
+        $this->precedentTopK = max(1, (int) config('classify.precedents.top_k', 40));
+        $this->precedentPerHeading = max(1, (int) config('classify.precedents.per_heading', 4));
+    }
 
     /**
      * Hybrid candidate retrieval: semantic (pgvector cosine) + lexical (token
@@ -48,6 +59,9 @@ class CatalogRetriever
             }
             $lists[] = $this->semantic($vector, $per, $kindSql, $kindBind);
             $lists[] = $this->lexical($q, $per, $kindSql, $kindBind);
+            if ($this->precedentsEnabled) {
+                $lists[] = $this->precedentSemantic($vector, $per, $kindSql, $kindBind);
+            }
         }
 
         $fused = $this->fuse($lists, $limit);
@@ -125,6 +139,66 @@ class CatalogRetriever
              LIMIT {$per}",
             array_merge([$vector], $kindBind, [$vector]),
         );
+    }
+
+    /**
+     * Precedent-backed candidate generation — a third retrieval source. Finds the
+     * nearest real-customs precedents to the query, aggregates their evidence by
+     * HS6 heading (rank-decayed, so repeated and higher-ranked precedents push a
+     * heading up), then maps the winning headings to catalog candidate codes. The
+     * fan-out per heading is capped so one heading can't crowd out the rest, and
+     * the whole list is bounded to $per for balanced RRF weight. Grounded in how
+     * real products were actually classified, not in the catalog's legal wording.
+     *
+     * @return array<int, object>
+     */
+    private function precedentSemantic(string $vector, int $per, string $kindSql, array $kindBind): array
+    {
+        // Nearest precedents by cosine (HNSW). Over-fetch so several precedents can
+        // vote per heading.
+        $hits = DB::select(
+            "SELECT hs6
+             FROM precedents
+             WHERE embedding IS NOT NULL
+             ORDER BY embedding <=> ?::vector
+             LIMIT {$this->precedentTopK}",
+            [$vector],
+        );
+        if (empty($hits)) {
+            return [];
+        }
+
+        // Rank-decayed vote per heading: a heading backed by several near
+        // precedents (or one very near) outranks a heading seen once, far down.
+        $k = 60;
+        $headingScore = [];
+        foreach (array_values($hits) as $rank => $hit) {
+            $headingScore[$hit->hs6] = ($headingScore[$hit->hs6] ?? 0) + 1 / ($k + $rank + 1);
+        }
+        arsort($headingScore);
+
+        // Expand each heading (best first) into a few catalog codes, keeping the
+        // list heading-ranked and bounded. A heading with no catalog rows (or none
+        // of the requested kind) simply contributes nothing.
+        $out = [];
+        foreach (array_keys($headingScore) as $hs6) {
+            $rows = DB::select(
+                "SELECT id, code, name, kind
+                 FROM catalog
+                 WHERE subposition = ? {$kindSql}
+                 ORDER BY code
+                 LIMIT {$this->precedentPerHeading}",
+                array_merge([$hs6], $kindBind),
+            );
+            foreach ($rows as $row) {
+                $out[] = $row;
+                if (count($out) >= $per) {
+                    return $out;
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**
