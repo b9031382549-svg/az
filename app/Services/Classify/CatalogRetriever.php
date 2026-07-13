@@ -14,11 +14,17 @@ class CatalogRetriever
 
     private readonly int $precedentPerHeading;
 
+    private readonly bool $headingFusion;
+
+    private readonly int $headingCodes;
+
     public function __construct(private readonly OllamaEmbedder $embedder)
     {
         $this->precedentsEnabled = (bool) config('classify.precedents.enabled', false);
         $this->precedentTopK = max(1, (int) config('classify.precedents.top_k', 40));
         $this->precedentPerHeading = max(1, (int) config('classify.precedents.per_heading', 4));
+        $this->headingFusion = (bool) config('classify.retrieval.heading_fusion', false);
+        $this->headingCodes = max(1, (int) config('classify.retrieval.heading_codes', 2));
     }
 
     /**
@@ -51,23 +57,168 @@ class CatalogRetriever
         // The first query is primary (canonical) — its vector backs the
         // auto-confirm semantic-similarity gate.
         $lists = [];
+        $headingLists = [];
         $primaryVector = null;
         foreach ($queries as $i => $q) {
             $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($q)));
             if ($i === 0) {
                 $primaryVector = $vector;
             }
-            $lists[] = $this->semantic($vector, $per, $kindSql, $kindBind);
-            $lists[] = $this->lexical($q, $per, $kindSql, $kindBind);
-            if ($this->precedentsEnabled) {
+            $sem = $this->semantic($vector, $per, $kindSql, $kindBind);
+            $lex = $this->lexical($q, $per, $kindSql, $kindBind);
+            $lists[] = $sem;
+            $lists[] = $lex;
+
+            if ($this->headingFusion) {
+                // Sources vote at the 4-digit heading level; precedents vote their
+                // heading directly (no code expansion).
+                $headingLists[] = $this->headingsOf($sem);
+                $headingLists[] = $this->headingsOf($lex);
+                if ($this->precedentsEnabled) {
+                    $headingLists[] = $this->precedentHeadings($vector);
+                }
+            } elseif ($this->precedentsEnabled) {
                 $lists[] = $this->precedentSemantic($vector, $per, $kindSql, $kindBind);
             }
         }
 
-        $fused = $this->fuse($lists, $limit);
+        $fused = $this->headingFusion
+            ? $this->fuseByHeading($lists, $headingLists, (string) $primaryVector, $limit, $kindSql, $kindBind)
+            : $this->fuse($lists, $limit);
         $this->attachSemanticSim($fused, $primaryVector);
 
         return $fused;
+    }
+
+    /**
+     * Distinct 4-digit headings of a ranked code list, in first-occurrence order —
+     * the source's ranked "vote" over headings.
+     *
+     * @param  array<int, object>  $rows
+     * @return array<int, string>
+     */
+    private function headingsOf(array $rows): array
+    {
+        $out = [];
+        $seen = [];
+        foreach ($rows as $r) {
+            $h = substr((string) $r->code, 0, 4);
+            if ($h === '' || isset($seen[$h])) {
+                continue;
+            }
+            $seen[$h] = true;
+            $out[] = $h;
+        }
+
+        return $out;
+    }
+
+    /**
+     * The nearest precedents' 4-digit headings, rank-decayed and aggregated — a
+     * heading-level vote (no HS6→code expansion). @return array<int, string>
+     */
+    private function precedentHeadings(string $vector): array
+    {
+        $hits = DB::select(
+            "SELECT hs6 FROM precedents WHERE embedding IS NOT NULL
+             ORDER BY embedding <=> ?::vector LIMIT {$this->precedentTopK}",
+            [$vector],
+        );
+        if (empty($hits)) {
+            return [];
+        }
+        $k = 60;
+        $score = [];
+        foreach (array_values($hits) as $rank => $h) {
+            $head = substr((string) $h->hs6, 0, 4);
+            $score[$head] = ($score[$head] ?? 0) + 1 / ($k + $rank + 1);
+        }
+        arsort($score);
+
+        return array_keys($score);
+    }
+
+    /** Reciprocal Rank Fusion over ranked key lists → keys, best first. */
+    private function rrfKeys(array $lists, int $k = 60): array
+    {
+        $score = [];
+        foreach ($lists as $keys) {
+            $seen = [];
+            $rank = 0;
+            foreach ($keys as $key) {
+                if ($key === '' || isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $score[$key] = ($score[$key] ?? 0) + 1 / ($k + $rank + 1);
+                $rank++;
+            }
+        }
+        arsort($score);
+
+        return array_keys($score);
+    }
+
+    /**
+     * Heading-first shortlist assembly. Rank the 4-digit headings by RRF over the
+     * heading votes; then emit catalog codes heading by heading — a heading's own
+     * semantic/lexical candidates (best code-score first), or, for a heading only a
+     * precedent voted for, its catalog codes nearest the query.
+     *
+     * @param  array<int, array<int, object>>  $codeLists  semantic+lexical rows (for within-heading code order)
+     * @param  array<int, array<int, string>>  $headingLists  ranked heading votes per source
+     * @return array<int, object>
+     */
+    private function fuseByHeading(array $codeLists, array $headingLists, string $vector, int $limit, string $kindSql, array $kindBind): array
+    {
+        $rankedHeadings = $this->rrfKeys($headingLists);
+        if (empty($rankedHeadings)) {
+            return $this->fuse($codeLists, $limit);
+        }
+
+        // code-level RRF scores of the semantic/lexical pool, for ordering codes within a heading
+        $k = 60;
+        $cScore = [];
+        $rows = [];
+        foreach ($codeLists as $list) {
+            foreach (array_values($list) as $rank => $row) {
+                $cScore[$row->id] = ($cScore[$row->id] ?? 0) + 1 / ($k + $rank + 1);
+                $rows[$row->id] = $row;
+            }
+        }
+        $byHeading = [];
+        foreach ($rows as $id => $row) {
+            $byHeading[substr((string) $row->code, 0, 4)][] = $id;
+        }
+
+        $out = [];
+        $pos = 0;
+        foreach ($rankedHeadings as $h) {
+            if (isset($byHeading[$h])) {
+                $ids = $byHeading[$h];
+                usort($ids, fn ($a, $b) => $cScore[$b] <=> $cScore[$a]);
+                $ids = array_slice($ids, 0, $this->headingCodes); // cap so the shortlist covers many headings
+                $emit = array_map(fn ($id) => $rows[$id], $ids);
+            } else {
+                // heading only a precedent voted for — pull its nearest catalog codes
+                $emit = DB::select(
+                    "SELECT id, code, name, kind FROM catalog
+                     WHERE position = ? AND embedding IS NOT NULL {$kindSql}
+                     ORDER BY embedding <=> ?::vector LIMIT {$this->precedentPerHeading}",
+                    array_merge([$h], $kindBind, [$vector]),
+                );
+            }
+            foreach ($emit as $row) {
+                $row->score = round(1 / (1 + $pos), 5);
+                $out[] = $row;
+                $pos++;
+                if (count($out) >= $limit) {
+                    return $out;
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**

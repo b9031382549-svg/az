@@ -23,6 +23,20 @@ return [
         'per_heading' => (int) env('CLASSIFY_PRECEDENTS_PER_HEADING', 4), // catalog codes expanded per winning HS6
     ],
 
+    // Retrieval fusion. heading_fusion: fuse candidate evidence at the 4-DIGIT HS
+    // HEADING level instead of the full code. Every source (semantic, lexical,
+    // precedents) votes for a heading; RRF ranks headings; the shortlist is then
+    // built heading-first (each heading's best codes, precedent-only headings pull a
+    // nearest representative). Aggregates scattered per-code signal to the heading we
+    // actually classify — measured +12pp recall@24 on the Fedor gold. OFF by default.
+    'retrieval' => [
+        'heading_fusion' => (bool) env('CLASSIFY_HEADING_FUSION', false),
+        // Codes emitted per heading in the heading-first shortlist. 1 is best on the
+        // Fedor gold (+10.7pp recall@24 vs +6pp at 2): a smaller cap fits MORE
+        // headings into the shortlist, which is what the 4-digit classifier needs.
+        'heading_codes' => (int) env('CLASSIFY_HEADING_CODES', 1),
+    ],
+
     // Independent search mechanisms run in parallel per item; their results are
     // stored side by side (classification_results) and reconciled into a
     // consensus. 'enabled' is the active set, in priority order. New mechanisms
