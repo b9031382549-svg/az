@@ -14,6 +14,16 @@ class DirectLlmMechanismTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Pin the code-mode path + model so these tests are deterministic regardless of
+        // the ambient .env (which sets granularity=heading and a Nebius model in this
+        // deployment). The heading-mode tests below override the granularity explicitly.
+        config()->set('classify.direct.granularity', 'code');
+        config()->set('classify.direct.model', 'openai/gpt-oss-120b');
+    }
+
     private function mockComplete(string $content, bool $throw = false): void
     {
         $llm = Mockery::mock(OpenRouterClient::class);

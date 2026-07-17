@@ -26,6 +26,36 @@ class OpenRouterClient
     }
 
     /**
+     * Resolve the target provider + real model from a per-call model string.
+     * A "nebius:" prefix routes the call to Nebius Token Factory (OpenAI-
+     * compatible); anything else uses the default OpenRouter connection. This
+     * keeps both providers available and switchable PER STAGE via config alone,
+     * e.g. classify.expand_model = "nebius:deepseek-ai/DeepSeek-V4-Pro".
+     *
+     * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string}
+     */
+    private function resolveProvider(string $model): array
+    {
+        if (str_starts_with($model, 'nebius:')) {
+            return [
+                'name' => 'Nebius',
+                'base_url' => rtrim((string) config('services.nebius.base_url'), '/'),
+                'api_key' => config('services.nebius.api_key'),
+                'model' => substr($model, strlen('nebius:')),
+                'key_env' => 'NEBIUS_API_KEY',
+            ];
+        }
+
+        return [
+            'name' => 'OpenRouter',
+            'base_url' => $this->baseUrl,
+            'api_key' => $this->apiKey,
+            'model' => $model,
+            'key_env' => 'OPENROUTER_API_KEY',
+        ];
+    }
+
+    /**
      * Send a chat completion and return content together with token usage.
      *
      * @param  array<int, array{role: string, content: string}>  $messages
@@ -34,8 +64,15 @@ class OpenRouterClient
      */
     public function complete(array $messages, array $options = []): array
     {
-        if (empty($this->apiKey)) {
-            throw new RuntimeException('OPENROUTER_API_KEY is not configured.');
+        // Pick the provider (OpenRouter by default, Nebius when the model is
+        // prefixed "nebius:") from the per-call model, so a single stage can be
+        // routed to either provider by config alone.
+        $model = (string) ($options['model'] ?? $this->defaultModel);
+        unset($options['model']);
+        $provider = $this->resolveProvider($model);
+
+        if (empty($provider['api_key'])) {
+            throw new RuntimeException($provider['key_env'].' is not configured.');
         }
 
         // A per-call HTTP timeout (e.g. for a slow reasoning model) — not an API
@@ -44,12 +81,11 @@ class OpenRouterClient
         unset($options['timeout']);
 
         $payload = array_merge([
-            'model' => $this->defaultModel,
             'temperature' => 0,
             'messages' => $messages,
-        ], $options);
+        ], $options, ['model' => $provider['model']]);
 
-        $response = Http::withToken($this->apiKey)
+        $response = Http::withToken($provider['api_key'])
             ->withHeaders([
                 // Optional attribution headers recommended by OpenRouter.
                 'HTTP-Referer' => config('app.url'),
@@ -57,11 +93,11 @@ class OpenRouterClient
             ])
             ->timeout($timeout)
             ->acceptJson()
-            ->post($this->baseUrl.'/chat/completions', $payload);
+            ->post($provider['base_url'].'/chat/completions', $payload);
 
         if ($response->failed()) {
             throw new RuntimeException(
-                'OpenRouter request failed ('.$response->status().'): '.$response->body()
+                $provider['name'].' request failed ('.$response->status().'): '.$response->body()
             );
         }
 

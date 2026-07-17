@@ -55,6 +55,16 @@ return [
         'log_payloads' => (bool) env('OPENROUTER_LOG_PAYLOADS', true),
     ],
 
+    // Nebius Token Factory — OpenAI-compatible LLM inference, used as an
+    // alternative provider PER CALL: prefix any model with "nebius:" (e.g.
+    // classify.expand_model=nebius:deepseek-ai/DeepSeek-V4-Pro) to route that
+    // stage here instead of OpenRouter; no prefix keeps OpenRouter. Both
+    // providers stay available side by side — see OpenRouterClient::resolveProvider.
+    'nebius' => [
+        'base_url' => env('NEBIUS_BASE_URL', 'https://api.tokenfactory.nebius.com/v1'),
+        'api_key' => env('NEBIUS_API_KEY'),
+    ],
+
     // Local embedding model served by Ollama (catalog similarity search).
     'ollama' => [
         'url' => env('OLLAMA_URL', 'http://ollama:11434'),

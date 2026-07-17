@@ -39,6 +39,7 @@ class ClassifyAccuracyTest extends Command
         {--out=results.jsonl : Results filename under storage/app/accuracy (use a distinct name per dataset)}
         {--tag=acc-test : Batch tag for scratch ClassificationItems}
         {--fresh : Discard prior progress + scratch items and start over}
+        {--decider= : Override the 4 decision stages (tier1+tier2 rerank, broker, direct) with ONE model, e.g. nebius:openai/gpt-oss-120b. expand + search stay at prod so retrieval/candidates are identical across runs.}
         {--score-only : Skip running; just re-score the existing results file}';
 
     protected $description = 'Accuracy of each classifier tool (vector/broker/direct/search) vs a gold reference (Fedor headings, or an inline-gold CSV).';
@@ -370,10 +371,28 @@ class ClassifyAccuracyTest extends Command
             'classify.broker.answer_granularity' => 'heading',
             'classify.direct.granularity' => 'heading',
         ]);
+
+        // Optional A/B: route the DECISION stages (both rerank tiers, broker, direct)
+        // to one model, leaving expand + search on prod so retrieval — and thus the
+        // 24 candidates every tool sees — is byte-for-byte identical across runs.
+        if ($decider = (string) $this->option('decider')) {
+            config([
+                'services.openrouter.classify_model' => $decider,
+                'services.openrouter.classify_model_tier1' => $decider, // tier-1+tier-2 collapsed onto one model
+                'classify.broker.model' => $decider,
+                'classify.broker.brief_model' => $decider,
+                'classify.broker.fact_model' => $decider,
+                'classify.direct.model' => $decider,
+            ]);
+        }
     }
 
     private function modelSummary(): string
     {
+        if ($decider = (string) $this->option('decider')) {
+            return "decider={$decider} on rerank(tier1+2)+broker+direct · expand+search stay prod (deepseek) · vote 4-digit heading";
+        }
+
         return 'vector/broker/expand=deepseek-chat (tier1 qwen-2.5-7b), direct=gpt-oss-120b, search=deepseek-v4-flash:online · broker+direct vote 4-digit heading';
     }
 
