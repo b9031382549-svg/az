@@ -14,6 +14,14 @@ class BrokerDescentMechanismTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Pin the full-code descent path so these tests don't inherit an ambient
+        // .env answer_granularity=heading. The heading-mode test overrides it.
+        config()->set('classify.broker.answer_granularity', 'code');
+    }
+
     private function seedTree(): void
     {
         // chapter 84 -> 8471 -> {847130 (2 leaves), 847141 (1 leaf)}; chapter 85 -> 8528 -> 852872.
