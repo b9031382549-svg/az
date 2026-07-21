@@ -210,6 +210,24 @@ return [
             'timeout' => 600,
             'nice' => 0,
         ],
+
+        // Dataset test runs get their OWN worker pool on the 'testing' queue. It never
+        // runs the prod default queue, so a test job's in-process config([...]) override
+        // (test models / granularity / flags) can never bleed into a real classification
+        // on a shared worker. tries=1: the row bundles paid LLM calls that must not retry.
+        'supervisor-testing' => [
+            'connection' => 'redis',
+            'queue' => ['testing'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 900, // a conflict row runs broker + direct + :online search
+            'nice' => 5,      // yield CPU to the production supervisor
+        ],
     ],
 
     'environments' => [
@@ -220,11 +238,19 @@ return [
                 'balanceMaxShift' => 2,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-testing' => [
+                'minProcesses' => 0, // idle until a dataset run is dispatched
+                'maxProcesses' => 2,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-testing' => [
+                'minProcesses' => 0,
+                'maxProcesses' => 2,
             ],
         ],
     ],

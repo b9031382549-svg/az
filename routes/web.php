@@ -13,6 +13,10 @@ use App\Livewire\Classify;
 use App\Livewire\Invoices;
 use App\Livewire\Logs;
 use App\Livewire\ReviewQueue;
+use App\Livewire\Testing;
+use App\Livewire\TestingCompare;
+use App\Livewire\TestingDataset;
+use App\Livewire\TestingRun;
 use App\Livewire\UploadInvoices;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +43,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/review/decision/{item}', ClassificationDecision::class)->name('review.decision');
     Route::get('/benchmark', Benchmark::class)->name('benchmark');
     Route::get('/catalog', Catalog::class)->name('catalog');
+
+    // Testing — dataset-based accuracy measurement + before/after comparison
+    Route::get('/testing', Testing::class)->name('testing');
+    Route::get('/testing/dataset/{dataset}', TestingDataset::class)->name('testing.dataset');
+    Route::get('/testing/run/{run}', TestingRun::class)->name('testing.run');
+    Route::get('/testing/compare', TestingCompare::class)->name('testing.compare');
 
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');
     Route::post('/locale', [LocaleController::class, 'update'])->name('locale.set');

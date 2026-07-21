@@ -34,6 +34,23 @@ class Consensus
     private const HUMAN_DECIDED = ['confirmed', 'rejected', 'blocked_on_fact'];
 
     /**
+     * The mechanisms that drive the resolution: the enabled set minus the shadow
+     * set (never all-shadow — a run that shadows everything still resolves on the
+     * enabled set). Shared with the dataset test runner so a test run reproduces
+     * prod's authoritative selection exactly instead of re-deriving it.
+     *
+     * @param  array<int, string>  $enabled
+     * @param  array<int, string>  $shadow
+     * @return array<int, string>
+     */
+    public static function computeAuthoritative(array $enabled, array $shadow): array
+    {
+        $authoritative = array_values(array_diff($enabled, $shadow));
+
+        return $authoritative === [] ? array_values($enabled) : $authoritative;
+    }
+
+    /**
      * Recompute and persist the item's resolution once every enabled mechanism
      * has reported. Safe to call after each mechanism finishes (idempotent) and
      * never overwrites a human/terminal decision.
@@ -53,16 +70,13 @@ class Consensus
             return;
         }
 
-        $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
-        $shadow = (array) config('classify.mechanisms.shadow', []);
-
         // Shadow mechanisms run and are stored, but only the authoritative ones
         // drive the resolution — so a new mechanism can be measured before it
         // starts routing items to humans.
-        $authoritative = array_values(array_diff($enabled, $shadow));
-        if ($authoritative === []) {
-            $authoritative = $enabled; // never shadow everything
-        }
+        $authoritative = self::computeAuthoritative(
+            (array) config('classify.mechanisms.enabled', ['vector']),
+            (array) config('classify.mechanisms.shadow', []),
+        );
 
         $results = $item->results()->get();
         $authResults = $results->whereIn('mechanism', $authoritative)->values();
