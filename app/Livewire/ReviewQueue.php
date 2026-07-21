@@ -151,7 +151,10 @@ class ReviewQueue extends Component
         // heading toggle any more, and no async judge. "Found" = auto-resolved (cache /
         // 2-of-3 consensus / web-search); "Needs attention" = a genuine conflict/review
         // a human must decide.
+        // whereNull('test_run_id'): dataset test rows live only in the Testing tab and
+        // must never surface in the human review queue, counts, donut or report.
         $scoped = fn () => ClassificationItem::query()
+            ->whereNull('test_run_id')
             ->when($this->batch !== 'all', fn ($q) => $q->where('batch', $this->batch));
 
         $q = $scoped()->with(['finalCode', 'translation', 'results']);
@@ -218,6 +221,7 @@ class ReviewQueue extends Component
     {
         $rows = ClassificationItem::query()
             ->whereNotNull('batch')
+            ->whereNull('test_run_id') // test-run batches ("testrun:{id}") never appear as uploads
             ->selectRaw('batch, count(*) as total, max(created_at) as last_at')
             ->groupBy('batch')
             ->orderByRaw('max(created_at) desc')

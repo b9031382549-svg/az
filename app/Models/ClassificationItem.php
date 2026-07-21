@@ -44,6 +44,22 @@ class ClassificationItem extends Model
     }
 
     /**
+     * The dataset test run that produced this item, if any. Prod items have a null
+     * test_run_id; prod views exclude test rows with an explicit whereNull filter
+     * (there is deliberately NO global scope — a static scope would silently break
+     * the search-resolver's whereKey()->update() flip and route-model binding).
+     */
+    public function testRun(): BelongsTo
+    {
+        return $this->belongsTo(TestRun::class, 'test_run_id');
+    }
+
+    public function testDatasetRow(): BelongsTo
+    {
+        return $this->belongsTo(TestDatasetRow::class, 'test_dataset_row_id');
+    }
+
+    /**
      * Codes a reviewer may confirm for this item: every candidate any mechanism
      * considered, plus each mechanism's own pick (a mechanism's pick may not be
      * in another's candidate list). Requires `results` to be loaded.

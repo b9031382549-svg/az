@@ -37,6 +37,8 @@
       <a href="{{ route('review') }}" class="{{ $nav('review') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.5 2"/></svg>{{ __('Review queue') }}</a>
       {{-- Benchmark hidden from the menu (route still exists, just not linked). --}}
+      <a href="{{ route('testing') }}" class="{{ $nav('testing*') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v5L4 15a1.5 1.5 0 001.3 2.3h9.4A1.5 1.5 0 0016 15l-4-7.5v-5"/><path d="M6.5 2.5h7M7 12h6"/></svg>{{ __('Testing') }}</a>
       <a href="{{ route('catalog') }}" class="{{ $nav('catalog') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17"/></svg>{{ __('Catalog') }}</a>
 
