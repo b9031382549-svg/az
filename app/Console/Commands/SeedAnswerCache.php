@@ -22,13 +22,15 @@ class SeedAnswerCache extends Command
     public function handle(): int
     {
         if ($this->option('fresh')) {
-            AnswerCache::truncate();
-            $this->warn('Truncated answer_cache.');
+            // Only the PRODUCTION scope (0) — never wipe datasets' bound memory.
+            AnswerCache::where('test_dataset_id', 0)->delete();
+            $this->warn('Cleared the production answer_cache (test_dataset_id = 0).');
         }
 
         $source = (string) $this->option('source');
         $rows = GoldLabel::where('source', $source)->get()
             ->map(fn ($g) => [
+                'test_dataset_id' => 0, // production scope
                 'source' => $g->source,
                 'name' => $g->name,
                 'name_key' => $g->name_key,
@@ -50,10 +52,12 @@ class SeedAnswerCache extends Command
         }
 
         foreach (array_chunk($rows, 500) as $chunk) {
-            AnswerCache::upsert($chunk, ['name_key'], ['source', 'name', 'heading', 'is_service', 'tier', 'updated_at']);
+            AnswerCache::upsert($chunk, ['test_dataset_id', 'name_key'], ['source', 'name', 'heading', 'is_service', 'tier', 'updated_at']);
         }
 
-        $this->info('Seeded answer_cache: '.count($rows)." entries from '{$source}' (".AnswerCache::whereNotNull('heading')->count().' goods, '.AnswerCache::where('is_service', true)->count().' services).');
+        $goods = AnswerCache::where('test_dataset_id', 0)->whereNotNull('heading')->count();
+        $services = AnswerCache::where('test_dataset_id', 0)->where('is_service', true)->count();
+        $this->info('Seeded answer_cache: '.count($rows)." entries from '{$source}' ({$goods} goods, {$services} services).");
 
         return self::SUCCESS;
     }

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
 use App\Services\Classify\Consensus;
+use App\Services\Classify\HeadingMatch;
 use App\Services\Classify\Mechanisms\BrokerDescentMechanism;
 use App\Services\Classify\Mechanisms\DirectLlmMechanism;
 use App\Services\Classify\Mechanisms\VectorMechanism;
@@ -248,19 +249,13 @@ class ClassifyAccuracyTest extends Command
 
     private function head(?string $code): ?string
     {
-        if ($code === null || $code === '') {
-            return null;
-        }
-
-        return mb_substr($code, 0, 4);
+        return HeadingMatch::heading($code);
     }
 
     /** A service if the kind says so or the code sits in chapter/heading 99. */
     private function serviceish(?string $kind, ?string $code): bool
     {
-        return $kind === 'service'
-            || $kind === '99'
-            || ($code !== null && str_starts_with($code, '99'));
+        return HeadingMatch::isService($kind, $code);
     }
 
     /** @return array{heading: ?string, hs6: ?string, full: ?string, is_service: bool}|null */

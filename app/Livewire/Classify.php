@@ -250,11 +250,13 @@ class Classify extends Component
             'manualLimit' => self::MANUAL_LIMIT,
             'fileLimit' => self::FILE_LIMIT,
             'stats' => [
-                'total' => ClassificationItem::count(),
+                // Global counts exclude dataset test rows (test_run_id set) — those live
+                // only in the Testing tab, never in the production classifier stats.
+                'total' => ClassificationItem::whereNull('test_run_id')->count(),
                 // "Found" = the classifier produced an answer: consensus/cache (agreed) +
                 // the web-search resolver (ai_resolved).
-                'auto' => ClassificationItem::whereIn('resolution', ['agreed', 'ai_resolved'])->count(),
-                'review' => ClassificationItem::whereIn('resolution', ['conflict', 'blocked_on_fact'])->count(),
+                'auto' => ClassificationItem::whereNull('test_run_id')->whereIn('resolution', ['agreed', 'ai_resolved'])->count(),
+                'review' => ClassificationItem::whereNull('test_run_id')->whereIn('resolution', ['conflict', 'blocked_on_fact'])->count(),
                 'tokensAll' => (int) LlmUsage::sum('total_tokens'),
             ],
         ]);

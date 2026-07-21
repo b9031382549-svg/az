@@ -18,7 +18,9 @@ class ResultsApiController extends Controller
     /** GET /api/results/{item} — one item with full per-mechanism traces. */
     public function result(int $item): JsonResponse
     {
-        $it = ClassificationItem::with(['results', 'finalCode'])->find($item);
+        $it = ClassificationItem::with(['results', 'finalCode'])
+            ->whereNull('test_run_id') // the API exposes production results, not dataset test rows
+            ->find($item);
         if ($it === null) {
             return response()->json(['error' => 'Item not found.'], 404);
         }
@@ -30,7 +32,7 @@ class ResultsApiController extends Controller
     public function upload(Request $request, string $batch): JsonResponse
     {
         $limit = min(1000, max(1, (int) $request->query('limit', 200)));
-        $base = ClassificationItem::where('batch', $batch);
+        $base = ClassificationItem::where('batch', $batch)->whereNull('test_run_id');
 
         $total = (int) (clone $base)->count();
         if ($total === 0) {

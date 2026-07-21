@@ -42,6 +42,7 @@ class BenchmarkService
         // than once.
         $itemsByKey = [];
         ClassificationItem::query()
+            ->whereNull('test_run_id') // never let a dataset test row win "best item per name"
             ->select('id', 'source_text', 'final_code', 'kind', 'resolution', 'batch')
             ->orderByDesc('id')
             ->get()

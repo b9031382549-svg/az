@@ -39,6 +39,7 @@ class ReviewExportController extends Controller
         $batchOk = $batch !== 'all' && Str::isUuid($batch); // request_id/batch are uuids
 
         $rows = ClassificationItem::query()
+            ->whereNull('test_run_id') // never export dataset test rows (esp. when batch=all)
             ->with([
                 'finalCode:id,name,name_en,name_ru',
                 'translation:source_hash,en,ru',

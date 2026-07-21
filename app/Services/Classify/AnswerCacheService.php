@@ -21,24 +21,32 @@ class AnswerCacheService
         return (bool) config('classify.cache.enabled', true);
     }
 
-    /** The cached answer for a name, or null. */
-    public function lookup(string $text): ?AnswerCache
+    /**
+     * The cached answer for a name, or null. Scope 0 (default) is the PRODUCTION
+     * cache — the only rows the live classifier ever sees; a positive $datasetId
+     * looks up that dataset's OWN memory (used by a memory-on test run so its cache
+     * stays isolated from production and from other datasets).
+     */
+    public function lookup(string $text, ?int $datasetId = null): ?AnswerCache
     {
         if (! $this->enabled() || trim($text) === '') {
             return null;
         }
 
-        return AnswerCache::where('name_key', AnswerCache::keyFor($text))->first();
+        return AnswerCache::where('test_dataset_id', $datasetId ?? 0)
+            ->where('name_key', AnswerCache::keyFor($text))
+            ->first();
     }
 
     /**
      * Resolve an item from the cache if its name is known. Writes a 'cache' trace row
      * and sets the item's resolution — a good becomes its 4-digit heading, a service
      * the "99" service level, both confident. Returns true when it was a cache hit.
+     * $datasetId scopes the lookup (null/0 = production; see lookup()).
      */
-    public function apply(ClassificationItem $item): bool
+    public function apply(ClassificationItem $item, ?int $datasetId = null): bool
     {
-        $hit = $this->lookup((string) $item->source_text);
+        $hit = $this->lookup((string) $item->source_text, $datasetId);
         if ($hit === null) {
             return false;
         }
