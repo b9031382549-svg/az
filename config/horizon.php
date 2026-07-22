@@ -239,7 +239,7 @@ return [
                 'balanceCooldown' => 3,
             ],
             'supervisor-testing' => [
-                'minProcesses' => 0, // idle until a dataset run is dispatched
+                'minProcesses' => 1, // Horizon requires >= 1; one idle worker for the testing queue
                 'maxProcesses' => 2,
             ],
         ],
@@ -249,7 +249,7 @@ return [
                 'maxProcesses' => 3,
             ],
             'supervisor-testing' => [
-                'minProcesses' => 0,
+                'minProcesses' => 1,
                 'maxProcesses' => 2,
             ],
         ],
