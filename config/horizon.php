@@ -210,24 +210,6 @@ return [
             'timeout' => 600,
             'nice' => 0,
         ],
-
-        // Dataset test runs get their OWN worker pool on the 'testing' queue. It never
-        // runs the prod default queue, so a test job's in-process config([...]) override
-        // (test models / granularity / flags) can never bleed into a real classification
-        // on a shared worker. tries=1: the row bundles paid LLM calls that must not retry.
-        'supervisor-testing' => [
-            'connection' => 'redis_testing', // its own retry_after (>= the row-job timeout)
-            'queue' => ['testing'],
-            'balance' => 'auto',
-            'autoScalingStrategy' => 'time',
-            'maxProcesses' => 2,
-            'maxTime' => 0,
-            'maxJobs' => 0,
-            'memory' => 256,
-            'tries' => 1,
-            'timeout' => 900, // a conflict row runs broker + direct + :online search
-            'nice' => 5,      // yield CPU to the production supervisor
-        ],
     ],
 
     'environments' => [
@@ -238,24 +220,11 @@ return [
                 'balanceMaxShift' => 2,
                 'balanceCooldown' => 3,
             ],
-            'supervisor-testing' => [
-                'minProcesses' => 1, // Horizon requires >= 1; one idle worker for the testing queue
-                // Match the prod queue's parallelism so a dataset run is as fast (a run's
-                // wall-clock = total work / workers). Env-tunable: lower it (+ php artisan
-                // optimize) if a big run competes with prod for Nebius throughput.
-                'maxProcesses' => (int) env('TESTING_MAX_PROCESSES', 8),
-                'balanceMaxShift' => 3, // ramp up to maxProcesses quickly at the start of a run
-                'balanceCooldown' => 2,
-            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
-            ],
-            'supervisor-testing' => [
-                'minProcesses' => 1,
-                'maxProcesses' => (int) env('TESTING_MAX_PROCESSES', 4),
             ],
         ],
     ],

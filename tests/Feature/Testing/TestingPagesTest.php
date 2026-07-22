@@ -2,7 +2,8 @@
 
 namespace Tests\Feature\Testing;
 
-use App\Jobs\ClassifyDatasetRowJob;
+use App\Jobs\ClassifyTestItemMechanismJob;
+use App\Jobs\ScoreRunJob;
 use App\Livewire\Testing;
 use App\Livewire\TestingCompare;
 use App\Livewire\TestingDataset;
@@ -10,6 +11,7 @@ use App\Livewire\TestingRun;
 use App\Models\TestDataset;
 use App\Models\TestRun;
 use App\Models\User;
+use App\Services\Testing\DatasetMemory;
 use App\Services\Testing\TestRunner;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,9 +39,8 @@ class TestingPagesTest extends TestCase
         Livewire::test(TestingCompare::class)->assertOk();
     }
 
-    public function test_launch_dispatches_one_row_job_per_scorable_row_on_the_testing_queue(): void
+    public function test_launch_fans_out_a_mechanism_job_per_row_on_the_default_queue(): void
     {
-        config(['queue.default' => 'sync']); // skip the redis retry_after guard
         Bus::fake();
 
         $dataset = TestDataset::create(['name' => 'd', 'mechanisms' => self::MECH]);
@@ -54,9 +55,25 @@ class TestingPagesTest extends TestCase
         $this->assertSame('running', $run->fresh()->status);
         $this->assertSame('testrun:'.$run->id, $run->fresh()->batch);
 
-        Bus::assertBatched(fn (PendingBatch $batch) => $batch->jobs->count() === 2 // only the 2 scorable rows
-            && ($batch->options['queue'] ?? null) === 'testing'
-            && $batch->jobs->every(fn ($j) => $j instanceof ClassifyDatasetRowJob));
+        // one vector job per scorable row (2), on the SAME production queue (not 'testing')
+        Bus::assertBatched(fn (PendingBatch $batch) => $batch->jobs->count() === 2
+            && ($batch->options['queue'] ?? null) !== 'testing'
+            && $batch->jobs->every(fn ($j) => $j instanceof ClassifyTestItemMechanismJob));
+    }
+
+    public function test_a_cache_hit_row_is_not_fanned_out(): void
+    {
+        Bus::fake();
+
+        $dataset = TestDataset::create(['name' => 'd', 'mechanisms' => self::MECH]);
+        $dataset->rows()->create(['source_text' => 'coffee', 'expected_code' => '0901', 'expected_heading' => '0901', 'expected_is_service' => false]);
+        app(DatasetMemory::class)->seedFromLabels($dataset);
+
+        app(TestRunner::class)->launch($dataset, 'mem', ['enabled' => ['vector'], 'shadow' => [], 'cache' => true, 'search' => false]);
+
+        // every row hit the cache → no mechanism batch, just the scorer
+        Bus::assertNothingBatched();
+        Bus::assertDispatched(ScoreRunJob::class);
     }
 
     private function makeRun(TestDataset $dataset): TestRun
