@@ -216,7 +216,7 @@ return [
         // (test models / granularity / flags) can never bleed into a real classification
         // on a shared worker. tries=1: the row bundles paid LLM calls that must not retry.
         'supervisor-testing' => [
-            'connection' => 'redis',
+            'connection' => 'redis_testing', // its own retry_after (>= the row-job timeout)
             'queue' => ['testing'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',

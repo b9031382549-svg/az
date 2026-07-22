@@ -16,8 +16,11 @@ use RuntimeException;
  */
 class TestRunner
 {
-    /** The per-row job timeout; retry_after must exceed this or paid calls double-fire. */
+    /** The per-row job timeout; the queue's retry_after must exceed this or paid calls double-fire. */
     private const ROW_TIMEOUT = 600;
+
+    /** Dedicated queue connection for test runs (its own, larger retry_after). */
+    private const CONNECTION = 'redis_testing';
 
     /**
      * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool}  $mechanisms
@@ -44,6 +47,7 @@ class TestRunner
 
         Bus::batch($jobs)
             ->name($run->batch)
+            ->onConnection(self::CONNECTION)
             ->onQueue('testing')
             ->allowFailures()   // one bad row must not cancel the rest
             ->finally(fn () => ScoreRunJob::dispatch($run->id)) // fires even with failures
@@ -80,20 +84,23 @@ class TestRunner
 
     /**
      * Fail fast on a config that would re-bill paid LLM calls: on redis, a job still
-     * running when retry_after elapses is re-dispatched (a duplicate paid run). Only
-     * matters for the real redis queue — the sync/array test queue is exempt.
+     * running when retry_after elapses is re-dispatched (a duplicate paid run). We check
+     * the DEDICATED test connection (its retry_after defaults to 900 >= the row timeout),
+     * so this is a safety net against a misconfigured TESTING_QUEUE_RETRY_AFTER — the
+     * prod queue's own retry_after is irrelevant here.
      */
     private function assertQueueSafe(): void
     {
-        if (config('queue.default') !== 'redis') {
-            return;
+        $conn = (array) config('queue.connections.'.self::CONNECTION);
+        if (($conn['driver'] ?? null) !== 'redis') {
+            return; // sync/array (tests) — nothing to guard
         }
-        $retryAfter = (int) config('queue.connections.redis.retry_after', 90);
+        $retryAfter = (int) ($conn['retry_after'] ?? 90);
         if ($retryAfter < self::ROW_TIMEOUT) {
             throw new RuntimeException(
-                "REDIS_QUEUE_RETRY_AFTER ({$retryAfter}s) must be >= the row-job timeout ("
+                "TESTING_QUEUE_RETRY_AFTER ({$retryAfter}s) must be >= the row-job timeout ("
                 .self::ROW_TIMEOUT.'s) or a slow paid job re-dispatches while still running. '
-                .'Raise REDIS_QUEUE_RETRY_AFTER and redeploy/optimize before running a dataset.'
+                .'Raise TESTING_QUEUE_RETRY_AFTER and redeploy/optimize before running a dataset.'
             );
         }
     }
