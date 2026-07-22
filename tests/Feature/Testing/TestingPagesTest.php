@@ -76,6 +76,24 @@ class TestingPagesTest extends TestCase
         Bus::assertDispatched(ScoreRunJob::class);
     }
 
+    public function test_run_page_shows_a_positive_formatted_duration_and_tokens(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $dataset = TestDataset::create(['name' => 'd', 'mechanisms' => self::MECH]);
+        $start = now()->subSeconds(90);
+        $run = TestRun::create([
+            'test_dataset_id' => $dataset->id, 'description' => 'r', 'batch' => 'testrun:x',
+            'mechanisms' => self::MECH, 'config' => [], 'status' => 'done', 'total' => 0,
+            'started_at' => $start, 'finished_at' => $start->copy()->addSeconds(90),
+            'accuracy' => ['columns' => [], 'total' => 0, 'tokens' => 12345],
+        ]);
+
+        Livewire::test(TestingRun::class, ['run' => $run])
+            ->assertOk()
+            ->assertSee('1m 30s')  // positive + formatted (not "-90s" or a "0s" rollover)
+            ->assertSee('12 345'); // tokens
+    }
+
     private function makeRun(TestDataset $dataset): TestRun
     {
         $run = TestRun::create([

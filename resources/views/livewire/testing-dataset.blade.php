@@ -84,7 +84,7 @@
             $o = $r->accuracy['columns']['overall'] ?? null;
             $acc = ($o && ($o['ran'] ?? 0) > 0) ? round(100 * $o['correct'] / $o['ran']) : null;
             $tok = $r->accuracy['tokens'] ?? null;
-            $durS = ($r->started_at && $r->finished_at) ? $r->finished_at->diffInSeconds($r->started_at) : null;
+            $durS = ($r->started_at && $r->finished_at) ? (int) abs($r->finished_at->diffInSeconds($r->started_at)) : null;
             $dur = $durS === null ? '—' : (intdiv($durS, 60) > 0 ? intdiv($durS, 60).'m '.($durS % 60).'s' : $durS.'s');
           @endphp
           <tr class="border-b hair hover:bg-surface">
