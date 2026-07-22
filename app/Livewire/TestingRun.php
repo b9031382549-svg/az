@@ -6,6 +6,7 @@ use App\Models\TestDatasetRow;
 use App\Models\TestRun;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use App\Services\Testing\RunScorer;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -37,12 +38,20 @@ class TestingRun extends Component
         $rowsPage = $this->run->dataset->scorableRows()->orderBy('id')->paginate(25);
         $detail = $complete ? $this->detail($rowsPage->items()) : [];
 
+        // Duration: final when done, else elapsed so far. Tokens: the persisted total
+        // when scored, else a live sum of what's been spent so far.
+        $end = $this->run->finished_at ?? now();
+        $durationSeconds = $this->run->started_at ? $end->diffInSeconds($this->run->started_at) : null;
+        $tokens = $this->run->accuracy['tokens'] ?? app(RunScorer::class)->tokens($this->run);
+
         return view('livewire.testing-run', [
             'total' => $total,
             'done' => $done,
             'complete' => $complete,
             'pct' => $total > 0 ? (int) round(min(100, $done / $total * 100)) : 0,
             'accuracy' => $this->run->accuracy['columns'] ?? [],
+            'durationSeconds' => $durationSeconds,
+            'tokens' => (int) $tokens,
             'rowsPage' => $rowsPage,
             'detail' => $detail,
             'majorityLabel' => $this->majorityLabel(),

@@ -415,5 +415,8 @@
     "or from a run:": "или из прогона:",
     "choose a run…": "выберите прогон…",
     "Seed": "Заполнить",
-    "“Correct answers” is the perfect-memory ceiling (leakage — exact-name rows then score ~100%). “From a run” replays what the pipeline produced (the flywheel).": "«Верные ответы» — это потолок идеальной памяти (утечка — строки с точным именем дадут ~100%). «Из прогона» повторяет то, что выдал пайплайн (флайвил)."
+    "“Correct answers” is the perfect-memory ceiling (leakage — exact-name rows then score ~100%). “From a run” replays what the pipeline produced (the flywheel).": "«Верные ответы» — это потолок идеальной памяти (утечка — строки с точным именем дадут ~100%). «Из прогона» повторяет то, что выдал пайплайн (флайвил).",
+    "Duration": "Длительность",
+    "running": "идёт",
+    "so far": "пока"
 }

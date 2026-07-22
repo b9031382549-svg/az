@@ -5,6 +5,7 @@ namespace App\Services\Testing;
 use App\Models\TestRun;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Turns a finished run's stored classification_results into per-mechanism accuracy.
@@ -111,7 +112,21 @@ class RunScorer
             $this->tally($columns['overall'], $item->final_code, $item->kind, $expHeading, $expService);
         }
 
-        return ['columns' => $columns, 'total' => $rows->count()];
+        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run)];
+    }
+
+    /**
+     * Total LLM tokens this run spent — summed from each mechanism result's stored usage
+     * (attributable to the run; the shared product-brief and the web search are logged
+     * separately in llm_usage, so this is a close lower bound on the true spend).
+     */
+    public function tokens(TestRun $run): int
+    {
+        return (int) DB::table('classification_results')
+            ->join('classification_items', 'classification_items.id', '=', 'classification_results.classification_item_id')
+            ->where('classification_items.test_run_id', $run->id)
+            ->pluck('classification_results.usage')
+            ->sum(fn ($u) => (int) (json_decode((string) $u, true)['total_tokens'] ?? 0));
     }
 
     /**

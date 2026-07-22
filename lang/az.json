@@ -415,5 +415,8 @@
     "or from a run:": "və ya icradan:",
     "choose a run…": "icra seçin…",
     "Seed": "Doldur",
-    "“Correct answers” is the perfect-memory ceiling (leakage — exact-name rows then score ~100%). “From a run” replays what the pipeline produced (the flywheel).": "«Düzgün cavablar» mükəmməl yaddaşın tavanıdır (sızma — eyni adlı sətirlər ~100% verər). «İcradan» pipeline-ın verdiyini təkrarlayır (flywheel)."
+    "“Correct answers” is the perfect-memory ceiling (leakage — exact-name rows then score ~100%). “From a run” replays what the pipeline produced (the flywheel).": "«Düzgün cavablar» mükəmməl yaddaşın tavanıdır (sızma — eyni adlı sətirlər ~100% verər). «İcradan» pipeline-ın verdiyini təkrarlayır (flywheel).",
+    "Duration": "Müddət",
+    "running": "gedir",
+    "so far": "indiyədək"
 }

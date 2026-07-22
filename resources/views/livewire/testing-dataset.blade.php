@@ -73,20 +73,30 @@
           <th class="px-4 py-3 font-medium">{{ __('Run') }}</th>
           <th class="px-4 py-3 font-medium">{{ __('Status') }}</th>
           <th class="px-4 py-3 font-medium">{{ __('Overall') }}</th>
+          <th class="px-4 py-3 font-medium">{{ __('Duration') }}</th>
+          <th class="px-4 py-3 font-medium">{{ __('Tokens') }}</th>
           <th class="px-4 py-3 font-medium">{{ __('When') }}</th>
         </tr>
       </thead>
       <tbody>
         @forelse($runs as $r)
-          @php $o = $r->accuracy['columns']['overall'] ?? null; $acc = ($o && ($o['ran'] ?? 0) > 0) ? round(100 * $o['correct'] / $o['ran']) : null; @endphp
+          @php
+            $o = $r->accuracy['columns']['overall'] ?? null;
+            $acc = ($o && ($o['ran'] ?? 0) > 0) ? round(100 * $o['correct'] / $o['ran']) : null;
+            $tok = $r->accuracy['tokens'] ?? null;
+            $durS = ($r->started_at && $r->finished_at) ? $r->finished_at->diffInSeconds($r->started_at) : null;
+            $dur = $durS === null ? '—' : (intdiv($durS, 60) > 0 ? intdiv($durS, 60).'m '.($durS % 60).'s' : $durS.'s');
+          @endphp
           <tr class="border-b hair hover:bg-surface">
             <td class="px-4 py-3"><a href="{{ route('testing.run', $r) }}" class="hover:underline">#{{ $r->id }} · {{ $r->description }}</a></td>
             <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded-full {{ $r->status === 'done' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted' }}">{{ __(ucfirst($r->status)) }}</span></td>
             <td class="px-4 py-3 tnum font-medium">{{ $acc !== null ? $acc.'%' : '—' }}</td>
+            <td class="px-4 py-3 tnum text-muted">{{ $dur }}</td>
+            <td class="px-4 py-3 tnum text-muted">{{ $tok !== null ? number_format($tok, 0, '.', ' ') : '—' }}</td>
             <td class="px-4 py-3 text-muted">{{ $r->created_at?->format('Y-m-d H:i') }}</td>
           </tr>
         @empty
-          <tr><td colspan="4" class="px-4 py-6 text-center text-muted">{{ __('No runs yet — launch one above.') }}</td></tr>
+          <tr><td colspan="6" class="px-4 py-6 text-center text-muted">{{ __('No runs yet — launch one above.') }}</td></tr>
         @endforelse
       </tbody>
     </table>
