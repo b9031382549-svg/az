@@ -6,6 +6,7 @@ use App\Models\TestDataset;
 use App\Models\TestRun;
 use App\Services\Testing\DatasetMemory;
 use App\Services\Testing\TestRunner;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -100,12 +101,49 @@ class TestingDataset extends Component
 
     public function render()
     {
+        $runs = $this->dataset->runs()->latest()->get();
+
         return view('livewire.testing-dataset', [
             'rows' => $this->dataset->rows()->orderBy('id')->paginate(20),
-            'runs' => $this->dataset->runs()->latest()->get(),
-            'doneRuns' => $this->dataset->runs()->where('status', 'done')->latest()->get(),
+            'runs' => $runs,
+            'doneRuns' => $runs->where('status', 'done'),
             'scorable' => $this->dataset->scorableRows()->count(),
             'memoryCount' => app(DatasetMemory::class)->count($this->dataset),
+            'chart' => $this->chart($runs),
         ]);
+    }
+
+    /**
+     * Accuracy per mechanism across the finished runs, oldest→newest, for the
+     * accuracy-by-run line chart. Only columns that actually have data appear (so
+     * memory-off runs drop the memory line, etc.).
+     *
+     * @param  Collection<int, TestRun>  $runs
+     * @return array{labels: array<int, string>, series: array<string, array<int, ?int>>, count: int}
+     */
+    private function chart($runs): array
+    {
+        $done = $runs->where('status', 'done')->sortBy('id')->values();
+
+        $series = [];
+        foreach (['overall', 'majority', 'vector', 'broker', 'direct', 'search', 'memory'] as $col) {
+            $points = [];
+            $hasData = false;
+            foreach ($done as $run) {
+                $b = $run->accuracy['columns'][$col] ?? null;
+                $acc = ($b && ($b['ran'] ?? 0) > 0) ? (int) round(100 * $b['correct'] / $b['ran']) : null;
+                $hasData = $hasData || $acc !== null;
+                $points[] = $acc;
+            }
+            if ($hasData) {
+                $series[$col] = $points;
+            }
+        }
+
+        return [
+            'labels' => $done->map(fn ($r) => '#'.$r->id)->all(),
+            'series' => $series,
+            'count' => $done->count(),
+        ];
     }
 }

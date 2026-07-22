@@ -54,6 +54,47 @@
   </div>
   @endif
 
+  {{-- Accuracy-by-run chart --}}
+  @if(($chart['count'] ?? 0) >= 1)
+    @php
+      $labels = $chart['labels']; $series = $chart['series']; $n = count($labels);
+      $W = 640; $H = 250; $pl = 34; $pr = 14; $pt = 12; $pb = 28;
+      $plotW = $W - $pl - $pr; $plotH = $H - $pt - $pb;
+      $xAt = fn ($i) => $n <= 1 ? $pl + $plotW / 2 : $pl + $i / max(1, $n - 1) * $plotW;
+      $yAt = fn ($a) => $pt + (1 - $a / 100) * $plotH;
+      $colors = ['overall' => 'currentColor', 'majority' => '#3f6b4f', 'vector' => '#2563eb', 'broker' => '#7c3aed', 'direct' => '#0891b2', 'search' => '#B5462E', 'memory' => '#9a9183'];
+      $names = ['overall' => __('Overall'), 'majority' => __('Majority'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'search' => __('Web search'), 'memory' => __('Memory')];
+    @endphp
+    <div class="card p-5 mb-6">
+      <p class="font-medium mb-3">{{ __('Accuracy by run') }}</p>
+      <div class="overflow-x-auto">
+        <svg viewBox="0 0 {{ $W }} {{ $H }}" class="w-full min-w-[440px]" style="max-height:270px">
+          @foreach([0, 25, 50, 75, 100] as $g)
+            <line x1="{{ $pl }}" y1="{{ $yAt($g) }}" x2="{{ $W - $pr }}" y2="{{ $yAt($g) }}" stroke="currentColor" stroke-opacity="0.12"/>
+            <text x="{{ $pl - 6 }}" y="{{ $yAt($g) + 3 }}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity="0.5">{{ $g }}</text>
+          @endforeach
+          @foreach($labels as $i => $lab)
+            <text x="{{ $xAt($i) }}" y="{{ $H - 9 }}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.5">{{ $lab }}</text>
+          @endforeach
+          @foreach($series as $key => $pts)
+            @php $pointStr = collect($pts)->map(fn ($a, $i) => $a === null ? null : $xAt($i).','.$yAt($a))->filter()->implode(' '); @endphp
+            @if($pointStr !== '')
+              <polyline points="{{ $pointStr }}" fill="none" stroke="{{ $colors[$key] }}" stroke-width="{{ $key === 'overall' ? 2.5 : 1.5 }}" stroke-linejoin="round" stroke-linecap="round"/>
+              @foreach($pts as $i => $a)
+                @if($a !== null)<circle cx="{{ $xAt($i) }}" cy="{{ $yAt($a) }}" r="{{ $key === 'overall' ? 3 : 2.5 }}" fill="{{ $colors[$key] }}"><title>{{ $names[$key] }} · {{ $labels[$i] }}: {{ $a }}%</title></circle>@endif
+              @endforeach
+            @endif
+          @endforeach
+        </svg>
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-muted">
+        @foreach($series as $key => $pts)
+          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-[3px] rounded-full" style="background:{{ $colors[$key] }}"></span>{{ $names[$key] }}</span>
+        @endforeach
+      </div>
+    </div>
+  @endif
+
   {{-- Runs --}}
   <div class="flex items-center justify-between mb-2">
     <p class="font-medium">{{ __('Runs') }}</p>

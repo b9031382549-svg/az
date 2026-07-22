@@ -94,6 +94,22 @@ class TestingPagesTest extends TestCase
             ->assertSee('12 345'); // tokens
     }
 
+    public function test_dataset_page_renders_the_accuracy_chart_once_a_run_is_done(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $dataset = TestDataset::create(['name' => 'd', 'mechanisms' => self::MECH]);
+        TestRun::create([
+            'test_dataset_id' => $dataset->id, 'description' => 'baseline', 'batch' => 'testrun:z',
+            'mechanisms' => self::MECH, 'status' => 'done', 'total' => 2,
+            'config' => [],
+            'accuracy' => ['columns' => ['overall' => ['ran' => 2, 'answered' => 2, 'correct' => 1], 'vector' => ['ran' => 2, 'answered' => 2, 'correct' => 1]], 'total' => 2, 'tokens' => 100],
+        ]);
+
+        Livewire::test(TestingDataset::class, ['dataset' => $dataset])
+            ->assertOk()
+            ->assertSee('Accuracy by run');
+    }
+
     private function makeRun(TestDataset $dataset): TestRun
     {
         $run = TestRun::create([
