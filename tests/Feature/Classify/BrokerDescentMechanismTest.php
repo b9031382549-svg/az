@@ -200,6 +200,45 @@ class BrokerDescentMechanismTest extends TestCase
         $this->assertContains('heading-stop', array_column($result->path, 'by'));
     }
 
+    public function test_heading_mode_stops_the_descent_at_the_heading_not_the_subposition(): void
+    {
+        // Chapter 30 has TWO headings (3003, 3004) so the heading is a real decision, and
+        // 3004 has a 6-digit subposition below it. Heading mode must decide the chapter and
+        // the heading, then STOP — never spend a third decide() on the 300410 subposition.
+        foreach ([
+            ['3003900000', '30', '3003', '300390', 'Medicament A'],
+            ['3004100000', '30', '3004', '300410', 'Medicament B'],
+            ['8471300000', '84', '8471', '847130', 'Noutbuk'],
+        ] as [$code, $ch, $pos, $sub, $name]) {
+            CatalogCode::create(['code' => $code, 'name' => $name, 'kind' => 'good', 'chapter' => $ch, 'position' => $pos, 'subposition' => $sub, 'is_active' => true]);
+        }
+        $this->artisan('data:build-rubricator')->assertSuccessful();
+        config()->set('classify.expand_query', false);
+        config()->set('classify.broker.use_brief', false);
+        config()->set('classify.broker.answer_granularity', 'heading');
+
+        // Count decide() calls without throwing (a 3rd response is provided so a regression
+        // descends gracefully and is caught by the assertion, not by a mock exception the
+        // broker's try/catch would swallow into a fallback).
+        $calls = 0;
+        $responses = [
+            $this->decideResponse('30', 0.9),      // chapters 30 vs 84
+            $this->decideResponse('3004', 0.85),   // headings 3003 vs 3004
+            $this->decideResponse('300410', 0.9),  // (regression only) subpositions
+        ];
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->andReturnUsing(function () use (&$calls, $responses) {
+            return $responses[$calls++] ?? end($responses);
+        });
+        $this->instance(OpenRouterClient::class, $llm);
+
+        $result = app(BrokerDescentMechanism::class)->classify('medicament');
+
+        $this->assertSame(2, $calls); // chapter + heading only — no 6-digit descent
+        $this->assertSame('3004', $result->matchedCode);
+        $this->assertContains('heading-stop', array_column($result->path, 'by'));
+    }
+
     public function test_undecided_root_fork_abstains(): void
     {
         $this->seedTree();
