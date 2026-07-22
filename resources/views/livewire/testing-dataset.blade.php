@@ -54,7 +54,7 @@
   </div>
   @endif
 
-  {{-- Accuracy-by-run chart --}}
+  {{-- Accuracy-by-run chart (interactive: hover to highlight + tooltip; mechanism checkboxes toggle lines) --}}
   @if(($chart['count'] ?? 0) >= 1)
     @php
       $labels = $chart['labels']; $series = $chart['series']; $n = count($labels);
@@ -64,8 +64,10 @@
       $yAt = fn ($a) => $pt + (1 - $a / 100) * $plotH;
       $colors = ['overall' => 'currentColor', 'majority' => '#3f6b4f', 'vector' => '#2563eb', 'broker' => '#7c3aed', 'direct' => '#0891b2', 'search' => '#B5462E', 'memory' => '#9a9183'];
       $names = ['overall' => __('Overall'), 'majority' => __('Majority'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'search' => __('Web search'), 'memory' => __('Memory')];
+      // Which mechanism checkbox toggles each line (overall/majority are composites — always on).
+      $vis = ['overall' => 'true', 'majority' => 'true', 'vector' => '$wire.useVector', 'broker' => '$wire.useBroker', 'direct' => '$wire.useDirect', 'search' => '$wire.useSearch', 'memory' => '$wire.useMemory'];
     @endphp
-    <div class="card p-5 mb-6">
+    <div class="card p-5 mb-6" x-data="{ hover: null, tip: { show: false, text: '', x: 0, y: 0 } }">
       <p class="font-medium mb-3">{{ __('Accuracy by run') }}</p>
       <div class="overflow-x-auto">
         <svg viewBox="0 0 {{ $W }} {{ $H }}" class="w-full min-w-[440px]" style="max-height:270px">
@@ -77,21 +79,47 @@
             <text x="{{ $xAt($i) }}" y="{{ $H - 9 }}" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.5">{{ $lab }}</text>
           @endforeach
           @foreach($series as $key => $pts)
-            @php $pointStr = collect($pts)->map(fn ($a, $i) => $a === null ? null : $xAt($i).','.$yAt($a))->filter()->implode(' '); @endphp
+            @php
+              $pointStr = collect($pts)->map(fn ($a, $i) => $a === null ? null : $xAt($i).','.$yAt($a))->filter()->implode(' ');
+              $w = $key === 'overall' ? 2.5 : 1.5; $r = $key === 'overall' ? 3 : 2.5;
+            @endphp
             @if($pointStr !== '')
-              <polyline points="{{ $pointStr }}" fill="none" stroke="{{ $colors[$key] }}" stroke-width="{{ $key === 'overall' ? 2.5 : 1.5 }}" stroke-linejoin="round" stroke-linecap="round"/>
-              @foreach($pts as $i => $a)
-                @if($a !== null)<circle cx="{{ $xAt($i) }}" cy="{{ $yAt($a) }}" r="{{ $key === 'overall' ? 3 : 2.5 }}" fill="{{ $colors[$key] }}"><title>{{ $names[$key] }} · {{ $labels[$i] }}: {{ $a }}%</title></circle>@endif
-              @endforeach
+              <g x-show="{{ $vis[$key] }}"
+                 x-on:mouseenter="hover = '{{ $key }}'" x-on:mouseleave="hover = null"
+                 x-bind:opacity="hover === null || hover === '{{ $key }}' ? 1 : 0.15" style="transition:opacity .12s">
+                {{-- wide transparent hit-line so the thin stroke is easy to hover --}}
+                <polyline points="{{ $pointStr }}" fill="none" stroke="transparent" stroke-width="12" style="cursor:pointer"/>
+                <polyline points="{{ $pointStr }}" fill="none" stroke="{{ $colors[$key] }}" stroke-linejoin="round" stroke-linecap="round"
+                          x-bind:stroke-width="hover === '{{ $key }}' ? {{ $w + 1.4 }} : {{ $w }}" style="transition:stroke-width .1s"/>
+                @foreach($pts as $i => $a)
+                  @if($a !== null)
+                    <circle cx="{{ $xAt($i) }}" cy="{{ $yAt($a) }}" fill="{{ $colors[$key] }}"
+                            x-bind:r="hover === '{{ $key }}' ? {{ $r + 1 }} : {{ $r }}"/>
+                    <circle cx="{{ $xAt($i) }}" cy="{{ $yAt($a) }}" r="11" fill="transparent" style="cursor:pointer"
+                            data-tip="{{ $names[$key] }} · {{ $labels[$i] }}: {{ $a }}%"
+                            x-on:mouseenter="hover = '{{ $key }}'; tip = { show: true, text: $el.dataset.tip, x: $event.clientX + 12, y: $event.clientY - 12 }"
+                            x-on:mousemove="tip.x = $event.clientX + 12; tip.y = $event.clientY - 12"
+                            x-on:mouseleave="hover = null; tip.show = false"/>
+                  @endif
+                @endforeach
+              </g>
             @endif
           @endforeach
         </svg>
       </div>
+      {{-- legend: hover to highlight, dimmed when its checkbox hides the line --}}
       <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-muted">
         @foreach($series as $key => $pts)
-          <span class="inline-flex items-center gap-1.5"><span class="w-3 h-[3px] rounded-full" style="background:{{ $colors[$key] }}"></span>{{ $names[$key] }}</span>
+          <span class="inline-flex items-center gap-1.5" style="cursor:default"
+                x-bind:class="({{ $vis[$key] }}) ? '' : 'opacity-30'"
+                x-on:mouseenter="hover = '{{ $key }}'" x-on:mouseleave="hover = null">
+            <span class="w-3 h-[3px] rounded-full" style="background:{{ $colors[$key] }}"></span>{{ $names[$key] }}
+          </span>
         @endforeach
       </div>
+      {{-- cursor-following tooltip --}}
+      <div x-cloak x-show="tip.show" x-text="tip.text" x-bind:style="`left:${tip.x}px; top:${tip.y}px`"
+           class="fixed z-50 pointer-events-none px-2 py-1 rounded-md bg-ink text-paper text-xs font-medium shadow-lg"></div>
     </div>
   @endif
 
