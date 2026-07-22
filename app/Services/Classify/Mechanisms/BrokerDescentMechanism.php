@@ -102,7 +102,19 @@ final class BrokerDescentMechanism implements ClassifierMechanism
 
             $children = RubricatorNode::whereNull('parent_id')->orderBy('code')->get();
 
+            // In 4-digit ('heading') mode the answer is fixed once the descent reaches a
+            // 4-digit node; going deeper into 6-digit subpositions only spends a decide()
+            // call whose extra digits we truncate away (~a third of the broker's tokens).
+            $headingMode = (string) config('classify.broker.answer_granularity', 'code') === 'heading';
+
             for ($depth = 0; $depth < (int) ($cfg['max_depth'] ?? 5); $depth++) {
+                // Heading mode: once the descent has fixed a 4-digit node, stop — the deeper
+                // (6-digit) fork's decide() only produces digits we immediately truncate away,
+                // whether that node was reached by a decision or an auto-descend.
+                if ($headingMode && $node !== null && mb_strlen((string) $node->code) >= 4) {
+                    break;
+                }
+
                 if ($children->isEmpty()) {
                     break; // $node is the deepest rubric — go to leaf mode
                 }
