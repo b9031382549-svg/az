@@ -17,7 +17,8 @@
       <span class="kicker">{{ __('Mechanisms') }}</span>
       @foreach([['useVector', __('Vector')], ['useBroker', __('Broker')], ['useDirect', __('Direct')], ['useSearch', __('Web search')], ['useMemory', __('Memory')]] as [$prop, $label])
         <label class="flex items-center gap-1.5 text-sm">
-          <input type="checkbox" wire:model="{{ $prop }}"> {{ $label }}
+          {{-- Memory is .live so ticking it reveals the memory panel below --}}
+          <input type="checkbox" wire:model{{ $prop === 'useMemory' ? '.live' : '' }}="{{ $prop }}"> {{ $label }}
         </label>
       @endforeach
       <button wire:click="launch" wire:loading.attr="disabled" wire:target="launch" class="btn btn-ink btn-sm ml-auto">
@@ -28,7 +29,8 @@
     <p class="text-xs text-faint mt-3">{{ __('The effective models + retrieval flags are snapshotted at launch, so a later comparison reflects the code change, not config drift.') }}</p>
   </div>
 
-  {{-- Dataset memory (answer cache scoped to this dataset) --}}
+  {{-- Dataset memory — shown only when the Memory mechanism is ticked for a run --}}
+  @if($useMemory)
   <div class="card p-6 mb-6">
     <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
       <p class="font-medium">{{ __('Memory') }} <span class="text-muted font-normal">· {{ $memoryCount }} {{ __('entries') }}</span></p>
@@ -50,6 +52,7 @@
     </div>
     <p class="text-xs text-faint mt-3">{{ __('“Correct answers” is the perfect-memory ceiling (leakage — exact-name rows then score ~100%). “From a run” replays what the pipeline produced (the flywheel).') }}</p>
   </div>
+  @endif
 
   {{-- Runs --}}
   <div class="flex items-center justify-between mb-2">
