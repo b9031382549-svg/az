@@ -3,11 +3,16 @@
 namespace App\Services\Testing;
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
  * Parses a 2-column dataset spreadsheet (column A = item name, column B = correct
  * code) into labelled rows. We score at the 4-digit HS heading, so expected_heading
  * and expected_is_service are derived here once.
+ *
+ * Sheet selection: workbooks often carry a summary/readme tab as the ACTIVE sheet with
+ * the real items on another tab — so we scan EVERY worksheet and keep the one that
+ * yields the most usable rows (rather than trusting getActiveSheet()).
  *
  * Leading-zero recovery: xlsx stores a code like "0901" (coffee, chapter 09) as the
  * NUMBER 901, which loses the chapter's leading zero. HS codes are even-length, so an
@@ -31,9 +36,37 @@ class DatasetImporter
 
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($path);
+
+        // Keep the sheet with the most USABLE (non-skipped) rows — a summary/readme tab
+        // that happens to be active never wins over the real items tab.
+        $best = [];
+        $bestValid = -1;
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            $rows = $this->parseSheet($sheet, $limit);
+            $valid = 0;
+            foreach ($rows as $r) {
+                if ($r['skip_reason'] === null) {
+                    $valid++;
+                }
+            }
+            if ($valid > $bestValid) {
+                $bestValid = $valid;
+                $best = $rows;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * @return array<int, array{source_text:string, expected_code:?string, expected_heading:?string, expected_is_service:bool, skip_reason:?string}>
+     */
+    private function parseSheet(Worksheet $sheet, int $limit): array
+    {
         // formatData=false → raw cell values (numeric codes come back as int/float,
         // which is exactly what we need for the leading-zero recovery below).
-        $grid = $reader->load($path)->getActiveSheet()->toArray(null, true, false, false);
+        $grid = $sheet->toArray(null, true, false, false);
 
         $out = [];
         foreach ($grid as $row) {
