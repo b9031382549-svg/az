@@ -240,7 +240,12 @@ return [
             ],
             'supervisor-testing' => [
                 'minProcesses' => 1, // Horizon requires >= 1; one idle worker for the testing queue
-                'maxProcesses' => 2,
+                // Match the prod queue's parallelism so a dataset run is as fast (a run's
+                // wall-clock = total work / workers). Env-tunable: lower it (+ php artisan
+                // optimize) if a big run competes with prod for Nebius throughput.
+                'maxProcesses' => (int) env('TESTING_MAX_PROCESSES', 8),
+                'balanceMaxShift' => 3, // ramp up to maxProcesses quickly at the start of a run
+                'balanceCooldown' => 2,
             ],
         ],
 
@@ -250,7 +255,7 @@ return [
             ],
             'supervisor-testing' => [
                 'minProcesses' => 1,
-                'maxProcesses' => 2,
+                'maxProcesses' => (int) env('TESTING_MAX_PROCESSES', 4),
             ],
         ],
     ],
