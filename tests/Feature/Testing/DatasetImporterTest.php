@@ -41,4 +41,38 @@ class DatasetImporterTest extends TestCase
         $this->assertNotNull($rows[3]['skip_reason']); // "n/a" -> no usable code
         $this->assertNull($rows[3]['expected_heading']);
     }
+
+    public function test_picks_the_items_sheet_over_an_active_summary_sheet(): void
+    {
+        $ss = new Spreadsheet;
+
+        // The ACTIVE/first tab is a summary/readme (what tripped the real upload).
+        $summary = $ss->getActiveSheet();
+        $summary->setTitle('Summary');
+        $summary->fromArray([
+            ['Claude labeled', 1200],
+            ['Agreement rate', 90],   // too short -> skipped
+            ['Note', 'see items tab'], // no usable code -> skipped
+        ]);
+
+        // The real items live on a second tab.
+        $items = $ss->createSheet();
+        $items->setTitle('Items');
+        $data = [['Name', 'Code']];
+        for ($i = 1; $i <= 30; $i++) {
+            $data[] = ["Product {$i}", 900 + $i];
+        }
+        $items->fromArray($data);
+
+        $ss->setActiveSheetIndex(0); // summary is active — the importer must NOT trust this
+
+        $path = tempnam(sys_get_temp_dir(), 'ds').'.xlsx';
+        (new Xlsx($ss))->save($path);
+        $rows = (new DatasetImporter)->rows($path);
+        @unlink($path);
+
+        // The 30-row Items sheet wins over the 1-usable-row Summary sheet.
+        $this->assertCount(30, $rows);
+        $this->assertSame('Product 1', $rows[0]['source_text']);
+    }
 }
