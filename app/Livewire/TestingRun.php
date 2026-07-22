@@ -41,7 +41,8 @@ class TestingRun extends Component
         // Duration: final when done, else elapsed so far. Tokens: the persisted total
         // when scored, else a live sum of what's been spent so far.
         $end = $this->run->finished_at ?? now();
-        $durationSeconds = $this->run->started_at ? $end->diffInSeconds($this->run->started_at) : null;
+        // abs(): Carbon 3's diffInSeconds is signed, so guard the direction.
+        $durationSeconds = $this->run->started_at ? (int) abs($end->diffInSeconds($this->run->started_at)) : null;
         $tokens = $this->run->accuracy['tokens'] ?? app(RunScorer::class)->tokens($this->run);
 
         return view('livewire.testing-run', [
