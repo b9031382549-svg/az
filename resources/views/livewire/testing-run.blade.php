@@ -10,6 +10,24 @@
     <p class="text-sm text-muted mt-1">{{ $run->description }}</p>
   </div>
 
+  @php
+    $fmtDur = function ($s) {
+        if ($s === null) return '—';
+        $m = intdiv($s, 60); $sec = $s % 60;
+        return $m > 0 ? "{$m}m {$sec}s" : "{$sec}s";
+    };
+  @endphp
+  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-4 mb-6">
+    <div class="card-flat p-4 min-w-[130px]">
+      <p class="kicker mb-1.5">{{ __('Duration') }}{{ $complete ? '' : ' · '.__('running') }}</p>
+      <p class="font-display text-2xl tnum">{{ $fmtDur($durationSeconds) }}</p>
+    </div>
+    <div class="card-flat p-4 min-w-[130px]">
+      <p class="kicker mb-1.5">{{ __('Tokens') }}{{ $complete ? '' : ' · '.__('so far') }}</p>
+      <p class="font-display text-2xl tnum">{{ number_format($tokens, 0, '.', ' ') }}</p>
+    </div>
+  </div>
+
   {{-- Progress (polls until done) --}}
   @unless($complete)
     <div class="card p-5 mb-6" wire:poll.1500ms>
