@@ -2,58 +2,81 @@
 
 namespace App\Services\Testing;
 
-use App\Jobs\ClassifyDatasetRowJob;
+use App\Jobs\ClassifyTestItemMechanismJob;
 use App\Jobs\ScoreRunJob;
+use App\Models\ClassificationItem;
 use App\Models\TestDataset;
 use App\Models\TestRun;
+use App\Services\Classify\AnswerCacheService;
 use Illuminate\Support\Facades\Bus;
-use RuntimeException;
 
 /**
- * Creates a test run and fans its rows out as a batch on the dedicated 'testing'
- * queue. Snapshots the FULL effective classify.* config (models AND retrieval flags)
- * so a later "before/after" reflects the code change, not silent config drift.
+ * Launches a dataset test run as the PRODUCTION pipeline: one short mechanism job per
+ * (item, mechanism) on the normal 'default' queue, reconciled against the run's chosen
+ * mechanism set. No per-run config override and no dedicated queue — the run reads the
+ * live prod config exactly like a real classification, so nothing can drift or "leak".
+ *
+ * `config` is snapshotted only as a RECORD (what models/flags this run used) for reading
+ * an A/B comparison later — it is never applied.
  */
 class TestRunner
 {
-    /** The per-row job timeout; the queue's retry_after must exceed this or paid calls double-fire. */
-    private const ROW_TIMEOUT = 600;
-
-    /** Dedicated queue connection for test runs (its own, larger retry_after). */
-    private const CONNECTION = 'redis_testing';
+    public function __construct(private readonly AnswerCacheService $cache) {}
 
     /**
      * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool}  $mechanisms
      */
     public function launch(TestDataset $dataset, string $description, array $mechanisms): TestRun
     {
-        $this->assertQueueSafe();
-
         $run = new TestRun;
         $run->test_dataset_id = $dataset->id;
         $run->description = trim($description);
         $run->mechanisms = $this->normalizeMechanisms($mechanisms);
         $run->config = $this->configSnapshot();
-        $run->status = 'pending';
+        $run->status = 'running';
         $run->total = $dataset->scorableRows()->count();
+        $run->started_at = now();
         $run->save();
-
-        // batch key needs the id; set it now that we have one.
         $run->update(['batch' => TestRun::batchKey($run->id)]);
 
-        $jobs = $dataset->scorableRows()->pluck('id')
-            ->map(fn ($id) => new ClassifyDatasetRowJob($run->id, (int) $id))
-            ->all();
+        $useCache = $run->mechanisms['cache'];
+        $enabled = $run->mechanisms['enabled'];
+
+        $jobs = [];
+        foreach ($dataset->scorableRows()->orderBy('id')->get() as $row) {
+            $item = ClassificationItem::create([
+                'batch' => $run->batch,
+                'test_run_id' => $run->id,
+                'test_dataset_row_id' => $row->id,
+                'source_text' => $row->source_text,
+                // The item's identity, unique per run row (so duplicate names in a dataset
+                // don't collide on unique(batch, source_hash)). Briefs/facts are keyed by
+                // TEXT inside their own services, so a test run SHARES them with production —
+                // which is exactly what "faithful to prod" wants; source_hash doesn't change that.
+                'source_hash' => hash('sha256', $run->batch.'|row|'.$row->id),
+                'resolution' => 'pending',
+            ]);
+
+            // memory-on: dataset-scoped cache short-circuit, exactly like prod's cache-first step.
+            if ($useCache && $this->cache->apply($item, $run->test_dataset_id)) {
+                continue; // hit → terminal, no mechanism jobs
+            }
+            foreach ($enabled as $mech) {
+                $jobs[] = new ClassifyTestItemMechanismJob($item->id, $mech);
+            }
+        }
+
+        if ($jobs === []) {
+            ScoreRunJob::dispatch($run->id); // all cache hits (or nothing to run) — score now
+
+            return $run;
+        }
 
         Bus::batch($jobs)
             ->name($run->batch)
-            ->onConnection(self::CONNECTION)
-            ->onQueue('testing')
-            ->allowFailures()   // one bad row must not cancel the rest
-            ->finally(fn () => ScoreRunJob::dispatch($run->id)) // fires even with failures
+            ->allowFailures()  // one bad job must not cancel the rest
+            ->finally(fn () => ScoreRunJob::dispatch($run->id)) // fires after mechanisms AND searches
             ->dispatch();
-
-        $run->update(['status' => 'running', 'started_at' => now()]);
 
         return $run;
     }
@@ -72,7 +95,7 @@ class TestRunner
         ];
     }
 
-    /** Whole classify subtree + the two rerank model ids the vector mechanism uses. */
+    /** Whole classify subtree + the two rerank model ids — RECORDED (not applied). */
     private function configSnapshot(): array
     {
         return [
@@ -80,28 +103,5 @@ class TestRunner
             'services.openrouter.classify_model' => config('services.openrouter.classify_model'),
             'services.openrouter.classify_model_tier1' => config('services.openrouter.classify_model_tier1'),
         ];
-    }
-
-    /**
-     * Fail fast on a config that would re-bill paid LLM calls: on redis, a job still
-     * running when retry_after elapses is re-dispatched (a duplicate paid run). We check
-     * the DEDICATED test connection (its retry_after defaults to 900 >= the row timeout),
-     * so this is a safety net against a misconfigured TESTING_QUEUE_RETRY_AFTER — the
-     * prod queue's own retry_after is irrelevant here.
-     */
-    private function assertQueueSafe(): void
-    {
-        $conn = (array) config('queue.connections.'.self::CONNECTION);
-        if (($conn['driver'] ?? null) !== 'redis') {
-            return; // sync/array (tests) — nothing to guard
-        }
-        $retryAfter = (int) ($conn['retry_after'] ?? 90);
-        if ($retryAfter < self::ROW_TIMEOUT) {
-            throw new RuntimeException(
-                "TESTING_QUEUE_RETRY_AFTER ({$retryAfter}s) must be >= the row-job timeout ("
-                .self::ROW_TIMEOUT.'s) or a slow paid job re-dispatches while still running. '
-                .'Raise TESTING_QUEUE_RETRY_AFTER and redeploy/optimize before running a dataset.'
-            );
-        }
     }
 }

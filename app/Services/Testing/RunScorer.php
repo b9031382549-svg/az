@@ -28,14 +28,40 @@ class RunScorer
 
     public function __construct(private readonly Consensus $consensus) {}
 
-    /** Compute accuracy, persist it on the run, and mark the run done. */
+    /**
+     * Compute accuracy, persist it, and mark the run done — but ONLY once every item is
+     * settled. Dispatched from several places (the batch's finally, a hard-fail
+     * re-trigger); the guard makes a premature or duplicate call a harmless no-op, so the
+     * persisted score always reflects the fully-classified run.
+     */
     public function finalize(TestRun $run): void
     {
+        $run->refresh();
+        if ($run->status === 'done' || ! $this->isSettled($run)) {
+            return;
+        }
+
         $run->update([
             'accuracy' => $this->score($run),
             'status' => 'done',
             'finished_at' => now(),
         ]);
+    }
+
+    /** Every item has a terminal resolution AND no conflict is still awaiting its search. */
+    private function isSettled(TestRun $run): bool
+    {
+        if ($run->items()->where('resolution', 'pending')->exists()) {
+            return false;
+        }
+
+        // A conflict that claimed a search (search_resolved_at set) but has no 'search'
+        // result row yet is mid-search — wait for it before scoring the search/overall.
+        return ! $run->items()
+            ->where('resolution', 'conflict')
+            ->whereNotNull('search_resolved_at')
+            ->whereDoesntHave('results', fn ($q) => $q->where('mechanism', 'search'))
+            ->exists();
     }
 
     /**

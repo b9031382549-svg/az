@@ -73,20 +73,6 @@ return [
             'after_commit' => false,
         ],
 
-        // Dedicated connection for dataset TEST runs (its own Horizon supervisor on the
-        // 'testing' queue). A single row runs vector+broker+direct+search sequentially and
-        // can take minutes, so retry_after is far larger than the prod queue's — a slow
-        // paid row is never re-dispatched mid-flight (which would double-bill the LLM
-        // calls). Same Redis server; only the retry window differs.
-        'redis_testing' => [
-            'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
-            'queue' => 'testing',
-            'retry_after' => (int) env('TESTING_QUEUE_RETRY_AFTER', 900),
-            'block_for' => null,
-            'after_commit' => false,
-        ],
-
         'deferred' => [
             'driver' => 'deferred',
         ],
