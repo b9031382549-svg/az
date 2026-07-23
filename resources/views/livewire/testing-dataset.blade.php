@@ -26,6 +26,36 @@
         <span wire:loading wire:target="launch">{{ __('Starting…') }}</span>
       </button>
     </div>
+    {{-- Optional: point THIS run at an external model endpoint (e.g. a fine-tuned model
+         on a rented GPU). Blank → the run mirrors prod. Only the decision stages are
+         routed there; web search stays on prod. --}}
+    <div x-data="{ open: @js($endpointModel !== '') }" class="mt-4 pt-4 border-t hair">
+      <button type="button" x-on:click="open = !open" class="text-sm text-muted hover:underline">
+        <span x-text="open ? '▾' : '▸'"></span> {{ __('Test an external model (rented GPU)') }}
+      </button>
+      <div x-show="open" x-cloak class="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="field-label">{{ __('Decision model') }}</label>
+          <input wire:model="endpointModel" class="field-input" placeholder="xif">
+          @error('endpointModel') <p class="text-sm text-stamp mt-1">{{ $message }}</p> @enderror
+        </div>
+        <div>
+          <label class="field-label">{{ __('Expand model (optional)') }}</label>
+          <input wire:model="endpointExpandModel" class="field-input" placeholder="base">
+          @error('endpointExpandModel') <p class="text-sm text-stamp mt-1">{{ $message }}</p> @enderror
+        </div>
+        <div>
+          <label class="field-label">{{ __('Endpoint URL') }}</label>
+          <input wire:model="endpointBaseUrl" class="field-input" placeholder="http://<ip>:8000/v1">
+          @error('endpointBaseUrl') <p class="text-sm text-stamp mt-1">{{ $message }}</p> @enderror
+        </div>
+        <div>
+          <label class="field-label">{{ __('API key') }}</label>
+          <input wire:model="endpointKey" class="field-input" placeholder="sk-vmtest">
+        </div>
+      </div>
+      <p x-show="open" x-cloak class="text-xs text-faint mt-2">{{ __('Routes the decision stages (rerank, broker, direct) at this endpoint and votes at 4-digit heading. Expand goes there too only if you set an expand model (a fine-tuned decision model can\'t expand — use base). Web search always stays on prod. Leave all blank for a normal prod-mirroring run.') }}</p>
+    </div>
     <p class="text-xs text-faint mt-3">{{ __('The effective models + retrieval flags are snapshotted at launch, so a later comparison reflects the code change, not config drift.') }}</p>
   </div>
 
@@ -157,7 +187,7 @@
             $dur = $durS === null ? '—' : (intdiv($durS, 60) > 0 ? intdiv($durS, 60).'m '.($durS % 60).'s' : $durS.'s');
           @endphp
           <tr class="border-b hair hover:bg-surface">
-            <td class="px-4 py-3"><a href="{{ route('testing.run', $r) }}" class="hover:underline">#{{ $r->id }} · {{ $r->description }}</a></td>
+            <td class="px-4 py-3"><a href="{{ route('testing.run', $r) }}" class="hover:underline">#{{ $r->id }} · {{ $r->description }}</a>@if($r->model_override)<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-line/40 text-muted font-mono" title="{{ __('External endpoint') }}">{{ $r->model_override }}</span>@endif</td>
             <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded-full {{ $r->status === 'done' ? 'bg-ledger/12 text-ledger' : 'bg-line/40 text-muted' }}">{{ __(ucfirst($r->status)) }}</span></td>
             <td class="px-4 py-3 tnum font-medium">{{ $acc !== null ? $acc.'%' : '—' }}</td>
             <td class="px-4 py-3 tnum text-muted">{{ $dur }}</td>

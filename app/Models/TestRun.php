@@ -41,4 +41,10 @@ class TestRun extends Model
     {
         return "testrun:{$id}";
     }
+
+    /** True when this run was routed at an external model endpoint (not prod). */
+    public function usesEndpointOverride(): bool
+    {
+        return trim((string) $this->model_override) !== '';
+    }
 }

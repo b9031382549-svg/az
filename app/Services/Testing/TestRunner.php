@@ -25,14 +25,23 @@ class TestRunner
 
     /**
      * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool}  $mechanisms
+     * @param  array{model?:string, expand_model?:string, base_url?:string, api_key?:string}  $override
+     *                                                                                                   optional external model endpoint (e.g. a fine-tuned
+     *                                                                                                   model on a rented GPU). Empty → mirror prod. Unlike `config`
+     *                                                                                                   (a record only), this IS applied by the run's mechanism jobs
+     *                                                                                                   via EndpointOverride.
      */
-    public function launch(TestDataset $dataset, string $description, array $mechanisms): TestRun
+    public function launch(TestDataset $dataset, string $description, array $mechanisms, array $override = []): TestRun
     {
         $run = new TestRun;
         $run->test_dataset_id = $dataset->id;
         $run->description = trim($description);
         $run->mechanisms = $this->normalizeMechanisms($mechanisms);
-        $run->config = $this->configSnapshot();
+        $run->config = $this->configSnapshot($override);
+        $run->model_override = trim((string) ($override['model'] ?? '')) ?: null;
+        $run->expand_model_override = trim((string) ($override['expand_model'] ?? '')) ?: null;
+        $run->endpoint_base_url = trim((string) ($override['base_url'] ?? '')) ?: null;
+        $run->endpoint_api_key = trim((string) ($override['api_key'] ?? '')) ?: null;
         $run->status = 'running';
         $run->total = $dataset->scorableRows()->count();
         $run->started_at = now();
@@ -95,13 +104,42 @@ class TestRunner
         ];
     }
 
-    /** Whole classify subtree + the two rerank model ids — RECORDED (not applied). */
-    private function configSnapshot(): array
+    /**
+     * Whole classify subtree + the two rerank model ids — RECORDED (not applied).
+     * When an endpoint override is set, the snapshot reflects what the run ACTUALLY
+     * uses (its jobs apply it), so the A/B history reads truthfully instead of showing
+     * the prod baseline.
+     *
+     * @param  array{model?:string, expand_model?:string, base_url?:string, api_key?:string}  $override
+     */
+    private function configSnapshot(array $override = []): array
     {
-        return [
+        $snap = [
             'classify' => config('classify'),
             'services.openrouter.classify_model' => config('services.openrouter.classify_model'),
             'services.openrouter.classify_model_tier1' => config('services.openrouter.classify_model_tier1'),
         ];
+
+        $model = trim((string) ($override['model'] ?? ''));
+        if ($model !== '') {
+            if (! str_starts_with($model, 'nebius:')) {
+                $model = 'nebius:'.$model;
+            }
+            $snap['services.openrouter.classify_model'] = $model;
+            $snap['services.openrouter.classify_model_tier1'] = $model;
+            $snap['classify']['broker']['model'] = $model;
+            $snap['classify']['broker']['brief_model'] = $model;
+            $snap['classify']['broker']['fact_model'] = $model;
+            $snap['classify']['direct']['model'] = $model;
+            $snap['classify']['direct']['granularity'] = 'heading';
+            $snap['classify']['broker']['answer_granularity'] = 'heading';
+        }
+
+        $expand = trim((string) ($override['expand_model'] ?? ''));
+        if ($expand !== '') {
+            $snap['classify']['expand_model'] = str_starts_with($expand, 'nebius:') ? $expand : 'nebius:'.$expand;
+        }
+
+        return $snap;
     }
 }

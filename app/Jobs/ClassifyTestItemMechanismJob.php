@@ -3,9 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\ClassificationItem;
+use App\Models\TestRun;
 use App\Services\Classify\Mechanisms\BrokerDescentMechanism;
 use App\Services\Classify\Mechanisms\DirectLlmMechanism;
 use App\Services\Classify\Mechanisms\VectorMechanism;
+use App\Services\Testing\EndpointOverride;
 use App\Services\Testing\TestRunFinalizer;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -51,11 +53,19 @@ class ClassifyTestItemMechanismJob implements ShouldQueue
 
         // Idempotent on retry: only run the mechanism if it hasn't already stored a row.
         if (! $item->results()->where('mechanism', $this->mechanism)->exists()) {
+            // Optional per-run endpoint override (e.g. a fine-tuned model on a rented
+            // GPU): applied ONLY for this mechanism call and restored after, because
+            // queue workers are reused and the config must not leak to the next run.
+            // A normal run has no override → apply() is a no-op → runs exactly as prod.
+            $run = $item->test_run_id !== null ? TestRun::find($item->test_run_id) : null;
+            $prior = $run !== null ? EndpointOverride::apply($run) : [];
             try {
                 $result = app($this->mechanismClass())->classify((string) $item->source_text);
                 $item->results()->updateOrCreate(['mechanism' => $this->mechanism], $result->toRow());
             } catch (Throwable $e) {
                 $this->abstain($item, $e); // handled here — never bubble to failed()
+            } finally {
+                EndpointOverride::restore($prior);
             }
         }
 
