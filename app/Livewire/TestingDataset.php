@@ -36,6 +36,16 @@ class TestingDataset extends Component
     /** Selected done-run to seed this dataset's memory from (flywheel replay). */
     public string $seedRunId = '';
 
+    // Optional: point THIS run at an external model endpoint (e.g. a fine-tuned model
+    // on a rented GPU). All blank → the run mirrors prod. See EndpointOverride.
+    public string $endpointModel = '';        // decision stages, e.g. "xif" (nebius: added if missing)
+
+    public string $endpointExpandModel = '';  // optional expand model, e.g. "base" (blank → expand stays prod)
+
+    public string $endpointBaseUrl = '';      // e.g. http://<ip>:8000/v1
+
+    public string $endpointKey = '';          // e.g. sk-vmtest
+
     public function mount(TestDataset $dataset): void
     {
         $this->dataset = $dataset;
@@ -50,10 +60,24 @@ class TestingDataset extends Component
 
     public function launch(TestRunner $runner): void
     {
-        $this->validate(['description' => 'required|string|max:200']);
+        $this->validate([
+            'description' => 'required|string|max:200',
+            'endpointModel' => 'nullable|string|max:120',
+            'endpointExpandModel' => 'nullable|string|max:120',
+            'endpointBaseUrl' => 'nullable|url|max:200',
+            'endpointKey' => 'nullable|string|max:200',
+        ]);
+
+        // An override is all-or-nothing: a model without an endpoint (or vice versa)
+        // would half-point the run and silently fall back to prod's Nebius base.
+        if (($this->endpointModel !== '') !== ($this->endpointBaseUrl !== '')) {
+            $this->addError('endpointModel', __('Set both a model and an endpoint URL, or leave both blank.'));
+
+            return;
+        }
 
         try {
-            $run = $runner->launch($this->dataset, $this->description, $this->mechanisms());
+            $run = $runner->launch($this->dataset, $this->description, $this->mechanisms(), $this->override());
         } catch (RuntimeException $e) {
             $this->addError('description', $e->getMessage());
 
@@ -61,6 +85,21 @@ class TestingDataset extends Component
         }
 
         $this->redirectRoute('testing.run', ['run' => $run->id], navigate: true);
+    }
+
+    /** @return array{model?:string, expand_model?:string, base_url?:string, api_key?:string} */
+    private function override(): array
+    {
+        if (trim($this->endpointModel) === '') {
+            return [];
+        }
+
+        return [
+            'model' => trim($this->endpointModel),
+            'expand_model' => trim($this->endpointExpandModel),
+            'base_url' => trim($this->endpointBaseUrl),
+            'api_key' => trim($this->endpointKey),
+        ];
     }
 
     /** @return array{enabled:array<int,string>, shadow:array<int,string>, cache:bool, search:bool} */
