@@ -265,5 +265,10 @@ return [
         'min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_MIN_CONF', 0.8),
         'timeout' => (int) env('CLASSIFY_SEARCH_RESOLVER_TIMEOUT', 180), // web search + reasoning is slow
         'prompt_version' => (string) env('CLASSIFY_SEARCH_RESOLVER_VERSION', 's1'),
+        // Cache confident web-search answers by (model, prompt_version, name) so an
+        // identical item never pays for the slow `:online` call twice — shared by prod
+        // and test runs. Only confident, catalog-valid answers are cached; a prompt_version
+        // bump or `search-cache:clear` invalidates. See App\Services\Classify\SearchCache.
+        'cache_enabled' => (bool) env('CLASSIFY_SEARCH_CACHE_ENABLED', true),
     ],
 ];

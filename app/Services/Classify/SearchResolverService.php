@@ -20,7 +20,7 @@ use Throwable;
  */
 class SearchResolverService
 {
-    public function __construct(private readonly OpenRouterClient $llm) {}
+    public function __construct(private readonly OpenRouterClient $llm, private readonly SearchCache $cache) {}
 
     /**
      * Resolve one conflicting item via web search. Writes the 'search' trace row and,
@@ -88,6 +88,27 @@ class SearchResolverService
     /** One search call → parsed {heading, kind, confidence, reason, sources}, or null. */
     private function ask(string $text, string $model): ?array
     {
+        // Cache read FIRST: lookup() is fully error-isolated (returns null on any fault),
+        // so a cache miss/error simply falls through to the live call below — the resolve
+        // path is never blocked. A hit skips the slow paid `:online` call entirely.
+        $cached = $this->cache->lookup($model, $text);
+        if ($cached !== null) {
+            // Log the hit as its own zero-cost row (real spend = 0); the avoided tokens
+            // go to meta so savings stay measurable. Use the response's resolved model so
+            // the log matches the original live call.
+            LlmLog::record('search_resolve', (string) ($cached['model'] ?? $model), [], 0, 'cache',
+                $cached['content'] ?? null, [], 'search_resolver', null,
+                ['item' => mb_substr($text, 0, 80), 'cache_hit' => true,
+                    'saved_total_tokens' => (int) ($cached['usage']['total_tokens'] ?? 0)]);
+
+            $d = $this->parse((string) ($cached['content'] ?? ''));
+            if ($d !== null) {
+                $d['sources'] = $cached['annotations'] ?? [];
+            }
+
+            return $d;
+        }
+
         $messages = [
             ['role' => 'system', 'content' => $this->prompt()],
             ['role' => 'user', 'content' => "ITEM: {$text}"],
@@ -104,6 +125,20 @@ class SearchResolverService
             $d = $this->parse((string) ($resp['content'] ?? ''));
             if ($d !== null) {
                 $d['sources'] = $resp['annotations'] ?? []; // web citations, if it searched
+
+                // Cache ONLY a confident, catalog-valid answer — never a no_match / null /
+                // low-confidence result, so a one-time "couldn't identify" (the web may do
+                // better later) is not frozen forever. Mirrors resolve()'s acceptance test.
+                [$validHeading] = $this->validate($d['heading'] ?? null, (string) ($d['kind'] ?? ''));
+                $min = (float) config('classify.search_resolver.min_confidence', 0.8);
+                if ($validHeading !== null && ($d['confidence'] ?? 0) >= $min) {
+                    $this->cache->store($model, $text, [
+                        'content' => (string) ($resp['content'] ?? ''),
+                        'usage' => $resp['usage'] ?? [],
+                        'model' => $resp['model'] ?? $model,
+                        'annotations' => $resp['annotations'] ?? [],
+                    ]);
+                }
             }
 
             return $d;
