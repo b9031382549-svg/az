@@ -46,8 +46,11 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       LOG_CHANNEL: stderr
-    # Horizon supervises several worker processes inside this one container.
-    mem_limit: 2g
+    # Horizon supervises up to maxProcesses (16) worker processes inside this one
+    # container. Each worker's soft memory cap is 256MB (Horizon restarts it above
+    # that), so 16 × 256MB + master/supervisor overhead ⇒ 4.5g. Realistic RSS per
+    # worker is ~60-110MB, so steady-state usage is far below this ceiling.
+    mem_limit: 4608m
     stop_signal: SIGTERM
     stop_grace_period: 30s
     depends_on:
