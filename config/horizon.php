@@ -216,7 +216,13 @@ return [
         'production' => [
             'supervisor-1' => [
                 'minProcesses' => 1,
-                'maxProcesses' => 8, // 4 vCPU box; workers are mostly network-bound on OpenRouter
+                // Workers are network-bound on OpenRouter/Nebius (CPU idle at ~0 load), so
+                // concurrency scales well past the 4 vCPU count. Neither LLM provider is the
+                // ceiling: OpenRouter has no per-key limit, Nebius gives 1200 RPM / 3M TPM with
+                // auto-scaling — measured 0% utilisation. Ceiling only; Horizon autoscales 1→16
+                // by queue depth. Container RAM is the real cap — see worker mem_limit in
+                // docker-compose.prod.yml (16 × 256MB soft limit ⇒ 4.5g).
+                'maxProcesses' => 16,
                 'balanceMaxShift' => 2,
                 'balanceCooldown' => 3,
             ],
