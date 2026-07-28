@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Classify\Consensus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -97,6 +98,45 @@ class ClassificationItem extends Model
         return $this->results
             ->filter(fn ($r) => $r->matched_code !== null && str_starts_with((string) $r->matched_code, (string) $this->final_code))
             ->max('confidence');
+    }
+
+    /**
+     * How the authoritative voting mechanisms agreed on the final heading, computed from
+     * the loaded `results` — excludes the cache/search trace rows (only the mechanisms
+     * that actually voted count). Requires `results` to be loaded.
+     *
+     * @return array{count: int, total: int, heading: ?string, kind: ?string}
+     */
+    public function agreement(): array
+    {
+        return Consensus::agreementOf(
+            $this->results->whereNotIn('mechanism', ['cache', 'search'])->values()
+        );
+    }
+
+    /**
+     * A coarse confidence tier for the FINAL decision, by EVIDENCE TYPE rather than any
+     * self-reported number: verified (cache hit / human confirm), unanimous (every voting
+     * mechanism agreed — the Memory-eligible tier, ~92-97% vs the benchmark), majority (a
+     * bare 2-of-3, ~55%), resolved (settled by the web search, ~63%), or weak (divergent /
+     * no agreement). Requires `results` to be loaded.
+     */
+    public function confidenceTier(): string
+    {
+        if ($this->resolution === 'confirmed' || $this->results->firstWhere('mechanism', 'cache') !== null) {
+            return 'verified';
+        }
+        if ($this->resolution === 'ai_resolved') {
+            return 'resolved';
+        }
+        if ($this->resolution === 'agreed') {
+            $ag = $this->agreement();
+            $min = (int) config('classify.memory_promotion.min_agreement', 2);
+
+            return $ag['total'] >= $min && $ag['count'] === $ag['total'] ? 'unanimous' : 'majority';
+        }
+
+        return 'weak';
     }
 
     /** Cached display translation of this item's name, keyed by source_hash. */

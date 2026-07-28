@@ -87,7 +87,34 @@ class Consensus
 
         $item->update($this->resolve($authResults));
 
+        $this->maybePromote($item, $authResults);
         $this->maybeSearchResolve($item);
+    }
+
+    /**
+     * Write a UNANIMOUS agreement back into the production memory so the same item later
+     * resolves for free. PROD ONLY: test-run items (test_run_id set) reach TestRunFinalizer
+     * rather than this method, and the guard is a second belt-and-suspenders check so an
+     * irreversible write can never leak into the shared production cache from a test. The
+     * unanimity gate + shadow/write policy lives in AnswerCacheService::promote().
+     *
+     * @param  Collection<int, ClassificationResult>  $authResults
+     */
+    private function maybePromote(ClassificationItem $item, Collection $authResults): void
+    {
+        // Only a REAL upload's unanimous item is promoted. Skip:
+        //  - test-run items (test_run_id set) — they reach TestRunFinalizer, not this
+        //    method; the guard is belt-and-suspenders on an irreversible write.
+        //  - the benchmark eval path — `benchmark:seed` fans GOLD names through this same
+        //    prod pipeline (batch "gold-<source>") purely to MEASURE accuracy, so those
+        //    must never leak the gold set into the live memory.
+        if ($item->test_run_id !== null
+            || $item->resolution !== 'agreed'
+            || str_starts_with((string) $item->batch, 'gold-')) {
+            return;
+        }
+
+        app(AnswerCacheService::class)->promote($item, self::agreementOf($authResults));
     }
 
     /**
@@ -121,35 +148,56 @@ class Consensus
     {
         $none = ['final_code' => null, 'final_catalog_id' => null, 'kind' => null];
 
-        $coded = $results->filter(fn ($r) => $r->matched_code !== null && $r->matched_code !== '');
+        // Agreement is measured on the 4-digit HEADING, not the full code (see agreementOf).
+        // The winning heading wins with a strict MAJORITY of the mechanisms that ran — for
+        // the 3-mechanism flow that is exactly "2 of 3" (abstentions count toward the
+        // denominator, so a lone code among abstentions is not a majority). Short → conflict.
+        $ag = self::agreementOf($results);
 
-        if ($coded->isEmpty()) {
+        if ($ag['count'] === 0) {
             return ['resolution' => 'no_match'] + $none;
         }
 
-        // Agreement is measured on the 4-digit HEADING, not the full code: group the
-        // mechanisms by the first 4 characters of their code and take the largest group.
-        // It wins with a strict MAJORITY of the mechanisms that ran — for the 3-mechanism
-        // flow that is exactly "2 of 3" (abstentions count toward the denominator, so a
-        // lone code among abstentions is not a majority). Anything short → conflict.
-        $threshold = intdiv($results->count(), 2) + 1;
+        $threshold = intdiv($ag['total'], 2) + 1;
+        if ($ag['count'] < $threshold) {
+            return ['resolution' => 'conflict'] + $none;
+        }
+
+        return [
+            'resolution' => 'agreed',
+            'final_code' => $ag['heading'],
+            'final_catalog_id' => null,
+            'kind' => $ag['kind'],
+        ];
+    }
+
+    /**
+     * How strongly a result set agrees on ONE 4-digit heading: the size of the largest
+     * group of mechanisms sharing a heading (`count`), out of how many results there are
+     * (`total`), plus that heading and its kind. Abstentions / error rows count toward the
+     * denominator (as in resolve()), so a lone code among abstentions is not unanimous.
+     * `count === total` (with `total >= 2`) is the UNANIMITY test used by memory promotion.
+     *
+     * @param  Collection<int, ClassificationResult>  $results
+     * @return array{count: int, total: int, heading: ?string, kind: ?string}
+     */
+    public static function agreementOf(Collection $results): array
+    {
+        $coded = $results->filter(fn ($r) => $r->matched_code !== null && $r->matched_code !== '');
+
+        if ($coded->isEmpty()) {
+            return ['count' => 0, 'total' => $results->count(), 'heading' => null, 'kind' => null];
+        }
+
         $winner = $coded
             ->groupBy(fn ($r) => mb_substr((string) $r->matched_code, 0, 4))
             ->sortByDesc(fn ($g) => $g->count())
             ->first();
 
-        if ($winner->count() < $threshold) {
-            return ['resolution' => 'conflict'] + $none;
-        }
-
-        // The answer is the shared heading itself (4 digits) — not any one mechanism's
-        // deeper code, which we no longer chase.
-        $heading = mb_substr((string) $winner->first()->matched_code, 0, 4);
-
         return [
-            'resolution' => 'agreed',
-            'final_code' => $heading,
-            'final_catalog_id' => null,
+            'count' => $winner->count(),
+            'total' => $results->count(),
+            'heading' => mb_substr((string) $winner->first()->matched_code, 0, 4),
             'kind' => $winner->first()->kind,
         ];
     }

@@ -57,6 +57,14 @@
         <span class="font-mono text-sm">{{ $item->final_code }}</span>
         <span class="text-muted">{{ \Illuminate\Support\Str::limit($finalName, 90) }}</span>
         @if($isHeading)<span class="px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted">{{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span>@endif
+        @php
+          $tier = $item->confidenceTier();
+          // Evidence strength behind the answer (measured vs the benchmark): unanimous
+          // ~92-97%, majority ~55%, web-resolved ~63%. Only unanimous is Memory-eligible.
+          $tierLabel = ['verified' => __('verified'), 'unanimous' => __('unanimous'), 'majority' => __('majority'), 'resolved' => __('web-resolved'), 'weak' => __('weak')][$tier] ?? $tier;
+          $tierTone = in_array($tier, ['verified', 'unanimous'], true) ? 'good' : ($tier === 'weak' ? 'muted' : 'warn');
+        @endphp
+        <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($tierTone) }}" title="{{ __('Confidence tier — the strength of evidence behind the answer') }}">{{ $tierLabel }}</span>
       @else
         <span class="text-muted">{{ __('awaiting a human decision') }}</span>
       @endif
