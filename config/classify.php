@@ -10,6 +10,28 @@ return [
         'enabled' => (bool) env('CLASSIFY_CACHE_ENABLED', true),
     ],
 
+    // Memory promotion — the write-back INVERSE of 'cache' above. When the ensemble
+    // reaches a UNANIMOUS agreement (every authoritative mechanism that ran landed on the
+    // same 4-digit heading), the item's answer is written back into the production
+    // answer_cache (scope 0, source 'auto:consensus') so an identical name later resolves
+    // for free with NO AI. ONLY unanimity is trusted: on the labelled benchmark a
+    // unanimous agreement matched ~92-97%, a bare 2-of-3 majority only ~55% and the
+    // web-search resolver ~63% — so a majority / ai_resolved answer is NEVER promoted (a
+    // wrong row would be frozen and silently short-circuit the whole pipeline forever).
+    // Rolled out behind 'shadow' first: shadow logs what it WOULD promote WITHOUT writing,
+    // so the real-traffic volume/quality can be measured before it is switched live.
+    'memory_promotion' => [
+        'enabled' => (bool) env('CLASSIFY_MEMORY_PROMOTION', false),
+        'shadow' => (bool) env('CLASSIFY_MEMORY_PROMOTION_SHADOW', true),
+        // Minimum mechanisms that must BOTH run and agree for unanimity to count, so a
+        // lone 1-of-1 (no independent corroboration) is never promoted.
+        'min_agreement' => (int) env('CLASSIFY_MEMORY_PROMOTION_MIN_AGREEMENT', 2),
+        // Provenance tag on written rows — distinguishes auto-promoted memory from the
+        // seeded Fedor reference, so it stays auditable and revertable en masse
+        // (cache:revert-promoted) if it ever proves to pollute.
+        'source' => (string) env('CLASSIFY_MEMORY_PROMOTION_SOURCE', 'auto:consensus'),
+    ],
+
     // Precedent-backed retrieval — a THIRD candidate source in CatalogRetriever,
     // alongside catalog-semantic and lexical. The nearest real-customs precedents
     // (product description → HS, translated to short Azerbaijani) vote by HS6

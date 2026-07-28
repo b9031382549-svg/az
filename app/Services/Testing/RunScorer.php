@@ -2,9 +2,12 @@
 
 namespace App\Services\Testing;
 
+use App\Models\ClassificationItem;
+use App\Models\ClassificationResult;
 use App\Models\TestRun;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -66,7 +69,7 @@ class RunScorer
     }
 
     /**
-     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int}
+     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, tiers: array<string, array{total:int, correct:int}>}
      */
     public function score(TestRun $run): array
     {
@@ -82,6 +85,13 @@ class RunScorer
             [...array_keys(self::MECHANISM_COLUMNS), 'majority', 'overall'],
             ['ran' => 0, 'answered' => 0, 'correct' => 0],
         );
+
+        // Calibration by CONFIDENCE TIER (evidence type), so the memory-promotion gate can
+        // be tuned against measured accuracy instead of a self-reported number: verified (a
+        // cache hit — the seeded answer), unanimous (every voting mechanism agreed — the
+        // promoted tier), majority (a bare 2-of-3), resolved (settled by the web search),
+        // weak (divergent). Bucketed on the item's FINAL answer — what the pipeline outputs.
+        $tiers = array_fill_keys(['verified', 'unanimous', 'majority', 'resolved', 'weak'], ['total' => 0, 'correct' => 0]);
 
         foreach ($rows as $row) {
             $item = $items->get($row->id);
@@ -110,9 +120,17 @@ class RunScorer
 
             // overall = the item's final answer after cache/consensus/search.
             $this->tally($columns['overall'], $item->final_code, $item->kind, $expHeading, $expService);
+
+            // Tier calibration: which evidence tier settled this item, and was that final
+            // answer correct — the accuracy that justifies (or not) promoting a tier.
+            $tier = $this->tierOf($item, $authResults);
+            $tiers[$tier]['total']++;
+            if (HeadingMatch::correct($item->final_code, $item->kind, $expHeading, $expService)) {
+                $tiers[$tier]['correct']++;
+            }
         }
 
-        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run)];
+        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'tiers' => $tiers];
     }
 
     /**
@@ -127,6 +145,35 @@ class RunScorer
             ->where('classification_items.test_run_id', $run->id)
             ->pluck('classification_results.usage')
             ->sum(fn ($u) => (int) (json_decode((string) $u, true)['total_tokens'] ?? 0));
+    }
+
+    /**
+     * The confidence tier that settled an item — the SAME classification the live pipeline
+     * makes (ClassificationItem::confidenceTier), recomputed here over the run's chosen
+     * authoritative set so a test run calibrates the exact gate prod would apply.
+     *
+     * @param  Collection<int, ClassificationResult>  $authResults
+     */
+    private function tierOf(ClassificationItem $item, $authResults): string
+    {
+        // A cache hit resolves with only a 'cache' row (no authoritative votes) — bucket it
+        // as 'verified', never let it fall through to 'majority' and inflate that number
+        // (this IS the metric used to judge whether a majority is trustworthy). Mirrors
+        // ClassificationItem::confidenceTier.
+        if ($item->resolution === 'confirmed' || $item->results->firstWhere('mechanism', 'cache') !== null) {
+            return 'verified';
+        }
+        if ($item->resolution === 'ai_resolved') {
+            return 'resolved';
+        }
+        if ($item->resolution === 'agreed') {
+            $ag = Consensus::agreementOf($authResults);
+            $min = (int) config('classify.memory_promotion.min_agreement', 2);
+
+            return $ag['total'] >= $min && $ag['count'] === $ag['total'] ? 'unanimous' : 'majority';
+        }
+
+        return 'weak';
     }
 
     /**

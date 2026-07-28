@@ -4,6 +4,8 @@ namespace App\Services\Classify;
 
 use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * The FIRST step of classification: look the item up in the verified answer cache
@@ -77,5 +79,81 @@ class AnswerCacheService
         ]);
 
         return true;
+    }
+
+    /**
+     * Write a UNANIMOUS ensemble answer back into the PRODUCTION memory (scope 0) so an
+     * identical name later resolves for free with no AI. Called by Consensus after an item
+     * settles to 'agreed'; enforces the unanimity gate — every authoritative mechanism
+     * that ran agreed on the winning heading, and at least min_agreement of them ran (a
+     * plain 2-of-3 majority or a web-search resolution is deliberately NOT promoted).
+     *
+     * Fully error-isolated (like SearchCache): a write-back is a nice-to-have, it must
+     * NEVER fail the classification queue or thrash a job. insertOrIgnore on the
+     * (test_dataset_id, name_key) unique key makes a concurrent duplicate — or a name that
+     * already has a seeded Fedor answer — a harmless no-op (never overwrites, never 23505).
+     *
+     * @param  array{count: int, total: int, heading: ?string, kind: ?string}  $agreement  from Consensus::agreementOf()
+     */
+    public function promote(ClassificationItem $item, array $agreement): void
+    {
+        $cfg = (array) config('classify.memory_promotion', []);
+        if (! ($cfg['enabled'] ?? false)) {
+            return;
+        }
+
+        $count = (int) ($agreement['count'] ?? 0);
+        $total = (int) ($agreement['total'] ?? 0);
+        $min = (int) ($cfg['min_agreement'] ?? 2);
+
+        // Unanimity: every mechanism that ran agreed on ONE heading, and enough of them
+        // ran to be a real independent corroboration (>= min_agreement).
+        if ($total < $min || $count !== $total) {
+            return;
+        }
+
+        $kind = (string) ($item->kind ?? '');
+        $heading = (string) ($item->final_code ?? '');
+        $isService = $kind === 'service';
+        // A good must carry a real 4-digit heading; a service is stored heading-null.
+        if (! $isService && ! preg_match('/^\d{4}$/', $heading)) {
+            return;
+        }
+        $name = (string) $item->source_text;
+        if (trim($name) === '') {
+            return;
+        }
+
+        // Shadow rollout: record what WOULD be promoted, write nothing — so the real
+        // volume/quality can be measured before the write-back is switched live.
+        if ($cfg['shadow'] ?? true) {
+            Log::info('memory_promotion.shadow', [
+                'item_id' => $item->id,
+                'name' => mb_substr($name, 0, 120),
+                'heading' => $isService ? null : $heading,
+                'is_service' => $isService,
+                'agreement' => "{$count}/{$total}",
+            ]);
+
+            return;
+        }
+
+        try {
+            AnswerCache::insertOrIgnore([
+                'test_dataset_id' => 0, // production scope — the cache the live classifier reads
+                'source' => (string) ($cfg['source'] ?? 'auto:consensus'),
+                'name' => $name,
+                'name_key' => AnswerCache::keyFor($name),
+                'heading' => $isService ? null : $heading,
+                'is_service' => $isService,
+                'tier' => 'auto',
+                'meta' => json_encode(['agreement' => "{$count}/{$total}", 'item_id' => $item->id],
+                    JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (Throwable) {
+            // A write-back failure must never affect the (already settled) classification.
+        }
     }
 }
