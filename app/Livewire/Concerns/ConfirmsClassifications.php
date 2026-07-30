@@ -4,6 +4,7 @@ namespace App\Livewire\Concerns;
 
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Services\Classify\AnswerCacheService;
 use App\Support\Audit;
 
 /**
@@ -38,6 +39,7 @@ trait ConfirmsClassifications
             ]);
             Audit::log(((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
                 ['id' => $item->id, 'code' => $code, 'was' => $was], $item);
+            app(AnswerCacheService::class)->promoteConfirmed($item);
 
             return true;
         }
@@ -61,6 +63,7 @@ trait ConfirmsClassifications
         ]);
         Audit::log(((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
             ['id' => $item->id, 'code' => $code, 'was' => $was], $item);
+        app(AnswerCacheService::class)->promoteConfirmed($item);
 
         return true;
     }

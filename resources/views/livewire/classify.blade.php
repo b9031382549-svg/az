@@ -4,6 +4,17 @@
       <p class="kicker mb-1.5">{{ __('XİF MN · goods & services') }}</p>
       <h1 class="font-display text-4xl">{{ __('Classify') }}</h1>
     </div>
+    <div class="flex items-center gap-2">
+      @if($memoryResetCount !== null)
+        <p class="text-muted text-sm">{{ __(':n rows removed.', ['n' => number_format($memoryResetCount)]) }}</p>
+      @endif
+      <button wire:click="resetMemory" wire:loading.attr="disabled" wire:target="resetMemory"
+              @disabled($resettableCacheCount === 0)
+              wire:confirm="{{ __('Delete :n cached answers and reset memory to only the :source baseline? This cannot be undone.', ['n' => number_format($resettableCacheCount), 'source' => $baselineSource]) }}"
+              class="btn btn-ghost btn-sm text-stamp" title="{{ __('Deletes every production cache row except :source (test data is never touched).', ['source' => $baselineSource]) }}">
+        {{ __('Reset memory') }}
+      </button>
+    </div>
   </div>
 
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Classify;
 
+use App\Livewire\Concerns\ConfirmsClassifications;
 use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
@@ -32,6 +33,92 @@ class AnswerCacheTest extends TestCase
         $svc = app(AnswerCacheService::class);
         $this->assertSame('1104', $svc->lookup('  barley   pearl 500G ')->heading); // normalized match
         $this->assertNull($svc->lookup('something never seen'));
+    }
+
+    public function test_seed_with_exclude_benchmarks_skips_held_out_names(): void
+    {
+        GoldLabel::create(['source' => 'gold', 'name' => 'Held Out Widget', 'name_key' => GoldLabel::keyFor('Held Out Widget'), 'heading' => '8471', 'is_service' => false, 'tier' => 'multi-family']);
+        GoldLabel::create(['source' => 'gold', 'name' => 'Held Out Service Item', 'name_key' => GoldLabel::keyFor('Held Out Service Item'), 'heading' => null, 'is_service' => true, 'tier' => 'multi-family']);
+        GoldLabel::create(['source' => 'gold', 'name' => 'Clean Widget', 'name_key' => GoldLabel::keyFor('Clean Widget'), 'heading' => '6302', 'is_service' => false, 'tier' => 'multi-family']);
+
+        $csv = storage_path('app/test-holdout-'.bin2hex(random_bytes(4)).'.csv');
+        $fh = fopen($csv, 'w');
+        fputcsv($fh, ['name']);
+        fputcsv($fh, ['Held Out Widget']);
+        fclose($fh);
+
+        $jsonl = storage_path('app/test-holdout-'.bin2hex(random_bytes(4)).'.jsonl');
+        file_put_contents($jsonl, json_encode(['name' => 'Held Out Service Item', 'gold' => null])."\n");
+
+        config()->set('classify.held_out_benchmarks', [$csv, $jsonl]);
+
+        $this->artisan('cache:seed', ['--source' => 'gold', '--exclude-benchmarks' => true])->assertSuccessful();
+
+        $this->assertDatabaseCount('answer_cache', 1);
+        $this->assertNotNull(AnswerCache::where('name_key', AnswerCache::keyFor('Clean Widget'))->first());
+        $this->assertNull(AnswerCache::where('name_key', AnswerCache::keyFor('Held Out Widget'))->first());
+        $this->assertNull(AnswerCache::where('name_key', AnswerCache::keyFor('Held Out Service Item'))->first());
+
+        @unlink($csv);
+        @unlink($jsonl);
+    }
+
+    public function test_seed_without_exclude_benchmarks_flag_seeds_everything(): void
+    {
+        GoldLabel::create(['source' => 'gold', 'name' => 'Held Out Widget', 'name_key' => GoldLabel::keyFor('Held Out Widget'), 'heading' => '8471', 'is_service' => false, 'tier' => 'multi-family']);
+
+        $csv = storage_path('app/test-holdout-'.bin2hex(random_bytes(4)).'.csv');
+        $fh = fopen($csv, 'w');
+        fputcsv($fh, ['name']);
+        fputcsv($fh, ['Held Out Widget']);
+        fclose($fh);
+        config()->set('classify.held_out_benchmarks', [$csv]);
+
+        // No --exclude-benchmarks — default behavior is unchanged, the held-out file is ignored.
+        $this->artisan('cache:seed', ['--source' => 'gold'])->assertSuccessful();
+
+        $this->assertDatabaseCount('answer_cache', 1);
+
+        @unlink($csv);
+    }
+
+    public function test_seed_warns_but_does_not_fail_when_a_held_out_file_is_missing(): void
+    {
+        GoldLabel::create(['source' => 'gold', 'name' => 'Some Widget', 'name_key' => GoldLabel::keyFor('Some Widget'), 'heading' => '8471', 'is_service' => false, 'tier' => 'multi-family']);
+        config()->set('classify.held_out_benchmarks', [storage_path('app/does-not-exist.csv')]);
+
+        $this->artisan('cache:seed', ['--source' => 'gold', '--exclude-benchmarks' => true])->assertSuccessful();
+
+        // A missing held-out file excludes NOTHING (fails open, not silently) — the row is seeded.
+        $this->assertDatabaseCount('answer_cache', 1);
+    }
+
+    public function test_seeding_a_new_source_never_overwrites_an_existing_different_source_answer(): void
+    {
+        GoldLabel::create(['source' => 'fedor', 'name' => 'Shared Product', 'name_key' => GoldLabel::keyFor('Shared Product'), 'heading' => '1104', 'is_service' => false, 'tier' => 'validated']);
+        $this->artisan('cache:seed', ['--source' => 'fedor'])->assertSuccessful();
+
+        // A broader 'gold' import disagrees on the same name — must NOT clobber fedor's answer.
+        GoldLabel::create(['source' => 'gold', 'name' => 'Shared Product', 'name_key' => GoldLabel::keyFor('Shared Product'), 'heading' => '9999', 'is_service' => false, 'tier' => 'multi-family']);
+        $this->artisan('cache:seed', ['--source' => 'gold'])->assertSuccessful();
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('Shared Product'))->first();
+        $this->assertSame('fedor', $row->source);
+        $this->assertSame('1104', $row->heading);
+        $this->assertDatabaseCount('answer_cache', 1); // no duplicate row for the gold side either
+    }
+
+    public function test_reseeding_the_same_source_still_refreshes_its_own_rows(): void
+    {
+        GoldLabel::create(['source' => 'fedor', 'name' => 'Refreshable Product', 'name_key' => GoldLabel::keyFor('Refreshable Product'), 'heading' => '1104', 'is_service' => false, 'tier' => 'claude']);
+        $this->artisan('cache:seed', ['--source' => 'fedor'])->assertSuccessful();
+
+        // The reference gets corrected upstream; re-seeding the SAME source must pick it up.
+        GoldLabel::where('name_key', GoldLabel::keyFor('Refreshable Product'))->update(['heading' => '2005', 'tier' => 'validated']);
+        $this->artisan('cache:seed', ['--source' => 'fedor'])->assertSuccessful();
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('Refreshable Product'))->first();
+        $this->assertSame('2005', $row->heading);
     }
 
     public function test_apply_resolves_a_good_at_the_4_digit_heading(): void
@@ -242,5 +329,137 @@ class AnswerCacheTest extends TestCase
 
         // A unanimous test item must NEVER touch the shared production memory (scope 0).
         $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    // --- Confirmed write-back (memory_promotion.confirmed) -------------------------------
+
+    public function test_promote_confirmed_writes_a_good_to_production_memory(): void
+    {
+        config()->set('classify.memory_promotion.confirmed.enabled', true);
+        $item = $this->agreedItem('Confirmed Widget', '8471', 'good', ['resolution' => 'confirmed']);
+
+        app(AnswerCacheService::class)->promoteConfirmed($item);
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('Confirmed Widget'))->first();
+        $this->assertNotNull($row);
+        $this->assertSame('8471', $row->heading);
+        $this->assertSame('confirmed', $row->source);
+    }
+
+    public function test_promote_confirmed_is_off_by_default(): void
+    {
+        config()->set('classify.memory_promotion.confirmed.enabled', false);
+        $item = $this->agreedItem('Off By Default Widget', '8471', 'good', ['resolution' => 'confirmed']);
+
+        app(AnswerCacheService::class)->promoteConfirmed($item);
+
+        $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    public function test_promote_confirmed_update_s_an_existing_wrong_answer_unlike_promote(): void
+    {
+        config()->set('classify.memory_promotion.confirmed.enabled', true);
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'auto:consensus', 'name' => 'Wrongly Cached Widget',
+            'name_key' => AnswerCache::keyFor('Wrongly Cached Widget'), 'heading' => '9999', 'is_service' => false]);
+        // A human catches and corrects the stale wrong answer.
+        $item = $this->agreedItem('Wrongly Cached Widget', '8471', 'good', ['resolution' => 'confirmed']);
+
+        app(AnswerCacheService::class)->promoteConfirmed($item);
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('Wrongly Cached Widget'))->first();
+        $this->assertSame('confirmed', $row->source);
+        $this->assertSame('8471', $row->heading); // the fix propagated, not left stale
+        $this->assertDatabaseCount('answer_cache', 1);
+    }
+
+    public function test_promote_confirmed_truncates_a_full_10_digit_confirmation_to_heading(): void
+    {
+        config()->set('classify.memory_promotion.confirmed.enabled', true);
+        $item = $this->agreedItem('Full Code Widget', '8471301000', 'good', ['resolution' => 'confirmed']);
+
+        app(AnswerCacheService::class)->promoteConfirmed($item);
+
+        $this->assertSame('8471', AnswerCache::where('name_key', AnswerCache::keyFor('Full Code Widget'))->first()->heading);
+    }
+
+    public function test_promote_confirmed_writes_a_service(): void
+    {
+        config()->set('classify.memory_promotion.confirmed.enabled', true);
+        $item = $this->agreedItem('Confirmed Service', '99', 'service', ['resolution' => 'confirmed']);
+
+        app(AnswerCacheService::class)->promoteConfirmed($item);
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('Confirmed Service'))->first();
+        $this->assertNull($row->heading);
+        $this->assertTrue((bool) $row->is_service);
+    }
+
+    public function test_confirming_an_item_via_the_trait_writes_to_memory(): void
+    {
+        config()->set('classify.memory_promotion.confirmed.enabled', true);
+        $item = $this->item('Trait Confirmed Widget');
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471301000', 'kind' => 'good', 'status' => 'needs_review']);
+        $item->update(['final_code' => '8471', 'kind' => 'good']);
+
+        $tester = new class
+        {
+            use ConfirmsClassifications;
+
+            public function confirm(ClassificationItem $item, string $code): bool
+            {
+                return $this->applyConfirm($item, $code);
+            }
+        };
+        $this->assertTrue($tester->confirm($item, '8471'));
+
+        $this->assertNotNull(AnswerCache::where('name_key', AnswerCache::keyFor('Trait Confirmed Widget'))->first());
+    }
+
+    // --- Reset memory to baseline (the classifier's "Reset memory" button) ---------------
+
+    public function test_reset_to_baseline_keeps_gold_and_deletes_everything_else_in_production_scope(): void
+    {
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'gold', 'name' => 'Gold Item', 'name_key' => AnswerCache::keyFor('Gold Item'), 'heading' => '1104', 'is_service' => false]);
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'fedor', 'name' => 'Fedor Item', 'name_key' => AnswerCache::keyFor('Fedor Item'), 'heading' => '1104', 'is_service' => false]);
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'auto:consensus', 'name' => 'Auto Item', 'name_key' => AnswerCache::keyFor('Auto Item'), 'heading' => '1104', 'is_service' => false]);
+
+        $deleted = app(AnswerCacheService::class)->resetToBaseline();
+
+        $this->assertSame(2, $deleted);
+        $this->assertDatabaseCount('answer_cache', 1);
+        $this->assertSame('gold', AnswerCache::first()->source);
+    }
+
+    public function test_reset_to_baseline_never_touches_test_dataset_memory(): void
+    {
+        $dataset = TestDataset::create(['name' => 'ds', 'mechanisms' => ['enabled' => ['vector']]]);
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'fedor', 'name' => 'Prod Item', 'name_key' => AnswerCache::keyFor('Prod Item'), 'heading' => '1104', 'is_service' => false]);
+        AnswerCache::create(['test_dataset_id' => $dataset->id, 'source' => 'dataset-labels', 'name' => 'Test Item', 'name_key' => AnswerCache::keyFor('Test Item'), 'heading' => '1104', 'is_service' => false]);
+
+        $deleted = app(AnswerCacheService::class)->resetToBaseline();
+
+        $this->assertSame(1, $deleted);
+        $this->assertDatabaseCount('answer_cache', 1);
+        $this->assertSame($dataset->id, AnswerCache::first()->test_dataset_id);
+    }
+
+    public function test_reset_to_baseline_respects_a_configured_baseline_source(): void
+    {
+        config()->set('classify.cache.baseline_source', 'ivan');
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'gold', 'name' => 'Gold Item', 'name_key' => AnswerCache::keyFor('Gold Item'), 'heading' => '1104', 'is_service' => false]);
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'ivan', 'name' => 'Ivan Item', 'name_key' => AnswerCache::keyFor('Ivan Item'), 'heading' => '1104', 'is_service' => false]);
+
+        $deleted = app(AnswerCacheService::class)->resetToBaseline();
+
+        $this->assertSame(1, $deleted);
+        $this->assertSame('ivan', AnswerCache::first()->source);
+    }
+
+    public function test_reset_to_baseline_is_a_no_op_when_only_the_baseline_exists(): void
+    {
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'gold', 'name' => 'Gold Item', 'name_key' => AnswerCache::keyFor('Gold Item'), 'heading' => '1104', 'is_service' => false]);
+
+        $this->assertSame(0, app(AnswerCacheService::class)->resetToBaseline());
+        $this->assertDatabaseCount('answer_cache', 1);
     }
 }

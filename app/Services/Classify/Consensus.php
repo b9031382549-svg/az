@@ -201,4 +201,26 @@ class Consensus
             'kind' => $winner->first()->kind,
         ];
     }
+
+    /**
+     * Whether a candidate heading matches the matched_code (truncated to heading) of ANY
+     * result in the given collection — the "grounding" check: does this answer overlap
+     * with something an independent mechanism already proposed as a candidate, even
+     * though it didn't win the original vote. Used to decide which search-resolved
+     * (ai_resolved) answers are trusted enough for memory/training — see
+     * AnswerCacheService::promoteGroundedSearch() and ExportFinetuneExamples. Measured
+     * (3 independent prod test runs, ~900 pooled search-tier examples): grounded +
+     * confidence >= 0.98 => 93-96% real accuracy; ungrounded => 34-58% (unstable).
+     *
+     * @param  Collection<int, ClassificationResult>  $results
+     */
+    public static function headingOverlaps(?string $heading, Collection $results): bool
+    {
+        if ($heading === null || $heading === '') {
+            return false;
+        }
+
+        return $results->contains(fn ($r) => $r->matched_code !== null
+            && mb_substr((string) $r->matched_code, 0, 4) === $heading);
+    }
 }
