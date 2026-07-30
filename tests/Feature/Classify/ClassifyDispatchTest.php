@@ -5,7 +5,9 @@ namespace Tests\Feature\Classify;
 use App\Jobs\ClassifyMechanismJob;
 use App\Jobs\TranslateItemJob;
 use App\Livewire\Classify;
+use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
+use App\Models\TestDataset;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -60,5 +62,22 @@ class ClassifyDispatchTest extends TestCase
             ->call('run');
 
         $this->assertSame(1, ClassificationItem::count());
+    }
+
+    public function test_reset_memory_button_keeps_the_baseline_and_deletes_the_rest(): void
+    {
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'gold', 'name' => 'Gold Item', 'name_key' => AnswerCache::keyFor('Gold Item'), 'heading' => '1104', 'is_service' => false]);
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'fedor', 'name' => 'Fedor Item', 'name_key' => AnswerCache::keyFor('Fedor Item'), 'heading' => '1104', 'is_service' => false]);
+        $dataset = TestDataset::create(['name' => 'ds', 'mechanisms' => ['enabled' => ['vector']]]);
+        AnswerCache::create(['test_dataset_id' => $dataset->id, 'source' => 'dataset-labels', 'name' => 'Test Item', 'name_key' => AnswerCache::keyFor('Test Item'), 'heading' => '1104', 'is_service' => false]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(Classify::class)
+            ->call('resetMemory')
+            ->assertSet('memoryResetCount', 1);
+
+        $this->assertDatabaseCount('answer_cache', 2); // the gold seed + the untouched test-dataset row
+        $this->assertNotNull(AnswerCache::where('test_dataset_id', 0)->where('source', 'gold')->first());
+        $this->assertNotNull(AnswerCache::where('test_dataset_id', $dataset->id)->first());
     }
 }

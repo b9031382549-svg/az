@@ -1,1 +1,16 @@
 *.jsonl
+
+# Throwaway round-2 diagnostics (rerank / HS-2022 / weight sweeps — not kept)
+ce_rerank.py
+diag_curve.php
+dump_candidates.php
+full_flow_heading.php
+ivan_accuracy.php
+ivan_diag.php
+measure_vector.php
+miss_probe.php
+probe_2404.php
+rank_vs_rerank.php
+rerank_heading_ab.php
+rerank_model_ab.php
+weight_sweep.php

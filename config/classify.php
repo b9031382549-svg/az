@@ -8,6 +8,23 @@ return [
     // exact normalized-name match; semantic (vector) lookup is planned.
     'cache' => [
         'enabled' => (bool) env('CLASSIFY_CACHE_ENABLED', true),
+        // The one source a "reset memory" action wipes the production cache DOWN TO —
+        // every other row (fedor / auto:consensus / confirmed / ai_resolved_grounded /
+        // ...) is deleted. See AnswerCacheService::resetToBaseline().
+        'baseline_source' => (string) env('CLASSIFY_CACHE_BASELINE_SOURCE', 'gold'),
+    ],
+
+    // Held-out benchmark/eval files — repo-relative paths, CSV (must have a 'name'
+    // column) or .jsonl (must have a "name" field per line). `cache:seed
+    // --exclude-benchmarks` never seeds a name found in any of these, so accuracy
+    // measured against them always reflects real classification, never a cache hit.
+    // Local research files (gitignored) — not present in every environment; a missing
+    // file is a loud warning at seed time, never a silent partial exclusion.
+    'held_out_benchmarks' => [
+        '123/benchmark_frozen_296.csv',
+        '123/benchmark_curated_452.csv',
+        '123/benchmark_holdout_454.csv',
+        'research-data/finetune/gold-split/test.jsonl',
     ],
 
     // Memory promotion — the write-back INVERSE of 'cache' above. When the ensemble
@@ -30,6 +47,24 @@ return [
         // seeded Fedor reference, so it stays auditable and revertable en masse
         // (cache:revert-promoted) if it ever proves to pollute.
         'source' => (string) env('CLASSIFY_MEMORY_PROMOTION_SOURCE', 'auto:consensus'),
+
+        // Two more write-back paths into the SAME production memory, each independently
+        // switchable. Both use insertOrIgnore-or-equivalent-safe writes; see
+        // AnswerCacheService for the exact semantics of each.
+        'confirmed' => [
+            // A human explicitly confirmed/corrected an item — the single strongest trust
+            // signal in the system. UPDATES an existing (possibly wrong) row: unlike the
+            // automated paths, a human override is authoritative enough to overwrite.
+            'enabled' => (bool) env('CLASSIFY_MEMORY_PROMOTE_CONFIRMED', false),
+            'source' => (string) env('CLASSIFY_MEMORY_PROMOTE_CONFIRMED_SOURCE', 'confirmed'),
+        ],
+        'grounded_search' => [
+            // A search-resolved (ai_resolved) answer, but ONLY when GROUNDED — see
+            // Consensus::headingOverlaps() and search_resolver.grounded_min_confidence
+            // below. Measured 93-96% real accuracy, comparable to the unanimous tier.
+            'enabled' => (bool) env('CLASSIFY_MEMORY_PROMOTE_GROUNDED_SEARCH', false),
+            'source' => (string) env('CLASSIFY_MEMORY_PROMOTE_GROUNDED_SEARCH_SOURCE', 'ai_resolved_grounded'),
+        ],
     ],
 
     // Precedent-backed retrieval — a THIRD candidate source in CatalogRetriever,
@@ -285,6 +320,11 @@ return [
         'model' => (string) env('CLASSIFY_SEARCH_RESOLVER_MODEL', 'deepseek/deepseek-v4-flash:online'),
         // Confidence the model must self-report for its heading to be taken as correct.
         'min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_MIN_CONF', 0.8),
+        // Stricter bar for GROUNDED memory write-back (memory_promotion.grounded_search):
+        // measured (3 prod test runs, ~900 pooled search-tier examples) — grounded +
+        // confidence >= 0.98 => 93-96% real accuracy, comparable to the unanimous tier.
+        // Below 0.98 the same grounded subset only measured 80-87%, not worth freezing.
+        'grounded_min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_GROUNDED_MIN_CONF', 0.98),
         'timeout' => (int) env('CLASSIFY_SEARCH_RESOLVER_TIMEOUT', 180), // web search + reasoning is slow
         'prompt_version' => (string) env('CLASSIFY_SEARCH_RESOLVER_VERSION', 's1'),
         // Cache confident web-search answers by (model, prompt_version, name) so an

@@ -40,7 +40,7 @@ final class DirectLlmMechanism implements ClassifierMechanism
         $usage = [];
         try {
             $messages = [
-                ['role' => 'system', 'content' => $this->prompt($mode)],
+                ['role' => 'system', 'content' => self::prompt($mode)],
                 ['role' => 'user', 'content' => "ITEM: {$text}"],
             ];
             $resp = $this->llm->complete($messages, [
@@ -234,7 +234,12 @@ final class DirectLlmMechanism implements ClassifierMechanism
         return CatalogCode::where('position', $heading)->where('is_active', true)->exists();
     }
 
-    private function prompt(string $mode = 'code'): string
+    /**
+     * The exact system prompt Direct uses for a granularity — public/static (pure, no
+     * instance state) so a fine-tune corpus builder can format training examples that
+     * match live inference byte-for-byte. See ExportFinetuneExamples.
+     */
+    public static function prompt(string $mode = 'code'): string
     {
         if ($mode === 'heading') {
             return <<<'PROMPT'

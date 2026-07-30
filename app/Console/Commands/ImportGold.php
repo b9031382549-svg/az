@@ -7,10 +7,15 @@ use Illuminate\Console\Command;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Import the two external reference ("gold") files into gold_labels:
- *   - Ivan  — one AI's full 10-digit codes (sheet result_goods).
- *   - Fedor — the "Validated Gold (both agree)" sheet: 4-digit heading +
+ * Import external reference ("gold") files into gold_labels:
+ *   - Ivan     — one AI's full 10-digit codes (sheet result_goods).
+ *   - Fedor    — the "Validated Gold (both agree)" sheet: 4-digit heading +
  *     good/service, where two models (Claude + GPT) agreed.
+ *   - gold-ref — the larger multi-family verified reference (~106k names, CSV,
+ *     ~93-95% precision per the team's own note) — a broader-coverage foundation,
+ *     used to seed production memory (see cache:seed --source=gold) and as the
+ *     base corpus for fine-tuning. Reference only — this import never touches
+ *     answer_cache or live classification by itself.
  * Idempotent (upsert by source+name_key). No LLM calls — pure file → table.
  */
 class ImportGold extends Command
@@ -18,9 +23,10 @@ class ImportGold extends Command
     protected $signature = 'benchmark:import-gold
         {--ivan= : path to Ivan xlsx (default start-data/gold/ivan.xlsx)}
         {--fedor= : path to Fedor xlsx (default start-data/gold/fedor.xlsx)}
+        {--gold-ref= : path to the gold-ref CSV (e.g. team_export_2026-07-20/hs_gold_ref.csv)}
         {--fresh : truncate gold_labels first}';
 
-    protected $description = 'Import Ivan/Fedor reference labels into gold_labels';
+    protected $description = 'Import Ivan/Fedor/gold-ref reference labels into gold_labels';
 
     public function handle(): int
     {
@@ -33,6 +39,7 @@ class ImportGold extends Command
 
         $ivan = $this->option('ivan') ?: base_path('start-data/gold/ivan.xlsx');
         $fedor = $this->option('fedor') ?: base_path('start-data/gold/fedor.xlsx');
+        $goldRef = $this->option('gold-ref');
 
         $n = 0;
         if (is_file($ivan)) {
@@ -45,6 +52,13 @@ class ImportGold extends Command
         } else {
             $this->warn("Fedor file not found: {$fedor}");
         }
+        if ($goldRef !== null) {
+            if (is_file($goldRef)) {
+                $n += $this->importGoldRef($goldRef);
+            } else {
+                $this->warn("gold-ref file not found: {$goldRef}");
+            }
+        }
 
         $this->info("Done. gold_labels now holds {$n} rows across ".GoldLabel::distinct('source')->count('source').' source(s).');
         foreach (GoldLabel::selectRaw('source, count(*) c')->groupBy('source')->pluck('c', 'source') as $s => $c) {
@@ -52,6 +66,89 @@ class ImportGold extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * gold-ref: CSV with columns name,service,chapter,heading,group,confidence,source,note
+     * — 'source' here is the ORIGINAL labelling attribution (e.g. "opus+gpt"), not the
+     * gold_labels.source column (always 'gold' for this import); kept in meta as
+     * 'labelled_by'. Same conflict handling as Fedor/Ivan would need: a name that
+     * appears twice with two DIFFERENT labels is dropped entirely as ambiguous rather
+     * than silently keeping whichever row happened to be read last.
+     */
+    private function importGoldRef(string $path): int
+    {
+        $fh = fopen($path, 'r');
+        if ($fh === false) {
+            $this->warn("Could not open {$path}");
+
+            return 0;
+        }
+
+        $header = fgetcsv($fh);
+        if ($header === false) {
+            fclose($fh);
+
+            return 0;
+        }
+        // Strip a UTF-8 BOM from the first header cell, if present.
+        $header[0] = preg_replace('/^\x{FEFF}/u', '', (string) $header[0]);
+        $col = array_flip(array_map(fn ($h) => mb_strtolower(trim((string) $h)), $header));
+
+        $byKey = []; // name_key => row array
+        $conflict = [];
+        while (($r = fgetcsv($fh)) !== false) {
+            $name = trim((string) ($r[$col['name']] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $key = GoldLabel::keyFor($name);
+            $isService = $this->bool($r[$col['service']] ?? null);
+            $rawHeading = trim((string) ($r[$col['heading']] ?? ''));
+            $heading = ! $isService && preg_match('/^\d{4}$/', $rawHeading) ? $rawHeading : null;
+            if (! $isService && $heading === null) {
+                continue; // a good with no usable heading — not trustworthy enough to keep
+            }
+
+            $row = [
+                'source' => 'gold',
+                'tier' => 'multi-family',
+                'name' => $name,
+                'name_key' => $key,
+                'code' => null,
+                'heading' => $heading,
+                'chapter' => $this->str($r[$col['chapter']] ?? null),
+                'is_service' => $isService,
+                'confidence' => is_numeric($r[$col['confidence']] ?? null) ? (float) $r[$col['confidence']] : null,
+                'unit' => null,
+                'category' => $this->str($r[$col['group']] ?? null),
+                'meta' => array_filter([
+                    'labelled_by' => $this->str($r[$col['source']] ?? null),
+                    'note' => $this->str($r[$col['note']] ?? null),
+                ]),
+            ];
+
+            if (isset($byKey[$key])) {
+                $existing = $byKey[$key];
+                $sameLabel = $existing['is_service'] === $isService && $existing['heading'] === $heading;
+                if (! $sameLabel) {
+                    $conflict[$key] = true;
+                }
+
+                continue; // keep the FIRST label for this name either way; conflicts are dropped below
+            }
+            $byKey[$key] = $row;
+        }
+        fclose($fh);
+
+        foreach (array_keys($conflict) as $key) {
+            unset($byKey[$key]);
+        }
+        if ($conflict !== []) {
+            $this->warn('  gold-ref: dropped '.count($conflict).' names with conflicting labels.');
+        }
+
+        return $this->store(array_values($byKey), 'gold');
     }
 
     /** Ivan: name → full 10-digit code (sheet result_goods, Azerbaijani names). */

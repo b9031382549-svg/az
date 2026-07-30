@@ -4,6 +4,8 @@ namespace App\Services\Classify;
 
 use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
+use App\Models\ClassificationResult;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -155,5 +157,137 @@ class AnswerCacheService
         } catch (Throwable) {
             // A write-back failure must never affect the (already settled) classification.
         }
+    }
+
+    /**
+     * Write a human-CONFIRMED answer into the PRODUCTION memory — the strongest trust
+     * signal in the system (a person made an explicit decision), so unlike promote() this
+     * UPDATES an existing row when one is already there: if a human is correcting a stale
+     * or wrong cache entry (fedor / gold / a prior auto-promotion), that fix must
+     * propagate forward, not leave the same wrong answer to keep auto-resolving silently.
+     * Called from ConfirmsClassifications::applyConfirm() after the item itself is saved.
+     */
+    public function promoteConfirmed(ClassificationItem $item): void
+    {
+        $cfg = (array) config('classify.memory_promotion.confirmed', []);
+        if (! ($cfg['enabled'] ?? false)) {
+            return;
+        }
+
+        [$name, $heading, $isService] = $this->normalizedAnswer($item->source_text, $item->kind, $item->final_code);
+        if ($name === null) {
+            return;
+        }
+
+        try {
+            AnswerCache::updateOrCreate(
+                ['test_dataset_id' => 0, 'name_key' => AnswerCache::keyFor($name)],
+                [
+                    'source' => (string) ($cfg['source'] ?? 'confirmed'),
+                    'name' => $name,
+                    'heading' => $heading,
+                    'is_service' => $isService,
+                    'tier' => 'human',
+                    'meta' => json_encode(['item_id' => $item->id], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+                ],
+            );
+        } catch (Throwable) {
+            // A write-back failure must never affect the (already applied) confirmation.
+        }
+    }
+
+    /**
+     * Write a GROUNDED search-resolved (ai_resolved) answer into the PRODUCTION memory.
+     * "Grounded" means the resolver's heading overlaps with at least one of the original
+     * pre-conflict vector/broker/direct candidates AND its self-reported confidence clears
+     * search_resolver.grounded_min_confidence — measured 93-96% real accuracy (vs ~64% for
+     * the resolver's bare min_confidence=0.8 gate alone), comparable to the unanimous tier.
+     * An AUTOMATED write, so — unlike promoteConfirmed() — insertOrIgnore: never allowed
+     * to overwrite ANY existing verified answer regardless of source. Called from
+     * SearchResolverService::resolve() once the item is confidently resolved.
+     *
+     * @param  Collection<int, ClassificationResult>  $authoritativeResults  the original
+     *                                                                       pre-conflict vector/broker/direct rows, to check grounding against.
+     */
+    public function promoteGroundedSearch(ClassificationItem $item, ClassificationResult $search, Collection $authoritativeResults): void
+    {
+        $cfg = (array) config('classify.memory_promotion.grounded_search', []);
+        if (! ($cfg['enabled'] ?? false)) {
+            return;
+        }
+
+        if ($search->matched_code === null || $search->confidence === null) {
+            return;
+        }
+        $minConf = (float) config('classify.search_resolver.grounded_min_confidence', 0.98);
+        if ($search->confidence < $minConf) {
+            return;
+        }
+        $heading = mb_substr((string) $search->matched_code, 0, 4);
+        if (! Consensus::headingOverlaps($heading, $authoritativeResults)) {
+            return;
+        }
+
+        [$name, $heading, $isService] = $this->normalizedAnswer($item->source_text, $search->kind, $heading);
+        if ($name === null) {
+            return;
+        }
+
+        try {
+            AnswerCache::insertOrIgnore([
+                'test_dataset_id' => 0,
+                'source' => (string) ($cfg['source'] ?? 'ai_resolved_grounded'),
+                'name' => $name,
+                'name_key' => AnswerCache::keyFor($name),
+                'heading' => $heading,
+                'is_service' => $isService,
+                'tier' => 'grounded',
+                'meta' => json_encode(['confidence' => $search->confidence, 'item_id' => $item->id],
+                    JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (Throwable) {
+            // A write-back failure must never affect the (already applied) resolution.
+        }
+    }
+
+    /**
+     * Wipe the PRODUCTION memory (scope 0) back down to just the baseline reference
+     * (config('classify.cache.baseline_source'), 'gold' by default) — deletes every
+     * fedor / ivan / auto:consensus / confirmed / ai_resolved_grounded / ... row added
+     * since. Test-dataset memory (test_dataset_id > 0 — DatasetMemory's own isolated
+     * area, never read by the live classifier) is untouched, so resetting from the
+     * main classifier can never affect a Testing subsystem measurement. Returns the
+     * number of rows deleted.
+     */
+    public function resetToBaseline(): int
+    {
+        return AnswerCache::where('test_dataset_id', 0)
+            ->where('source', '!=', (string) config('classify.cache.baseline_source', 'gold'))
+            ->delete();
+    }
+
+    /**
+     * Shared validation for a would-be answer_cache row: a real name, a service flagged
+     * heading-null, or a good with a genuine 4-digit heading. Returns [null, null, null]
+     * when the answer isn't well-formed enough to trust into memory.
+     *
+     * @return array{0: ?string, 1: ?string, 2: bool}
+     */
+    private function normalizedAnswer(?string $sourceText, ?string $kind, ?string $code): array
+    {
+        $name = (string) $sourceText;
+        if (trim($name) === '') {
+            return [null, null, false];
+        }
+
+        $isService = $kind === 'service';
+        $heading = $isService ? null : mb_substr((string) $code, 0, 4);
+        if (! $isService && ! preg_match('/^\d{4}$/', (string) $heading)) {
+            return [null, null, false];
+        }
+
+        return [$name, $heading, $isService];
     }
 }

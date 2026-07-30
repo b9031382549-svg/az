@@ -4,6 +4,7 @@ namespace App\Services\Classify;
 
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Models\ClassificationResult;
 use App\Models\RubricatorNode;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
@@ -20,7 +21,11 @@ use Throwable;
  */
 class SearchResolverService
 {
-    public function __construct(private readonly OpenRouterClient $llm, private readonly SearchCache $cache) {}
+    public function __construct(
+        private readonly OpenRouterClient $llm,
+        private readonly SearchCache $cache,
+        private readonly AnswerCacheService $memory,
+    ) {}
 
     /**
      * Resolve one conflicting item via web search. Writes the 'search' trace row and,
@@ -57,7 +62,7 @@ class SearchResolverService
 
         // Trace row (one per item, mechanism='search') — always written so the decision
         // page shows the search verdict + citations even when it didn't settle it.
-        $this->trace(
+        $search = $this->trace(
             $item,
             $heading,
             $kind,
@@ -75,7 +80,7 @@ class SearchResolverService
         // Apply at the 4-DIGIT heading (final_catalog_id null — no exact catalog row).
         // Conditional update: only a still-divergent item flips, so a human confirm/
         // reject that landed while this job ran is never overwritten.
-        ClassificationItem::whereKey($item->id)
+        $applied = ClassificationItem::whereKey($item->id)
             ->whereIn('resolution', ['conflict', 'review'])
             ->update([
                 'resolution' => 'ai_resolved',
@@ -83,6 +88,18 @@ class SearchResolverService
                 'final_catalog_id' => null,
                 'kind' => $kind,
             ]);
+
+        // Write GROUNDED answers back into memory — only when this heading overlaps with
+        // one of the original pre-conflict vector/broker/direct candidates (see
+        // AnswerCacheService::promoteGroundedSearch()); never for a hard/ungrounded case.
+        if ($applied === 1) {
+            $authoritative = Consensus::computeAuthoritative(
+                (array) config('classify.mechanisms.enabled', ['vector']),
+                (array) config('classify.mechanisms.shadow', []),
+            );
+            $authResults = $item->results()->whereIn('mechanism', $authoritative)->get();
+            $this->memory->promoteGroundedSearch($item, $search, $authResults);
+        }
     }
 
     /** One search call → parsed {heading, kind, confidence, reason, sources}, or null. */
@@ -185,9 +202,9 @@ class SearchResolverService
     }
 
     /** Persist / update the single `mechanism='search'` trace row for this item. */
-    private function trace(ClassificationItem $item, ?string $code, ?string $kind, ?float $confidence, string $status, string $reason, string $model, ?string $headingName = null): void
+    private function trace(ClassificationItem $item, ?string $code, ?string $kind, ?float $confidence, string $status, string $reason, string $model, ?string $headingName = null): ClassificationResult
     {
-        $item->results()->updateOrCreate(
+        return $item->results()->updateOrCreate(
             ['mechanism' => 'search'],
             [
                 'matched_code' => $code,

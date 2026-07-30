@@ -2,6 +2,7 @@
 .DS_Store
 .env
 .env.backup
+.env.bak.*
 .env.production
 .phpactor.json
 .phpunit.result.cache
@@ -49,3 +50,13 @@ Thumbs.db
 
 # Downloaded reference/training data (multi-GB — real customs HS datasets, never commit)
 /research-data/
+
+# Local benchmark/gold/training data dump (not shipped)
+/123/
+
+# Local MLX/LoRA research prototype (separate project, not part of this app)
+/AZdata-main/
+
+# Raw gold-reference CSV export (19MB+ — real customs HS dataset, never commit; imported
+# via `benchmark:import-gold --gold-ref=`, SCP'd to the server when needed, not shipped).
+/team_export_*/

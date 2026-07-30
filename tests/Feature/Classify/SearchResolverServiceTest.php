@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Classify;
 
+use App\Models\AnswerCache;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Services\Classify\SearchResolverService;
@@ -148,5 +149,90 @@ class SearchResolverServiceTest extends TestCase
         app(SearchResolverService::class)->resolve($item);
 
         $this->assertStringContainsString('[web: ru.wikipedia.org]', (string) $item->results()->where('mechanism', 'search')->first()->explanation);
+    }
+
+    // --- Grounded memory write-back (memory_promotion.grounded_search) -------------------
+
+    private function enableGroundedPromotion(): void
+    {
+        config()->set('classify.memory_promotion.grounded_search.enabled', true);
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
+        config()->set('classify.mechanisms.shadow', []);
+    }
+
+    public function test_grounded_and_confident_answer_is_written_to_memory(): void
+    {
+        $this->enableGroundedPromotion();
+        $item = $this->conflictItem();
+        // 'direct' already proposed 8471 before the conflict — search's answer overlaps it.
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '620800', 'kind' => 'good', 'status' => 'needs_review']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '940320', 'kind' => 'good', 'status' => 'needs_review']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471', 'kind' => 'good', 'status' => 'needs_review']);
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.98,"reason":"a laptop"}');
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor($item->source_text))->first();
+        $this->assertNotNull($row);
+        $this->assertSame('8471', $row->heading);
+        $this->assertSame('ai_resolved_grounded', $row->source);
+    }
+
+    public function test_grounded_write_is_off_by_default(): void
+    {
+        // Explicit disable — don't rely on ambient .env (a local dev box may have this
+        // flag turned on, as this exact feature does once someone tests it live).
+        config()->set('classify.memory_promotion.grounded_search.enabled', false);
+        $item = $this->conflictItem();
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471', 'kind' => 'good', 'status' => 'needs_review']);
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.99,"reason":"a laptop"}');
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    public function test_ungrounded_answer_is_not_written_even_at_full_confidence(): void
+    {
+        $this->enableGroundedPromotion();
+        $item = $this->conflictItem();
+        // None of the three proposed 8471 — search's answer isn't corroborated by anything.
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '620800', 'kind' => 'good', 'status' => 'needs_review']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '940320', 'kind' => 'good', 'status' => 'needs_review']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => null, 'kind' => null, 'status' => 'no_match']);
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":1.0,"reason":"a laptop"}');
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    public function test_grounded_but_below_098_confidence_is_not_written(): void
+    {
+        $this->enableGroundedPromotion();
+        $item = $this->conflictItem();
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471', 'kind' => 'good', 'status' => 'needs_review']);
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.9,"reason":"a laptop"}');
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    public function test_grounded_write_never_overwrites_an_existing_answer(): void
+    {
+        $this->enableGroundedPromotion();
+        AnswerCache::create(['test_dataset_id' => 0, 'source' => 'fedor', 'name' => 'noutbuk kompüter',
+            'name_key' => AnswerCache::keyFor('noutbuk kompüter'), 'heading' => '8528', 'is_service' => false]);
+        $item = $this->conflictItem(); // same source_text: 'noutbuk kompüter'
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471', 'kind' => 'good', 'status' => 'needs_review']);
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.99,"reason":"a laptop"}');
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('noutbuk kompüter'))->first();
+        $this->assertSame('fedor', $row->source);
+        $this->assertSame('8528', $row->heading); // untouched
+        $this->assertDatabaseCount('answer_cache', 1);
     }
 }
