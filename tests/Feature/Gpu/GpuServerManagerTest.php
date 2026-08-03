@@ -171,6 +171,21 @@ class GpuServerManagerTest extends TestCase
         $this->assertSame('computeinstance-x', $fake->destroyedId);
     }
 
+    public function test_destroy_clears_stale_status_detail(): void
+    {
+        // A clean teardown must not leave an old message on an off slot (regression for the
+        // transient-DNS "Destroy warning …" that lingered after the instance was long gone).
+        $fake = new FakeOrchestrator;
+        $this->slot('A')->update([
+            'status' => GpuServer::STATUS_SERVING, 'instance_id' => 'computeinstance-x',
+            'status_detail' => 'Destroy warning: some transient blip',
+        ]);
+
+        $this->manager($fake)->destroy($this->slot('A'));
+
+        $this->assertNull($this->slot('A')->status_detail);
+    }
+
     public function test_safety_destroys_idle_active_and_over_ceiling_but_spares_candidate(): void
     {
         config()->set('gpu.autostop_idle_minutes', 120);

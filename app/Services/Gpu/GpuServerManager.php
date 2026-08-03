@@ -137,12 +137,15 @@ class GpuServerManager
     /** Destroy the VM and reset the slot to off. Idempotent; keeps the adapter + image. */
     public function destroy(GpuServer $server): void
     {
+        $warning = null;
         if ($server->instance_id) {
             try {
                 $this->orchestrator->destroy($server->instance_id);
             } catch (Throwable $e) {
-                // Log via status_detail but still reset — a stuck instance must not pin the slot.
-                $server->status_detail = 'Destroy warning: '.$e->getMessage();
+                // Keep going — a stuck instance must not pin the slot — but surface a GENUINE
+                // failure. (The orchestrator already verifies a transient-error delete actually
+                // failed before throwing, so this only fires when the VM really survived.)
+                $warning = 'Destroy warning: '.$e->getMessage();
             }
         }
         $server->fill([
@@ -156,6 +159,9 @@ class GpuServerManager
             'served_adapter_id' => null,
             'current_run_id' => null,
             'hard_deadline_at' => null,
+            // Cleared on a clean teardown so a stale message never lingers on an off slot;
+            // only a real destroy failure leaves a warning behind.
+            'status_detail' => $warning,
         ])->save();
     }
 

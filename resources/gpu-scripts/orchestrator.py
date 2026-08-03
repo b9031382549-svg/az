@@ -18,7 +18,7 @@ CONTRACT: stdout is JSON only. Success -> {"ok": true, ...}; failure -> {"ok": f
 NOT RUNNABLE END-TO-END until a golden snapshot exists (that bake needs a rented VM — the
 paid boundary). The command construction + parsing below is what will drive it then.
 """
-import argparse, json, os, subprocess, sys, re, shlex
+import argparse, json, os, subprocess, sys, re, shlex, time
 
 PLATFORM = os.environ.get("GPU_PLATFORM", "gpu-h200-sxm")     # e.g. gpu-h100-sxm
 PRESET = os.environ.get("GPU_PRESET", "1gpu-16vcpu-200gb")
@@ -304,14 +304,34 @@ def cmd_fetch_adapter(a):
     out({"ok": True, "vps_path": a.vps_path, "sha256": sha})
 
 
+def _confirm_gone(iid, attempts=4):
+    """Is the instance actually gone? A transient CLI/DNS failure (e.g. the worker's docker
+    resolver blipping) can break `delete`'s wait-for-op even though the delete op was created
+    and completes server-side. So don't trust the delete error alone — GET the instance and
+    retry through transient failures: NotFound = truly gone (success); a clean GET = still
+    there (real failure); never-confirmed = conservatively False (surface the warning)."""
+    for i in range(attempts):
+        try:
+            _instance_view(iid)
+            return False  # GET succeeded → instance still exists → the delete really failed
+        except RuntimeError as e:
+            if "not found" in str(e).lower():
+                return True  # confirmed gone
+            if i < attempts - 1:
+                time.sleep(5)  # transient (DNS/Unavailable) → give the op + resolver a moment
+    return False
+
+
 def cmd_destroy(a):
     """Delete the instance (boot disk auto-deletes with it). The golden snapshot and the
     VPS adapters survive — nothing durable lives on the VM."""
     try:
         nebius(["compute", "instance", "delete", "--id", a.instance])
     except RuntimeError as e:
-        # Treat an already-gone instance as success (idempotent teardown).
-        if "not found" not in str(e).lower():
+        # "not found" = already gone (idempotent). Any other error might be a transient blip
+        # DURING the op-wait while the delete actually succeeds — verify before crying failure,
+        # so a flaky DNS lookup can't leave a scary permanent warning on an off slot.
+        if "not found" not in str(e).lower() and not _confirm_gone(a.instance):
             fail(e)
     out({"ok": True, "instance_id": a.instance, "destroyed": True})
 
