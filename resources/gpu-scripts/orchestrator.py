@@ -243,14 +243,21 @@ def cmd_start_training(a):
     scp(os.path.join(os.path.dirname(__file__), "train_lora.py"),
         f"ubuntu@{a.ip}:/home/ubuntu/train_lora.py", timeout=120, key=a.ssh_key)
     hb = "/home/ubuntu/heartbeat.json"
+    # Free the GPU by PORT (`fuser -k 8000/tcp`), NOT `pkill -f 'vllm serve'` — that pattern
+    # matches this launcher's own command line and kills its own shell (ssh 255, training
+    # never starts). `< /dev/null` + disown detaches so ssh returns cleanly.
     launch = (
-        "pkill -f 'vllm serve' 2>/dev/null; sleep 2; "
+        "fuser -k 8000/tcp 2>/dev/null; sleep 3; "
         "rm -f /home/ubuntu/heartbeat.json /home/ubuntu/SAVED; "
-        "sudo apt-get install -y -qq python3-dev build-essential >/dev/null 2>&1 || true; "
+        # python3-dev/build-essential are baked into the golden snapshot — only apt if truly
+        # missing, and with a lock timeout so a fresh instance's unattended-upgrades (holding
+        # the apt lock at boot) can't hang the launch past the ssh timeout.
+        "dpkg -s build-essential python3-dev >/dev/null 2>&1 || "
+        "sudo apt-get -o DPkg::Lock::Timeout=30 install -y -qq python3-dev build-essential >/dev/null 2>&1 || true; "
         f"nohup /home/ubuntu/venv/bin/python /home/ubuntu/train_lora.py "
         f"--data /home/ubuntu/train.jsonl --base /home/ubuntu/llama70 "
         f"--out /home/ubuntu/adapter_new --epochs {a.epochs} --heartbeat {hb} "
-        f"> /home/ubuntu/train.log 2>&1 && touch /home/ubuntu/SAVED &"
+        f"< /dev/null > /home/ubuntu/train.log 2>&1 && touch /home/ubuntu/SAVED & disown"
     )
     rc, _, se = ssh(a.ip, launch, timeout=120, key=a.ssh_key)
     if rc != 0:
@@ -273,7 +280,10 @@ def cmd_training_status(a):
                       timeout=20, key=a.ssh_key)
     alive = "ALIVE" in so2
     saved = "SAVED" in so2
-    state = "training" if alive else ("done" if saved else "failed")
+    # SAVED wins over ALIVE: once the adapter is on disk + the marker is set, training is
+    # DONE — even if the python process lingers (unsloth/torch/NCCL teardown can hang at exit
+    # after save_pretrained; a live-but-saved process must not pin the run in 'training').
+    state = "done" if saved else ("training" if alive else "failed")
     out({"ok": True, "state": state, "process_alive": alive, "saved": saved,
          "step": hb.get("step"), "total_steps": hb.get("total_steps"),
          "loss": hb.get("loss"), "eta_seconds": hb.get("eta_seconds")})

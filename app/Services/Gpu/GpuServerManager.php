@@ -112,7 +112,12 @@ class GpuServerManager
      */
     public function switchActiveTo(GpuServer $server): ?GpuServer
     {
-        if (! $server->isServing()) {
+        // A valid target is warm (vLLM up, base_url set) and either already `serving` or a
+        // freshly-trained `ready_to_switch` candidate. The latter is the WHOLE point of a
+        // retrain — so accept it, and flip it to `serving` below (its status must become
+        // `serving` or isServing()/the resolver won't route traffic to it once active).
+        $switchable = [GpuServer::STATUS_SERVING, GpuServer::STATUS_READY_TO_SWITCH];
+        if (! in_array($server->status, $switchable, true) || blank($server->base_url)) {
             throw new RuntimeException("Slot {$server->slot} is not serving yet — cannot switch to it.");
         }
         $previous = GpuServer::active();
@@ -121,6 +126,7 @@ class GpuServerManager
             GpuServer::query()->where('is_active', true)->update(['is_active' => false]);
             $server->is_active = true;
             $server->role = 'serving';
+            $server->status = GpuServer::STATUS_SERVING;
             $server->last_request_at = now();
             $server->save();
         });
