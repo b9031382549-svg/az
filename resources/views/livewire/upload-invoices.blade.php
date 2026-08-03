@@ -4,10 +4,19 @@
       <p class="kicker mb-1.5">{{ __('Data import') }}</p>
       <h1 class="font-display text-4xl">{{ __('Upload invoices') }}</h1>
     </div>
-    <div class="card-flat px-4 py-2.5 text-sm">
-      <span class="text-muted">{{ __('In the database now:') }}</span>
-      <span class="font-display text-lg tnum ml-1">{{ number_format($existing, 0, '.', ' ') }}</span>
-      <span class="text-muted">{{ __('invoices') }}</span>
+    <div class="flex items-center gap-3">
+      <div class="card-flat px-4 py-2.5 text-sm">
+        <span class="text-muted">{{ __('In the database now:') }}</span>
+        <span class="font-display text-lg tnum ml-1">{{ number_format($existing, 0, '.', ' ') }}</span>
+        <span class="text-muted">{{ __('invoices') }}</span>
+      </div>
+      @if($existing > 0)
+        <button wire:click="deleteAll"
+                wire:confirm="{{ __('Delete all :n invoices? This cannot be undone.', ['n' => number_format($existing, 0, '.', ' ')]) }}"
+                class="btn btn-ghost btn-sm text-stamp">
+          {{ __('Delete all invoices') }}
+        </button>
+      @endif
     </div>
   </div>
 
@@ -53,7 +62,7 @@
     @if($existing > 0)
       <div class="mt-3 flex items-start gap-2.5 text-sm card-flat p-3.5 border-amber/40">
         <span class="text-amber">⚠</span>
-        <span>The database already holds <b>{{ number_format($existing, 0, '.', ' ') }}</b> invoices. A new import is <b>added on top</b> unless you tick <b>“Replace existing data”</b> on the next step — re-importing the same file would create duplicates.</span>
+        <span>The database already holds <b>{{ number_format($existing, 0, '.', ' ') }}</b> invoices. A new import is <b>added on top</b> by default — tick <b>“Skip duplicates”</b> on the next step to avoid re-adding invoices already in the database (matched by series + number).</span>
       </div>
     @endif
   @endif
@@ -103,20 +112,24 @@
       <p class="text-faint text-xs mt-2">{{ __('Preview of the first :n rows.', ['n' => count($preview['sample'])]) }}</p>
 
       @if($existing > 0)
-        <div class="mt-4 card-flat p-3.5 text-sm flex items-start gap-2.5 {{ $fresh ? 'border-ledger/40' : 'border-amber/40' }}">
-          @if($fresh)
+        <div class="mt-4 card-flat p-3.5 text-sm flex items-start gap-2.5 {{ $skipDuplicates ? 'border-ledger/40' : 'border-amber/40' }}">
+          @if($skipDuplicates)
             <span class="text-ledger">↻</span>
-            <span>The existing <b>{{ number_format($existing, 0, '.', ' ') }}</b> invoices will be removed, then <b>{{ number_format($preview['count'], 0, '.', ' ') }}</b> imported. Final total: <b>{{ number_format($preview['count'], 0, '.', ' ') }}</b>.</span>
+            <span><b>{{ number_format($preview['count'] - ($preview['duplicates'] ?? 0), 0, '.', ' ') }}</b> new invoices will be added. <b>{{ number_format($preview['duplicates'] ?? 0, 0, '.', ' ') }}</b> already in the database (matched by series + number) will be skipped. Final total: <b>{{ number_format($existing + $preview['count'] - ($preview['duplicates'] ?? 0), 0, '.', ' ') }}</b>.</span>
           @else
             <span class="text-amber">⚠</span>
-            <span><b>{{ number_format($preview['count'], 0, '.', ' ') }}</b> rows will be <b>added</b> on top of {{ number_format($existing, 0, '.', ' ') }} → total <b>{{ number_format($existing + $preview['count'], 0, '.', ' ') }}</b> (duplicates if it's the same file). Tick “Replace existing data” to overwrite instead.</span>
+            <span><b>{{ number_format($preview['count'], 0, '.', ' ') }}</b> rows will be <b>added</b> on top of {{ number_format($existing, 0, '.', ' ') }} → total <b>{{ number_format($existing + $preview['count'], 0, '.', ' ') }}</b>.
+            @if(($preview['duplicates'] ?? 0) > 0)
+              <b>{{ number_format($preview['duplicates'], 0, '.', ' ') }}</b> of these look like duplicates already in the database.
+            @endif
+            Tick “Skip duplicates” to avoid re-adding them.</span>
           @endif
         </div>
       @endif
 
       <div class="flex items-center justify-between mt-5">
         <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-          <input type="checkbox" wire:model.live="fresh" class="accent-stamp"> {{ __('Replace existing data (truncate first)') }}
+          <input type="checkbox" wire:model.live="skipDuplicates" class="accent-stamp"> {{ __('Skip duplicate invoices (matched by series + number)') }}
         </label>
         <div class="flex gap-2">
           <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('Choose another') }}</button>
@@ -141,6 +154,9 @@
       @else
         <div class="mx-auto w-12 h-12 grid place-items-center rounded-2xl bg-ledger/12 text-ledger text-2xl mb-3">✓</div>
         <h2 class="font-display text-2xl mb-1">{{ __('Imported') }} {{ number_format($report['imported'],0,'.',' ') }} {{ __('invoices') }}</h2>
+        @if(($report['skipped'] ?? 0) > 0)
+          <p class="text-muted text-sm">{{ number_format($report['skipped'],0,'.',' ') }} {{ __('duplicates skipped') }}</p>
+        @endif
         <p class="text-muted">{{ number_format($report['total'],0,'.',' ') }} {{ __('invoices in the database now.') }}</p>
       @endif
       <div class="flex justify-center gap-2 mt-6">

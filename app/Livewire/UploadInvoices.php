@@ -22,7 +22,7 @@ class UploadInvoices extends Component
     /** @var array<string, mixed>|null */
     public ?array $report = null;
 
-    public bool $fresh = false;
+    public bool $skipDuplicates = false;
 
     public function updatedFile(): void
     {
@@ -47,12 +47,13 @@ class UploadInvoices extends Component
         }
 
         $filename = $this->file->getClientOriginalName();
-        $this->report = $importer->import($this->file->getRealPath(), $this->fresh);
+        $this->report = $importer->import($this->file->getRealPath(), $this->skipDuplicates);
 
         Audit::log('invoice.import', [
             'file' => $filename,
-            'replace' => (bool) $this->fresh,
+            'skip_duplicates' => (bool) $this->skipDuplicates,
             'imported' => $this->report['imported'] ?? null,
+            'skipped' => $this->report['skipped'] ?? null,
             'total' => $this->report['total'] ?? null,
             'error' => $this->report['error'] ?? null,
         ]);
@@ -62,7 +63,16 @@ class UploadInvoices extends Component
 
     public function startOver(): void
     {
-        $this->reset('file', 'preview', 'report', 'fresh');
+        $this->reset('file', 'preview', 'report', 'skipDuplicates');
+    }
+
+    public function deleteAll(InvoiceImporter $importer): void
+    {
+        $deleted = $importer->deleteAll();
+
+        Audit::log('invoice.delete_all', ['deleted' => $deleted]);
+
+        $this->reset('file', 'preview', 'report', 'skipDuplicates');
     }
 
     public function render()
