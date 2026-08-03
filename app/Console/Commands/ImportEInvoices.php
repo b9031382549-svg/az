@@ -22,8 +22,12 @@ class ImportEInvoices extends Command
             return self::FAILURE;
         }
 
+        if ($this->option('fresh')) {
+            $importer->deleteAll();
+        }
+
         $this->info("Importing {$path} ...");
-        $result = $importer->import($path, (bool) $this->option('fresh'));
+        $result = $importer->import($path);
 
         if ($result['error']) {
             $this->error($result['error']);
