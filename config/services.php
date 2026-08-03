@@ -63,6 +63,11 @@ return [
     'nebius' => [
         'base_url' => env('NEBIUS_BASE_URL', 'https://api.tokenfactory.nebius.com/v1'),
         'api_key' => env('NEBIUS_API_KEY'),
+        // Model the "gpu:" resolver falls back to when NO self-hosted GPU server is
+        // active — Token Factory serving the stock base (there is no fine-tuned adapter
+        // available here, so a gpu:tuned request degrades to base). See
+        // App\Services\Llm\InferenceEndpointResolver.
+        'fallback_model' => env('NEBIUS_FALLBACK_MODEL', 'meta-llama/Llama-3.3-70B-Instruct'),
     ],
 
     // Local embedding model served by Ollama (catalog similarity search).

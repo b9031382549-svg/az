@@ -10,6 +10,7 @@ use App\Livewire\Benchmark;
 use App\Livewire\Catalog;
 use App\Livewire\ClassificationDecision;
 use App\Livewire\Classify;
+use App\Livewire\GpuServers;
 use App\Livewire\Invoices;
 use App\Livewire\Logs;
 use App\Livewire\ReviewQueue;
@@ -49,6 +50,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/testing/dataset/{dataset}', TestingDataset::class)->name('testing.dataset');
     Route::get('/testing/run/{run}', TestingRun::class)->name('testing.run');
     Route::get('/testing/compare', TestingCompare::class)->name('testing.compare');
+
+    // A/B GPU orchestration — zero-downtime weekly LoRA retrain control room
+    Route::get('/gpu-servers', GpuServers::class)->name('gpu-servers');
 
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');
     Route::post('/locale', [LocaleController::class, 'update'])->name('locale.set');
