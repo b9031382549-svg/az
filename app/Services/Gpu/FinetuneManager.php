@@ -199,7 +199,13 @@ class FinetuneManager
     private function exportCorpus(int $runId): array
     {
         $path = rtrim((string) config('gpu.train_data_default'), '/')."/train-run-{$runId}.jsonl";
-        Artisan::call('finetune:export-examples', ['--output' => $path, '--cap' => (int) config('gpu.train.cap')]);
+        $args = ['--output' => $path, '--cap' => (int) config('gpu.train.cap')];
+        // A small max_examples (env GPU_TRAIN_MAX_EXAMPLES) trains on a tiny sample — for a
+        // fast, cheap TEST cycle. 0 = the full production corpus.
+        if (($limit = (int) config('gpu.train.max_examples')) > 0) {
+            $args['--limit'] = $limit;
+        }
+        Artisan::call('finetune:export-examples', $args);
         $rows = is_file($path) ? (int) substr_count((string) file_get_contents($path), "\n") : 0;
 
         return [$path, $rows];

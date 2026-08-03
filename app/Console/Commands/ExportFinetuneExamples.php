@@ -40,6 +40,7 @@ class ExportFinetuneExamples extends Command
     protected $signature = 'finetune:export-examples
         {--output= : Output JSONL path (default: storage/app/finetune/train-<date>.jsonl)}
         {--cap=200 : Max examples per 4-digit heading, trust-priority filled}
+        {--limit=0 : Total-example cap (0 = no limit) — a seeded random sample of the whole set; for quick test runs}
         {--seed=7 : Random seed for within-source sampling (reproducible re-runs)}';
 
     protected $description = 'Export answer_cache as a fine-tune-ready, heading-balanced JSONL training corpus';
@@ -65,6 +66,15 @@ class ExportFinetuneExamples extends Command
         }
         $selected = $selected->merge($services);
 
+        // Optional TOTAL cap — a seeded random sample across the whole (already heading-
+        // capped) set. 0 = the full corpus (production). A small value gives a fast, cheap
+        // TEST training run (the model-load time dominates anyway, so quality is irrelevant).
+        $limit = (int) $this->option('limit');
+        if ($limit > 0 && $selected->count() > $limit) {
+            $selected = collect($this->seededShuffle($selected->all(), $seed))->take($limit)->values();
+        }
+        $servicesOut = $selected->where('is_service', true)->count();
+
         $path = (string) ($this->option('output') ?: storage_path('app/finetune/train-'.date('Y-m-d').'.jsonl'));
         @mkdir(dirname($path), 0755, true);
         $fh = fopen($path, 'w');
@@ -78,9 +88,9 @@ class ExportFinetuneExamples extends Command
         }
         fclose($fh);
 
-        $this->info("Wrote {$selected->count()} examples to {$path}");
-        $this->line('  goods:    '.($selected->count() - $services->count()).' across '.$goods->pluck('heading')->unique()->count().' headings ('.$cappedHeadings.' capped at '.$cap.')');
-        $this->line('  services: '.$services->count().' (uncapped)');
+        $this->info("Wrote {$selected->count()} examples to {$path}".($limit > 0 ? " (limited to {$limit})" : ''));
+        $this->line('  goods:    '.($selected->count() - $servicesOut).' across '.$selected->where('is_service', false)->pluck('heading')->unique()->count().' headings ('.$cappedHeadings.' capped at '.$cap.')');
+        $this->line('  services: '.$servicesOut.($limit > 0 ? '' : ' (uncapped)'));
         $this->line('  by source:');
         foreach ($selected->countBy('source')->sortDesc() as $source => $count) {
             $this->line("    {$source}: {$count}");
