@@ -41,6 +41,8 @@
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v5L4 15a1.5 1.5 0 001.3 2.3h9.4A1.5 1.5 0 0016 15l-4-7.5v-5"/><path d="M6.5 2.5h7M7 12h6"/></svg>{{ __('Testing') }}</a>
       <a href="{{ route('catalog') }}" class="{{ $nav('catalog') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17"/></svg>{{ __('Catalog') }}</a>
+      <a href="{{ route('gpu-servers') }}" class="{{ $nav('gpu-servers*') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="15" height="5" rx="1.2"/><rect x="2.5" y="11" width="15" height="5" rx="1.2"/><path d="M5 6.5h.01M5 13.5h.01"/></svg>{{ __('GPU servers') }}</a>
 
       <div class="mx-5 my-3 border-t hair"></div>
       <a href="{{ route('settings') }}" class="{{ $nav('settings') }}">

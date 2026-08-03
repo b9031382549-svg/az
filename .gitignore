@@ -60,3 +60,6 @@ Thumbs.db
 # Raw gold-reference CSV export (19MB+ — real customs HS dataset, never commit; imported
 # via `benchmark:import-gold --gold-ref=`, SCP'd to the server when needed, not shipped).
 /team_export_*/
+
+# GPU orchestration script cache
+resources/gpu-scripts/__pycache__/

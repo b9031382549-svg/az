@@ -27,15 +27,25 @@ class OpenRouterClient
 
     /**
      * Resolve the target provider + real model from a per-call model string.
-     * A "nebius:" prefix routes the call to Nebius Token Factory (OpenAI-
-     * compatible); anything else uses the default OpenRouter connection. This
-     * keeps both providers available and switchable PER STAGE via config alone,
-     * e.g. classify.expand_model = "nebius:deepseek-ai/DeepSeek-V4-Pro".
+     * A "gpu:" prefix routes the call to the currently-active self-hosted GPU
+     * server (or the Token Factory fallback when none is active) via
+     * InferenceEndpointResolver — resolved LIVE from the DB each call so a switch
+     * takes effect without a redeploy. A "nebius:" prefix routes the call to
+     * Nebius Token Factory (OpenAI-compatible); anything else uses the default
+     * OpenRouter connection. All three coexist and are switchable PER STAGE via
+     * config alone, e.g. classify.direct.model = "gpu:tuned".
      *
      * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string}
      */
     private function resolveProvider(string $model): array
     {
+        if (str_starts_with($model, InferenceEndpointResolver::PREFIX)) {
+            $resolved = app(InferenceEndpointResolver::class)->resolve($model);
+            if ($resolved !== null) {
+                return $resolved;
+            }
+        }
+
         if (str_starts_with($model, 'nebius:')) {
             return [
                 'name' => 'Nebius',

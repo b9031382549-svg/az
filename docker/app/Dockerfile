@@ -8,7 +8,11 @@
 # ============================================================================
 FROM php:8.3-fpm-bookworm AS base
 
-# System libraries needed for the PHP extensions Laravel + Postgres use
+# System libraries needed for the PHP extensions Laravel + Postgres use, plus the
+# GPU-orchestration toolchain: python3 runs resources/gpu-scripts/orchestrator.py and
+# openssh-client (ssh/scp) reaches the GPU VMs. The `nebius` CLI itself is a static Go
+# binary mounted from the host (see docker-compose) — not baked, so no version drift and
+# no secrets in the image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         unzip \
@@ -20,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg-dev \
         libfreetype6-dev \
         curl \
+        python3 \
+        openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # PHP extensions: Postgres (pdo_pgsql/pgsql), the usual Laravel set, plus gd
