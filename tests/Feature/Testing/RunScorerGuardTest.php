@@ -51,6 +51,21 @@ class RunScorerGuardTest extends TestCase
         $this->assertSame('done', $run->fresh()->status);
     }
 
+    public function test_done_count_tracks_the_search_phase_not_just_the_mechanisms(): void
+    {
+        [$run, $rows] = $this->run2();
+        $this->item($run, $rows[0], 'agreed', '0901');
+        // A conflict that claimed the web search but has no 'search' row back yet. The old
+        // progress bar counted it as done (resolution != pending) and jumped to 2/2.
+        $c = $this->item($run, $rows[1], 'conflict');
+        $c->update(['search_resolved_at' => now()]);
+
+        $this->assertSame(1, app(RunScorer::class)->doneCount($run)); // mid-search → 1/2, not 2/2
+
+        $c->results()->create(['mechanism' => 'search', 'matched_code' => '0402', 'kind' => 'good', 'status' => 'auto_confirmed']);
+        $this->assertSame(2, app(RunScorer::class)->doneCount($run)); // search back → 2/2
+    }
+
     /** @return array{0: TestRun, 1: array<int, TestDatasetRow>} */
     private function run2(): array
     {

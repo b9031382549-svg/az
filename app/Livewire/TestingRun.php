@@ -32,7 +32,9 @@ class TestingRun extends Component
     {
         $this->run->refresh();
         $total = (int) $this->run->total;
-        $done = $this->run->items()->where('resolution', '!=', 'pending')->count();
+        // done = fully classified rows, INCLUDING the search tie-break (not just the
+        // vector/broker/direct votes) — so the bar hits 100% only when the run settles.
+        $done = app(RunScorer::class)->doneCount($this->run);
         $complete = $this->run->status === 'done';
 
         $rowsPage = $this->run->dataset->scorableRows()->orderBy('id')->paginate(25);
