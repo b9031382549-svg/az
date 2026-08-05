@@ -7,6 +7,7 @@ use App\Models\ClassificationResult;
 use App\Models\TestRun;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -52,6 +53,22 @@ class RunScorer
         ]);
     }
 
+    /**
+     * How many of the run's items are FULLY classified — the progress-bar numerator. A
+     * row is done only once it has left 'pending' AND, if it hit a conflict that went to
+     * the web search, that search has come back. So the bar tracks the whole pipeline and
+     * reaches 100% exactly when the run settles — instead of jumping there the moment the
+     * vote mechanisms (vector/broker/direct) finish while the slow search tie-break is
+     * still grinding through the conflicts.
+     */
+    public function doneCount(TestRun $run): int
+    {
+        return $run->items()
+            ->where('resolution', '!=', 'pending')
+            ->whereNot(fn ($q) => $this->constrainMidSearch($q))
+            ->count();
+    }
+
     /** Every item has a terminal resolution AND no conflict is still awaiting its search. */
     private function isSettled(TestRun $run): bool
     {
@@ -59,13 +76,21 @@ class RunScorer
             return false;
         }
 
-        // A conflict that claimed a search (search_resolved_at set) but has no 'search'
-        // result row yet is mid-search — wait for it before scoring the search/overall.
-        return ! $run->items()
-            ->where('resolution', 'conflict')
+        return ! $run->items()->where(fn ($q) => $this->constrainMidSearch($q))->exists();
+    }
+
+    /**
+     * A conflict that claimed a search (search_resolved_at set) but has no 'search' result
+     * row yet — still mid-search. Shared by isSettled() and doneCount() so the progress bar
+     * and the scorer's settle-guard can never drift.
+     *
+     * @param  Builder<ClassificationItem>  $query
+     */
+    private function constrainMidSearch($query): void
+    {
+        $query->where('resolution', 'conflict')
             ->whereNotNull('search_resolved_at')
-            ->whereDoesntHave('results', fn ($q) => $q->where('mechanism', 'search'))
-            ->exists();
+            ->whereDoesntHave('results', fn ($q) => $q->where('mechanism', 'search'));
     }
 
     /**
