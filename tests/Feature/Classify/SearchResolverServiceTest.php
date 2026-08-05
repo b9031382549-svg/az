@@ -5,6 +5,8 @@ namespace Tests\Feature\Classify;
 use App\Models\AnswerCache;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Models\TestDataset;
+use App\Models\TestRun;
 use App\Services\Classify\SearchResolverService;
 use App\Services\Llm\OpenRouterClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -176,6 +178,7 @@ class SearchResolverServiceTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame('8471', $row->heading);
         $this->assertSame('ai_resolved_grounded', $row->source);
+        $this->assertSame(0, (int) $row->test_dataset_id); // a prod item → production memory (scope 0)
     }
 
     public function test_grounded_write_is_off_by_default(): void
@@ -234,5 +237,27 @@ class SearchResolverServiceTest extends TestCase
         $this->assertSame('fedor', $row->source);
         $this->assertSame('8528', $row->heading); // untouched
         $this->assertDatabaseCount('answer_cache', 1);
+    }
+
+    public function test_grounded_answer_from_a_test_run_warms_the_dataset_not_prod(): void
+    {
+        // The SAME prod resolver runs for a Testing-row item (via ClassifyTestSearchJob), so
+        // its grounded write must land in the run's OWN dataset memory — never scope 0, which
+        // the live classifier reads. Without this a test run silently pollutes production.
+        $this->enableGroundedPromotion();
+        $dataset = TestDataset::create(['name' => 'ds', 'mechanisms' => ['enabled' => ['vector', 'broker', 'direct'], 'shadow' => [], 'cache' => false, 'search' => true]]);
+        $run = TestRun::create(['test_dataset_id' => $dataset->id, 'description' => 'r', 'mechanisms' => [], 'config' => [], 'status' => 'running']);
+        $item = ClassificationItem::create(['batch' => TestRun::batchKey($run->id), 'source_text' => 'noutbuk kompüter', 'source_hash' => 'h'.mt_rand(), 'resolution' => 'conflict', 'test_run_id' => $run->id]);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471', 'kind' => 'good', 'status' => 'needs_review']);
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.98,"reason":"a laptop"}');
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $this->assertSame('ai_resolved', $item->refresh()->resolution);
+        $row = AnswerCache::where('name_key', AnswerCache::keyFor('noutbuk kompüter'))->first();
+        $this->assertNotNull($row);
+        $this->assertSame($dataset->id, (int) $row->test_dataset_id); // its DATASET memory, not prod (0)
+        $this->assertSame('8471', $row->heading);
+        $this->assertSame('ai_resolved_grounded', $row->source);
     }
 }

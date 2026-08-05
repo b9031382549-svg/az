@@ -5,6 +5,7 @@ namespace App\Services\Classify;
 use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
+use App\Models\TestRun;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -197,7 +198,9 @@ class AnswerCacheService
     }
 
     /**
-     * Write a GROUNDED search-resolved (ai_resolved) answer into the PRODUCTION memory.
+     * Write a GROUNDED search-resolved (ai_resolved) answer into memory — the PRODUCTION
+     * cache (scope 0) for a live item, or the item's OWN DATASET memory for a Testing-run
+     * item (so a Testing run's search discoveries never pollute prod — see groundedSearchScope()).
      * "Grounded" means the resolver's heading overlaps with at least one of the original
      * pre-conflict vector/broker/direct candidates AND its self-reported confidence clears
      * search_resolver.grounded_min_confidence — measured 93-96% real accuracy (vs ~64% for
@@ -233,9 +236,14 @@ class AnswerCacheService
             return;
         }
 
+        // Scope the write: a prod item → production memory (scope 0); a Testing-run item →
+        // its run's OWN dataset memory, so a test run's search discoveries build that
+        // dataset's flywheel instead of leaking into (and lowering the quality of) prod.
+        $scope = $this->groundedSearchScope($item);
+
         try {
             AnswerCache::insertOrIgnore([
-                'test_dataset_id' => 0,
+                'test_dataset_id' => $scope,
                 'source' => (string) ($cfg['source'] ?? 'ai_resolved_grounded'),
                 'name' => $name,
                 'name_key' => AnswerCache::keyFor($name),
@@ -250,6 +258,21 @@ class AnswerCacheService
         } catch (Throwable) {
             // A write-back failure must never affect the (already applied) resolution.
         }
+    }
+
+    /**
+     * Which answer_cache scope a grounded promotion targets for this item: a live/prod
+     * item (no test_run_id) → 0 (production memory, the only scope the live classifier
+     * reads); a Testing-run item → that run's dataset, so its search discoveries warm the
+     * DATASET's own isolated memory and never touch production.
+     */
+    private function groundedSearchScope(ClassificationItem $item): int
+    {
+        if ($item->test_run_id === null) {
+            return 0;
+        }
+
+        return (int) (TestRun::whereKey($item->test_run_id)->value('test_dataset_id') ?? 0);
     }
 
     /**
