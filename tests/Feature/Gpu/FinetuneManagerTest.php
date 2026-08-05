@@ -65,4 +65,30 @@ class FinetuneManagerTest extends TestCase
         $this->assertSame(GpuServer::STATUS_READY_TO_SWITCH, $slot->fresh()->status);
         $this->assertSame($adapter->id, $slot->fresh()->served_adapter_id);
     }
+
+    public function test_a_failed_run_tears_down_its_training_vm(): void
+    {
+        // A launch failure (the real one was start-training timing out) must not strand the
+        // billing GPU: the run fails AND the slot's VM is destroyed + reset, since nothing
+        // else polls a failed run's orphaned training slot.
+        config()->set('gpu.nebius.golden_snapshot_id', 'computedisksnapshot-test');
+        $fake = new FakeOrchestrator;
+        $fake->failStartTraining = true;
+        $this->app->instance(GpuOrchestrator::class, $fake);
+        $manager = $this->app->make(FinetuneManager::class);
+
+        $slot = GpuServer::where('slot', 'B')->firstOrFail();
+        $run = $manager->start($slot);
+        $instanceId = $slot->fresh()->instance_id;
+        $this->assertNotNull($instanceId); // a VM was provisioned
+
+        $fake->statusResponse = ['ok' => true, 'ip' => '10.0.0.9', 'ssh_ok' => true, 'vllm_ready' => false, 'models' => []];
+        $manager->poll($run->fresh()); // pending → launch throws → fail + teardown
+
+        $this->assertSame(FinetuneRun::STATUS_FAILED, $run->fresh()->status);
+        $this->assertSame($instanceId, $fake->destroyedId);              // the VM was destroyed
+        $this->assertSame(GpuServer::STATUS_OFF, $slot->fresh()->status); // slot reset to off
+        $this->assertNull($slot->fresh()->instance_id);
+        $this->assertNull($slot->fresh()->current_run_id);
+    }
 }

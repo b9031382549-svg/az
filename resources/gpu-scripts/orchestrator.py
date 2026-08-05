@@ -243,23 +243,27 @@ def cmd_start_training(a):
     scp(os.path.join(os.path.dirname(__file__), "train_lora.py"),
         f"ubuntu@{a.ip}:/home/ubuntu/train_lora.py", timeout=120, key=a.ssh_key)
     hb = "/home/ubuntu/heartbeat.json"
-    # Free the GPU by PORT (`fuser -k 8000/tcp`), NOT `pkill -f 'vllm serve'` — that pattern
-    # matches this launcher's own command line and kills its own shell (ssh 255, training
-    # never starts). `< /dev/null` + disown detaches so ssh returns cleanly.
-    launch = (
+    # The bootstrap — free the GPU, apt-install the build deps ONLY if the snapshot lacks them,
+    # then run the trainer — executes as ONE detached background job (nohup … & disown) so the
+    # launch ssh returns in seconds. NOTHING slow may sit on the ssh-timeout path: the apt
+    # fallback once ran a COLD install here (deps weren't baked → `dpkg -s` fell through) and
+    # blew past the 120s budget, failing the whole retrain. Backgrounding it means a cold apt
+    # can take as long as it needs; progress is observed via the heartbeat + train.log by
+    # training-status. Free the GPU by PORT (`fuser -k 8000/tcp`), NOT `pkill -f 'vllm serve'`
+    # (that matches this launcher's own command line → suicide). SAVED is touched only on a
+    # clean trainer exit; a nonzero exit leaves no SAVED → training-status reports "failed".
+    bootstrap = (
         "fuser -k 8000/tcp 2>/dev/null; sleep 3; "
         "rm -f /home/ubuntu/heartbeat.json /home/ubuntu/SAVED; "
-        # python3-dev/build-essential are baked into the golden snapshot — only apt if truly
-        # missing, and with a lock timeout so a fresh instance's unattended-upgrades (holding
-        # the apt lock at boot) can't hang the launch past the ssh timeout.
         "dpkg -s build-essential python3-dev >/dev/null 2>&1 || "
-        "sudo apt-get -o DPkg::Lock::Timeout=30 install -y -qq python3-dev build-essential >/dev/null 2>&1 || true; "
-        f"nohup /home/ubuntu/venv/bin/python /home/ubuntu/train_lora.py "
+        "sudo apt-get -o DPkg::Lock::Timeout=60 install -y -qq python3-dev build-essential >/dev/null 2>&1 || true; "
+        f"/home/ubuntu/venv/bin/python /home/ubuntu/train_lora.py "
         f"--data /home/ubuntu/train.jsonl --base /home/ubuntu/llama70 "
         f"--out /home/ubuntu/adapter_new --epochs {a.epochs} --heartbeat {hb} "
-        f"< /dev/null > /home/ubuntu/train.log 2>&1 && touch /home/ubuntu/SAVED & disown"
+        "&& touch /home/ubuntu/SAVED"
     )
-    rc, _, se = ssh(a.ip, launch, timeout=120, key=a.ssh_key)
+    launch = f"nohup bash -c {shlex.quote(bootstrap)} < /dev/null > /home/ubuntu/train.log 2>&1 & disown"
+    rc, _, se = ssh(a.ip, launch, timeout=60, key=a.ssh_key)
     if rc != 0:
         fail(f"train launch failed: {se.strip()}")
     out({"ok": True, "heartbeat": hb})
