@@ -70,6 +70,15 @@ class FinetuneManager
             };
         } catch (Throwable $e) {
             $run->update(['status' => FinetuneRun::STATUS_FAILED, 'error' => mb_substr($e->getMessage(), 0, 480), 'finished_at' => now()]);
+            // A failed run must not strand its (billing) training VM: the coordinator won't
+            // poll a failed run again, and its server-poll skips a slot that still holds a
+            // current_run_id — so nothing else would tear this slot down before the 24h
+            // ceiling. destroy() kills the VM + resets the slot; best-effort so a teardown
+            // hiccup can never mask the original failure.
+            try {
+                $this->servers->destroy($server);
+            } catch (Throwable) {
+            }
         }
     }
 
