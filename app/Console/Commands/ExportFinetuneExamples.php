@@ -10,8 +10,9 @@ use Random\Engine\Mt19937;
 use Random\Randomizer;
 
 /**
- * Export answer_cache (scope 0 — the SAME table the live classifier reads) as a
- * fine-tune-ready JSONL corpus.
+ * Export answer_cache as a fine-tune-ready JSONL corpus — scope 0 (PRODUCTION, the SAME
+ * table the live classifier reads) by default, or ONE Testing dataset's own isolated
+ * memory via --dataset (an experiment/comparison corpus, never mixed with production).
  *
  * Every row in answer_cache IS already a verified answer — seeded (fedor/gold) or
  * written back live (auto:consensus / confirmed / ai_resolved_grounded) — so there is
@@ -24,9 +25,11 @@ use Random\Randomizer;
  * (gold-v1 needed exactly this capping on its own 106k "verified" rows; live traffic
  * will show the same skew once its volume grows). Filled in TRUST-priority order per
  * heading — confirmed, then auto:consensus, then ai_resolved_grounded, then fedor, then
- * gold last — so a handful of live-verified answers are never crowded out by the much
- * larger bulk reference. Within a single source, if it alone exceeds the cap, a seeded
- * random sample is taken (the same method gold-v1/build.py used).
+ * gold last, THEN every other source (dataset-scoped seeds carry sources production
+ * never sees — a bulk reference import, `dataset-labels`, `run:<id>` — lowest priority,
+ * arbitrary order among themselves) — so a handful of live-verified answers are never
+ * crowded out by the much larger bulk reference. Within a single source, if it alone
+ * exceeds the cap, a seeded random sample is taken (the same method gold-v1/build.py used).
  *
  * Services carry no heading — kept in full, uncapped (gold-v1 did the same: teach the
  * good/service split from every example available; there's no "common service" skew
@@ -39,6 +42,7 @@ class ExportFinetuneExamples extends Command
 
     protected $signature = 'finetune:export-examples
         {--output= : Output JSONL path (default: storage/app/finetune/train-<date>.jsonl)}
+        {--dataset=0 : answer_cache scope — 0 = production, or a Testing dataset id to export ONLY that dataset\'s own isolated memory}
         {--cap=200 : Max examples per 4-digit heading, trust-priority filled}
         {--limit=0 : Total-example cap (0 = no limit) — a seeded random sample of the whole set; for quick test runs}
         {--seed=7 : Random seed for within-source sampling (reproducible re-runs)}';
@@ -49,8 +53,9 @@ class ExportFinetuneExamples extends Command
     {
         $cap = (int) $this->option('cap');
         $seed = (int) $this->option('seed');
+        $datasetId = (int) $this->option('dataset');
 
-        $rows = AnswerCache::where('test_dataset_id', 0)->get(['name', 'heading', 'is_service', 'source']);
+        $rows = AnswerCache::where('test_dataset_id', $datasetId)->get(['name', 'heading', 'is_service', 'source']);
         $services = $rows->where('is_service', true);
         $goods = $rows->where('is_service', false)->whereNotNull('heading');
 
@@ -101,6 +106,10 @@ class ExportFinetuneExamples extends Command
 
     /**
      * Fill one heading's bucket up to $cap, trust-priority order — see class docblock.
+     * Named sources fill first, in SOURCE_PRIORITY order; anything else (e.g. a bulk
+     * catalog import or a dataset-scoped seed source production never sees) fills
+     * whatever's left last, so a dataset export never silently drops rows just because
+     * their source isn't one of the five named ones.
      *
      * @param  Collection<int, AnswerCache>  $group
      * @return Collection<int, AnswerCache>
@@ -110,7 +119,8 @@ class ExportFinetuneExamples extends Command
         $bySource = $group->groupBy('source');
         $selected = collect();
 
-        foreach (self::SOURCE_PRIORITY as $source) {
+        $order = [...self::SOURCE_PRIORITY, ...$bySource->keys()->diff(self::SOURCE_PRIORITY)];
+        foreach ($order as $source) {
             $remaining = $cap - $selected->count();
             if ($remaining <= 0) {
                 break;

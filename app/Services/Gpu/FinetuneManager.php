@@ -33,17 +33,23 @@ class FinetuneManager
     /**
      * Begin a cycle on a free slot: export the corpus fresh from answer_cache, record the
      * run, and provision the slot as a training worker. poll() takes it from there.
+     *
+     * @param  ?int  $sourceDatasetId  null = the normal weekly PRODUCTION retrain corpus
+     *                                 (answer_cache scope 0); a Testing dataset id trains
+     *                                 ONLY on that dataset's own isolated memory instead —
+     *                                 an experiment/comparison cycle, never mixed with prod.
      */
-    public function start(GpuServer $slot): FinetuneRun
+    public function start(GpuServer $slot, ?int $sourceDatasetId = null): FinetuneRun
     {
         $run = FinetuneRun::create([
             'gpu_server_id' => $slot->id,
+            'source_dataset_id' => $sourceDatasetId,
             'status' => FinetuneRun::STATUS_EXPORTING,
             'hyperparams' => ['epochs' => (float) config('gpu.train.epochs'), 'rank' => 16, 'lr' => 2e-4],
             'started_at' => now(),
         ]);
 
-        [$path, $rows] = $this->exportCorpus($run->id);
+        [$path, $rows] = $this->exportCorpus($run->id, $sourceDatasetId);
         $run->update(['corpus_path' => $path, 'corpus_rows' => $rows, 'status' => FinetuneRun::STATUS_PENDING]);
 
         $slot->current_run_id = $run->id;
@@ -205,12 +211,15 @@ class FinetuneManager
     }
 
     /** @return array{0: string, 1: int} [path, rows] */
-    private function exportCorpus(int $runId): array
+    private function exportCorpus(int $runId, ?int $sourceDatasetId = null): array
     {
         $path = rtrim((string) config('gpu.train_data_default'), '/')."/train-run-{$runId}.jsonl";
         $args = ['--output' => $path, '--cap' => (int) config('gpu.train.cap')];
+        if ($sourceDatasetId !== null) {
+            $args['--dataset'] = $sourceDatasetId;
+        }
         // A small max_examples (env GPU_TRAIN_MAX_EXAMPLES) trains on a tiny sample — for a
-        // fast, cheap TEST cycle. 0 = the full production corpus.
+        // fast, cheap TEST cycle. 0 = the full corpus (production or the chosen dataset).
         if (($limit = (int) config('gpu.train.max_examples')) > 0) {
             $args['--limit'] = $limit;
         }
