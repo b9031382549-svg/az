@@ -85,6 +85,46 @@ class ExportFinetuneExamplesTest extends TestCase
         $this->assertStringContainsString('Prod Widget', $rows[0]['messages'][1]['content']);
     }
 
+    public function test_dataset_option_exports_only_that_datasets_own_scope(): void
+    {
+        $this->row('Prod Widget', '8471'); // scope 0 — must NOT appear
+        AnswerCache::create(['test_dataset_id' => 5, 'source' => 'gold', 'name' => 'Dataset 5 Widget',
+            'name_key' => AnswerCache::keyFor('Dataset 5 Widget'), 'heading' => '8471', 'is_service' => false]);
+        AnswerCache::create(['test_dataset_id' => 6, 'source' => 'gold', 'name' => 'Dataset 6 Widget',
+            'name_key' => AnswerCache::keyFor('Dataset 6 Widget'), 'heading' => '8471', 'is_service' => false]);
+
+        $rows = $this->export(['--dataset' => 5]);
+
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('Dataset 5 Widget', $rows[0]['messages'][1]['content']);
+    }
+
+    public function test_a_source_not_in_the_named_priority_list_still_exports_last(): void
+    {
+        AnswerCache::create(['test_dataset_id' => 5, 'source' => 'catalog_unified_2026-07-19', 'name' => 'Bulk Item',
+            'name_key' => AnswerCache::keyFor('Bulk Item'), 'heading' => '8471', 'is_service' => false]);
+
+        $rows = $this->export(['--dataset' => 5]);
+
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('Bulk Item', $rows[0]['messages'][1]['content']);
+    }
+
+    public function test_named_priority_sources_still_fill_before_an_unnamed_source(): void
+    {
+        AnswerCache::create(['test_dataset_id' => 5, 'source' => 'confirmed', 'name' => 'Confirmed Item',
+            'name_key' => AnswerCache::keyFor('Confirmed Item'), 'heading' => '8471', 'is_service' => false]);
+        for ($i = 0; $i < 5; $i++) {
+            AnswerCache::create(['test_dataset_id' => 5, 'source' => 'catalog_unified_2026-07-19', 'name' => "Bulk {$i}",
+                'name_key' => AnswerCache::keyFor("Bulk {$i}"), 'heading' => '8471', 'is_service' => false]);
+        }
+
+        $rows = $this->export(['--dataset' => 5, '--cap' => 1]);
+
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('Confirmed Item', $rows[0]['messages'][1]['content']);
+    }
+
     public function test_a_heading_over_the_cap_is_trimmed(): void
     {
         for ($i = 0; $i < 5; $i++) {

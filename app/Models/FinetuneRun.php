@@ -53,6 +53,12 @@ class FinetuneRun extends Model
         return $this->belongsTo(FinetuneAdapter::class, 'adapter_id');
     }
 
+    /** The Testing dataset this run's corpus was scoped to, or null for the production corpus. */
+    public function sourceDataset(): BelongsTo
+    {
+        return $this->belongsTo(TestDataset::class, 'source_dataset_id');
+    }
+
     /** 0-100 training progress for the UI bar; null when total_steps is unknown yet. */
     public function progressPct(): ?int
     {
