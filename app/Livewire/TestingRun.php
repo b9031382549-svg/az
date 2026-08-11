@@ -67,7 +67,10 @@ class TestingRun extends Component
      * table: Step 1 (memory), Step 2 (vector/broker/direct + how many of them agreed),
      * Step 3 (web search overall + which agreement tier its confident+grounded answers
      * came from). Null when the run predates the funnel breakdown, so the view falls
-     * back to the flat per-mechanism table.
+     * back to the flat per-mechanism table. A prevote/search-by-origin tier with zero
+     * volume (ran === 0) is dropped rather than shown as a dead row — the common case is
+     * a run scored before the unanimity change, where bare-majority conflicts never
+     * reached the web search, so that origin tier is permanently empty for that run.
      *
      * @param  array{total:int, prevote: array<int, array{ran:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, correct:int, promoted:int}>}|null  $funnel
      * @param  array<string, array{ran:int, correct:int}>  $accuracy
@@ -89,6 +92,9 @@ class TestingRun extends Component
 
         $total = (int) $funnel['total'];
         foreach ($funnel['prevote'] as $n => $bucket) {
+            if ((int) $bucket['ran'] === 0) {
+                continue; // nothing landed in this tier — don't show a dead row
+            }
             $rows[] = [
                 'step' => '2',
                 'label' => __('Match :n/:m', ['n' => $n, 'm' => $total]),
@@ -99,6 +105,11 @@ class TestingRun extends Component
 
         $rows[] = ['step' => '3', 'label' => __('Web search'), 'bucket' => $accuracy['search'] ?? null, 'promoted' => null];
         foreach ($funnel['search_by_origin'] as $n => $bucket) {
+            if ((int) $bucket['ran'] === 0) {
+                // A run scored before the unanimity change: bare-majority conflicts never
+                // reached the web search back then, so this origin tier has no data yet.
+                continue;
+            }
             $rows[] = [
                 'step' => '3',
                 'label' => __('Search confirms :n/:m', ['n' => $n, 'm' => $total]),
