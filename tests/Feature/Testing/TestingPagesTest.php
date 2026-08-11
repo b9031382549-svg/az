@@ -131,7 +131,11 @@ class TestingPagesTest extends TestCase
             ->assertSee(__('Reference accuracy check'))
             ->assertSee(__('Sent to memory & training'))
             ->assertSee(__('Match :n/:m', ['n' => 3, 'm' => 3]))
-            ->assertSee(__('Search confirms :n/:m', ['n' => 2, 'm' => 3]));
+            ->assertSee(__('Search confirms :n/:m', ['n' => 2, 'm' => 3]))
+            // Zero-volume tiers (ran === 0, e.g. a run scored before the unanimity
+            // change) are dropped rather than shown as dead rows.
+            ->assertDontSee(__('Match :n/:m', ['n' => 1, 'm' => 3]))
+            ->assertDontSee(__('Search confirms :n/:m', ['n' => 1, 'm' => 3]));
     }
 
     public function test_dataset_page_renders_the_accuracy_chart_once_a_run_is_done(): void
