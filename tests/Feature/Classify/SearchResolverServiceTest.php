@@ -210,12 +210,12 @@ class SearchResolverServiceTest extends TestCase
         $this->assertDatabaseCount('answer_cache', 0);
     }
 
-    public function test_grounded_but_below_098_confidence_is_not_written(): void
+    public function test_grounded_but_below_090_confidence_is_not_written(): void
     {
         $this->enableGroundedPromotion();
         $item = $this->conflictItem();
         $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471', 'kind' => 'good', 'status' => 'needs_review']);
-        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.9,"reason":"a laptop"}');
+        $this->mockLlm('{"heading":"8471","kind":"good","confidence":0.85,"reason":"a laptop"}');
 
         app(SearchResolverService::class)->resolve($item);
 

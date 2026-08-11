@@ -3,12 +3,11 @@
 namespace App\Services\Testing;
 
 use App\Models\ClassificationItem;
-use App\Models\ClassificationResult;
 use App\Models\TestRun;
+use App\Services\Classify\AnswerCacheService;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -31,7 +30,10 @@ class RunScorer
         'search' => 'search',
     ];
 
-    public function __construct(private readonly Consensus $consensus) {}
+    public function __construct(
+        private readonly Consensus $consensus,
+        private readonly AnswerCacheService $answerCache,
+    ) {}
 
     /**
      * Compute accuracy, persist it, and mark the run done — but ONLY once every item is
@@ -94,7 +96,7 @@ class RunScorer
     }
 
     /**
-     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, tiers: array<string, array{total:int, correct:int}>}
+     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}}
      */
     public function score(TestRun $run): array
     {
@@ -105,18 +107,28 @@ class RunScorer
             (array) ($run->mechanisms['enabled'] ?? ['vector', 'broker', 'direct']),
             (array) ($run->mechanisms['shadow'] ?? []),
         );
+        $authCount = count($authoritative);
 
         $columns = array_fill_keys(
             [...array_keys(self::MECHANISM_COLUMNS), 'majority', 'overall'],
             ['ran' => 0, 'answered' => 0, 'correct' => 0],
         );
 
-        // Calibration by CONFIDENCE TIER (evidence type), so the memory-promotion gate can
-        // be tuned against measured accuracy instead of a self-reported number: verified (a
-        // cache hit — the seeded answer), unanimous (every voting mechanism agreed — the
-        // promoted tier), majority (a bare 2-of-3), resolved (settled by the web search),
-        // weak (divergent). Bucketed on the item's FINAL answer — what the pipeline outputs.
-        $tiers = array_fill_keys(['verified', 'unanimous', 'majority', 'resolved', 'weak'], ['total' => 0, 'correct' => 0]);
+        // The funnel: for every non-cache-hit row, how many of the authoritative
+        // mechanisms landed on the same heading (1..$authCount, "prevote"), and — for
+        // the ones short of unanimity — whether the web search that resolved them was
+        // confident+grounded enough to ACTUALLY write back into memory (wouldPromote*,
+        // the real enabled/shadow gate, not a hypothetical one). See RunScorer's class
+        // doc and AnswerCacheService::wouldPromote()/wouldPromoteGroundedSearch(). Each
+        // bucket reuses tally()'s ['ran','answered','correct'] shape plus 'promoted'.
+        $prevote = [];
+        for ($n = 1; $n <= $authCount; $n++) {
+            $prevote[$n] = ['ran' => 0, 'answered' => 0, 'correct' => 0, 'promoted' => 0];
+        }
+        $searchByOrigin = [];
+        for ($n = 1; $n < $authCount; $n++) {
+            $searchByOrigin[$n] = ['ran' => 0, 'answered' => 0, 'correct' => 0, 'promoted' => 0];
+        }
 
         foreach ($rows as $row) {
             $item = $items->get($row->id);
@@ -146,16 +158,40 @@ class RunScorer
             // overall = the item's final answer after cache/consensus/search.
             $this->tally($columns['overall'], $item->final_code, $item->kind, $expHeading, $expService);
 
-            // Tier calibration: which evidence tier settled this item, and was that final
-            // answer correct — the accuracy that justifies (or not) promoting a tier.
-            $tier = $this->tierOf($item, $authResults);
-            $tiers[$tier]['total']++;
-            if (HeadingMatch::correct($item->final_code, $item->kind, $expHeading, $expService)) {
-                $tiers[$tier]['correct']++;
+            // Funnel: skip rows with NO evidence at all (count === 0, e.g. no_match) —
+            // folding them into the weakest agreement bucket would dilute its accuracy
+            // with items that never carried any candidate in the first place.
+            $ag = Consensus::agreementOf($authResults);
+            if ($ag['count'] < 1) {
+                continue;
+            }
+
+            $idx = min($ag['count'], $authCount);
+            $this->tally($prevote[$idx], $ag['heading'], $ag['kind'], $expHeading, $expService);
+
+            if ($idx === $authCount) {
+                // Unanimous — this is exactly what Consensus::maybePromote() would have
+                // fed into AnswerCacheService::promote() on the live path.
+                if ($this->answerCache->wouldPromote($item, $ag)) {
+                    $prevote[$idx]['promoted']++;
+                }
+
+                continue;
+            }
+
+            $search = $byMech->get('search');
+            if ($search === null) {
+                continue; // this tier hasn't reached the web search yet (run still in flight)
+            }
+            $this->tally($searchByOrigin[$idx], $search->matched_code, $search->kind, $expHeading, $expService);
+            if ($this->answerCache->wouldPromoteGroundedSearch($item, $search, $authResults)) {
+                $searchByOrigin[$idx]['promoted']++;
             }
         }
 
-        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'tiers' => $tiers];
+        $funnel = ['total' => $authCount, 'prevote' => $prevote, 'search_by_origin' => $searchByOrigin];
+
+        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'funnel' => $funnel];
     }
 
     /**
@@ -170,35 +206,6 @@ class RunScorer
             ->where('classification_items.test_run_id', $run->id)
             ->pluck('classification_results.usage')
             ->sum(fn ($u) => (int) (json_decode((string) $u, true)['total_tokens'] ?? 0));
-    }
-
-    /**
-     * The confidence tier that settled an item — the SAME classification the live pipeline
-     * makes (ClassificationItem::confidenceTier), recomputed here over the run's chosen
-     * authoritative set so a test run calibrates the exact gate prod would apply.
-     *
-     * @param  Collection<int, ClassificationResult>  $authResults
-     */
-    private function tierOf(ClassificationItem $item, $authResults): string
-    {
-        // A cache hit resolves with only a 'cache' row (no authoritative votes) — bucket it
-        // as 'verified', never let it fall through to 'majority' and inflate that number
-        // (this IS the metric used to judge whether a majority is trustworthy). Mirrors
-        // ClassificationItem::confidenceTier.
-        if ($item->resolution === 'confirmed' || $item->results->firstWhere('mechanism', 'cache') !== null) {
-            return 'verified';
-        }
-        if ($item->resolution === 'ai_resolved') {
-            return 'resolved';
-        }
-        if ($item->resolution === 'agreed') {
-            $ag = Consensus::agreementOf($authResults);
-            $min = (int) config('classify.memory_promotion.min_agreement', 2);
-
-            return $ag['total'] >= $min && $ag['count'] === $ag['total'] ? 'unanimous' : 'majority';
-        }
-
-        return 'weak';
     }
 
     /**

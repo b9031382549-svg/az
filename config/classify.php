@@ -322,9 +322,13 @@ return [
         'min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_MIN_CONF', 0.8),
         // Stricter bar for GROUNDED memory write-back (memory_promotion.grounded_search):
         // measured (3 prod test runs, ~900 pooled search-tier examples) — grounded +
-        // confidence >= 0.98 => 93-96% real accuracy, comparable to the unanimous tier.
-        // Below 0.98 the same grounded subset only measured 80-87%, not worth freezing.
-        'grounded_min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_GROUNDED_MIN_CONF', 0.98),
+        // confidence >= 0.98 => 93-96% real accuracy, comparable to the unanimous tier;
+        // 0.98..0.90 only measured 80-87%. Kept at 0.90 anyway as a deliberate, permanent
+        // choice (not the earlier 0.98->0.90 prod demo, which was meant to be reverted) —
+        // now that Consensus::resolve() requires unanimity, non-unanimous conflicts are
+        // both more common and inherently weaker evidence, so 0.90 trades some grounded-
+        // write precision for materially higher recall on that larger conflict volume.
+        'grounded_min_confidence' => (float) env('CLASSIFY_SEARCH_RESOLVER_GROUNDED_MIN_CONF', 0.90),
         'timeout' => (int) env('CLASSIFY_SEARCH_RESOLVER_TIMEOUT', 180), // web search + reasoning is slow
         'prompt_version' => (string) env('CLASSIFY_SEARCH_RESOLVER_VERSION', 's1'),
         // Cache confident web-search answers by (model, prompt_version, name) so an

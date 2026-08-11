@@ -1,6 +1,8 @@
 <section class="p-5 sm:p-8 max-w-[1180px]">
   @php
-    $colLabels = ['memory' => __('Memory'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'majority' => $majorityLabel, 'search' => __('Web search'), 'overall' => __('Overall')];
+    // 'majority' here is the per-row detail table's consensus column (unchanged shape),
+    // not the funnel breakdown below — see $funnel for that.
+    $colLabels = ['memory' => __('Memory'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'majority' => __('Mechanism consensus'), 'search' => __('Web search'), 'overall' => __('Overall')];
     $acc = fn ($b) => ($b && ($b['ran'] ?? 0) > 0) ? round(100 * $b['correct'] / $b['ran']) : null;
   @endphp
 
@@ -46,27 +48,80 @@
   @if($complete)
     <div class="card p-0 overflow-hidden mb-6">
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="text-muted text-left">
-            <tr class="border-b hair">
-              <th class="px-4 py-3 font-medium">{{ __('Mechanism') }}</th>
-              <th class="px-4 py-3 font-medium text-right">{{ __('Ran') }}</th>
-              <th class="px-4 py-3 font-medium text-right">{{ __('Correct') }}</th>
-              <th class="px-4 py-3 font-medium text-right">{{ __('Accuracy') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            @foreach($colLabels as $col => $label)
-              @php $b = $accuracy[$col] ?? null; $a = $acc($b); @endphp
-              <tr class="border-b hair {{ $col === 'overall' ? 'font-medium bg-surface' : '' }}">
-                <td class="px-4 py-3">{{ $label }}</td>
-                <td class="px-4 py-3 text-right tnum">{{ (int) ($b['ran'] ?? 0) }}</td>
-                <td class="px-4 py-3 text-right tnum">{{ (int) ($b['correct'] ?? 0) }}</td>
-                <td class="px-4 py-3 text-right tnum font-medium">{{ $a !== null ? $a.'%' : '—' }}</td>
+        @if($funnelRows)
+          @php
+            $funnelPromoted = collect($funnelRows)->sum('promoted');
+            $lastStep = null;
+          @endphp
+          <table class="w-full text-sm">
+            <thead class="text-muted text-left">
+              <tr class="border-b hair">
+                <th class="px-4 py-2 font-medium" colspan="4">{{ __('Main algorithm') }}</th>
+                <th class="px-4 py-2 font-medium text-right" colspan="2">{{ __('Reference accuracy check') }}</th>
               </tr>
-            @endforeach
-          </tbody>
-        </table>
+              <tr class="border-b hair">
+                <th class="px-4 py-3 font-medium">{{ __('Step') }}</th>
+                <th class="px-4 py-3 font-medium">{{ __('Mechanism') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Ran') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Sent to memory & training') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Correct') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Accuracy') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach($funnelRows as $r)
+                @php
+                  $a = $acc($r['bucket']);
+                  $showStep = $r['step'] !== $lastStep;
+                  $rowspan = $showStep ? collect($funnelRows)->where('step', $r['step'])->count() : null;
+                  $lastStep = $r['step'];
+                @endphp
+                <tr class="border-b hair">
+                  @if($showStep)
+                    <td class="px-4 py-3 tnum text-muted align-top" rowspan="{{ $rowspan }}">{{ $r['step'] }}</td>
+                  @endif
+                  <td class="px-4 py-3">{{ $r['label'] }}</td>
+                  <td class="px-4 py-3 text-right tnum">{{ (int) ($r['bucket']['ran'] ?? 0) }}</td>
+                  <td class="px-4 py-3 text-right tnum">{{ $r['promoted'] !== null ? number_format($r['promoted']) : '—' }}</td>
+                  <td class="px-4 py-3 text-right tnum">{{ (int) ($r['bucket']['correct'] ?? 0) }}</td>
+                  <td class="px-4 py-3 text-right tnum font-medium">{{ $a !== null ? $a.'%' : '—' }}</td>
+                </tr>
+              @endforeach
+              @php $aOverall = $acc($accuracy['overall'] ?? null); @endphp
+              <tr class="border-b hair font-medium bg-surface">
+                <td class="px-4 py-3"></td>
+                <td class="px-4 py-3">{{ __('Overall') }}</td>
+                <td class="px-4 py-3 text-right tnum">{{ (int) ($accuracy['overall']['ran'] ?? 0) }}</td>
+                <td class="px-4 py-3 text-right tnum">{{ number_format($funnelPromoted) }}</td>
+                <td class="px-4 py-3 text-right tnum">{{ (int) ($accuracy['overall']['correct'] ?? 0) }}</td>
+                <td class="px-4 py-3 text-right tnum">{{ $aOverall !== null ? $aOverall.'%' : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        @else
+          {{-- Fallback for runs scored before the funnel breakdown existed. --}}
+          <table class="w-full text-sm">
+            <thead class="text-muted text-left">
+              <tr class="border-b hair">
+                <th class="px-4 py-3 font-medium">{{ __('Mechanism') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Ran') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Correct') }}</th>
+                <th class="px-4 py-3 font-medium text-right">{{ __('Accuracy') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach($colLabels as $col => $label)
+                @php $b = $accuracy[$col] ?? null; $a = $acc($b); @endphp
+                <tr class="border-b hair {{ $col === 'overall' ? 'font-medium bg-surface' : '' }}">
+                  <td class="px-4 py-3">{{ $label }}</td>
+                  <td class="px-4 py-3 text-right tnum">{{ (int) ($b['ran'] ?? 0) }}</td>
+                  <td class="px-4 py-3 text-right tnum">{{ (int) ($b['correct'] ?? 0) }}</td>
+                  <td class="px-4 py-3 text-right tnum font-medium">{{ $a !== null ? $a.'%' : '—' }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        @endif
       </div>
     </div>
 

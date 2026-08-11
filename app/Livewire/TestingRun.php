@@ -46,19 +46,68 @@ class TestingRun extends Component
         // abs(): Carbon 3's diffInSeconds is signed, so guard the direction.
         $durationSeconds = $this->run->started_at ? (int) abs($end->diffInSeconds($this->run->started_at)) : null;
         $tokens = $this->run->accuracy['tokens'] ?? app(RunScorer::class)->tokens($this->run);
+        $accuracy = $this->run->accuracy['columns'] ?? [];
 
         return view('livewire.testing-run', [
             'total' => $total,
             'done' => $done,
             'complete' => $complete,
             'pct' => $total > 0 ? (int) round(min(100, $done / $total * 100)) : 0,
-            'accuracy' => $this->run->accuracy['columns'] ?? [],
+            'accuracy' => $accuracy,
+            'funnelRows' => $this->funnelRows($this->run->accuracy['funnel'] ?? null, $accuracy),
             'durationSeconds' => $durationSeconds,
             'tokens' => (int) $tokens,
             'rowsPage' => $rowsPage,
             'detail' => $detail,
-            'majorityLabel' => $this->majorityLabel(),
         ]);
+    }
+
+    /**
+     * Flatten the run's funnel breakdown into ordered display rows for the top accuracy
+     * table: Step 1 (memory), Step 2 (vector/broker/direct + how many of them agreed),
+     * Step 3 (web search overall + which agreement tier its confident+grounded answers
+     * came from). Null when the run predates the funnel breakdown, so the view falls
+     * back to the flat per-mechanism table.
+     *
+     * @param  array{total:int, prevote: array<int, array{ran:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, correct:int, promoted:int}>}|null  $funnel
+     * @param  array<string, array{ran:int, correct:int}>  $accuracy
+     * @return array<int, array{step:string, label:string, bucket: array{ran:int, correct:int}|null, promoted:?int}>|null
+     */
+    private function funnelRows(?array $funnel, array $accuracy): ?array
+    {
+        if ($funnel === null) {
+            return null;
+        }
+
+        $rows = [
+            ['step' => '1', 'label' => __('Memory'), 'bucket' => $accuracy['memory'] ?? null, 'promoted' => null],
+        ];
+
+        foreach (['vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct')] as $col => $label) {
+            $rows[] = ['step' => '2', 'label' => $label, 'bucket' => $accuracy[$col] ?? null, 'promoted' => null];
+        }
+
+        $total = (int) $funnel['total'];
+        foreach ($funnel['prevote'] as $n => $bucket) {
+            $rows[] = [
+                'step' => '2',
+                'label' => __('Match :n/:m', ['n' => $n, 'm' => $total]),
+                'bucket' => $bucket,
+                'promoted' => $n === $total ? (int) $bucket['promoted'] : null,
+            ];
+        }
+
+        $rows[] = ['step' => '3', 'label' => __('Web search'), 'bucket' => $accuracy['search'] ?? null, 'promoted' => null];
+        foreach ($funnel['search_by_origin'] as $n => $bucket) {
+            $rows[] = [
+                'step' => '3',
+                'label' => __('Search confirms :n/:m', ['n' => $n, 'm' => $total]),
+                'bucket' => $bucket,
+                'promoted' => (int) $bucket['promoted'],
+            ];
+        }
+
+        return $rows;
     }
 
     /**
@@ -120,18 +169,5 @@ class TestingRun extends Component
             'heading' => HeadingMatch::isService($kind, $code) ? 'SVC' : (HeadingMatch::heading($code) ?? '—'),
             'ok' => HeadingMatch::correct($code, $kind, $row->expected_heading, (bool) $row->expected_is_service),
         ];
-    }
-
-    /** e.g. "majority 2/3" — the threshold N over M authoritative mechanisms. */
-    private function majorityLabel(): string
-    {
-        $auth = Consensus::computeAuthoritative(
-            (array) ($this->run->mechanisms['enabled'] ?? []),
-            (array) ($this->run->mechanisms['shadow'] ?? []),
-        );
-        $m = count($auth);
-        $n = intdiv($m, 2) + 1;
-
-        return __('majority :n/:m', ['n' => $n, 'm' => $m]);
     }
 }

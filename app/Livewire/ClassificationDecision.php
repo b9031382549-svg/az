@@ -7,6 +7,7 @@ use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
 use App\Models\RubricatorNode;
+use App\Services\Classify\Consensus;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -95,17 +96,18 @@ class ClassificationDecision extends Component
         $search = $results->firstWhere('mechanism', 'search');
         $adj = $this->item->adjudications->sortByDesc('id')->first();
 
-        // Recompute the 2-of-3 heading consensus for the AI-stage output line.
-        $coded = $mechResults->filter(fn ($r) => $r->matched_code !== null && $r->matched_code !== '');
-        $tally = $coded->groupBy(fn ($r) => mb_substr((string) $r->matched_code, 0, 4))->map->count();
-        $topHeading = $tally->sortDesc()->keys()->first();
-        $topCount = $topHeading !== null ? (int) $tally[$topHeading] : 0;
+        // Recompute the unanimous heading consensus for the AI-stage output line — same
+        // agreement math Consensus::resolve() uses, so this preview can never drift from
+        // the item's actual resolution. The >= 2 floor mirrors resolve()'s own unanimity
+        // gate: a lone single-mechanism result (total === 1, e.g. a still mid-flight item)
+        // is never "agreed" on its own.
+        $ag = Consensus::agreementOf($mechResults);
         $consensus = [
             'ran' => $mechResults->isNotEmpty(),
-            'heading' => $topHeading,
-            'agreed' => $topCount >= 2 && $topCount >= intdiv($mechResults->count(), 2) + 1,
-            'top_count' => $topCount,
-            'total' => $mechResults->count(),
+            'heading' => $ag['heading'],
+            'agreed' => $ag['total'] >= 2 && $ag['count'] === $ag['total'],
+            'top_count' => $ag['count'],
+            'total' => $ag['total'],
         ];
 
         return view('livewire.classification-decision', [

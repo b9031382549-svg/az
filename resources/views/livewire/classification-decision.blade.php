@@ -150,7 +150,7 @@
           <div class="flex items-center gap-2.5">
             <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">2</span>
             <span class="font-medium">{{ __('AI search') }}</span>
-            <span class="text-faint text-xs">{{ __('3 mechanisms → 2-of-3 on the heading') }}</span>
+            <span class="text-faint text-xs">{{ __('3 mechanisms → unanimous on the heading') }}</span>
           </div>
           <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($consensus['agreed'] ? 'good' : 'warn') }}">{{ $consensus['agreed'] ? __('agreed') : __('diverged') }}</span>
         </div>
@@ -218,7 +218,7 @@
                 @include('livewire.partials.mechanism-trace')
               </div>
             @endforeach
-            <p class="text-xs text-muted">{{ __('Consensus rule: the item resolves when at least 2 of the 3 mechanisms share the same 4-digit heading.') }}</p>
+            <p class="text-xs text-muted">{{ __('Consensus rule: the item resolves only when all 3 mechanisms share the same 4-digit heading.') }}</p>
           </div>
         </details>
       </li>

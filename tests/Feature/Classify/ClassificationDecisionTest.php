@@ -189,6 +189,24 @@ class ClassificationDecisionTest extends TestCase
         Livewire::actingAs(User::factory()->create())
             ->test(ClassificationDecision::class, ['item' => $item])
             ->assertOk()
-            ->assertSee('legacy item');
+            ->assertSee('legacy item')
+            // A single mechanism (total === 1) is never "agreed" on its own — the >= 2
+            // floor in ClassificationDecision::render() guards this, same as before.
+            ->assertSee('diverged');
+    }
+
+    public function test_bare_majority_now_shows_diverged_not_agreed(): void
+    {
+        // 2 of 3 share a heading — used to render "agreed"; now requires unanimity.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'bare majority item', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'needs_review', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471900000', 'status' => 'needs_review', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '2106909200', 'status' => 'needs_review', 'kind' => 'good']);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('AI search')
+            ->assertSee('diverged');
     }
 }
