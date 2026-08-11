@@ -10,16 +10,16 @@ use Illuminate\Support\Collection;
 /**
  * Reconciles the per-mechanism results of one item into a parent resolution.
  *
- * Policy: our answer is the 4-digit HEADING. An item auto-resolves when at least 2 of
- * the 3 mechanisms (vector / broker / direct) land on the same first 4 characters —
- * that heading is taken as correct. Short of a 2-mechanism agreement the heading is
- * undecided and the item is a `conflict`, handed to the next stage of the flow (TBD).
- * There is no AI judge in this flow (removed for now).
+ * Policy: our answer is the 4-digit HEADING. An item auto-resolves ONLY when every
+ * mechanism that ran (vector / broker / direct) lands on the same first 4 characters —
+ * that heading is taken as correct. Anything short of unanimity (including a bare
+ * majority) leaves the heading undecided and the item is a `conflict`, handed to the
+ * web-search resolver. There is no AI judge in this flow (removed for now).
  *
  * resolution vocabulary:
  *   pending          — not every enabled mechanism has reported yet
- *   agreed           — >=2 mechanisms share the same 4-digit heading (auto, confident)
- *   conflict         — no heading reached a 2-mechanism agreement (divergent / too few)
+ *   agreed           — every mechanism that ran shares the same 4-digit heading (auto, confident)
+ *   conflict         — the mechanisms did not unanimously agree (divergent, a bare majority, or too few)
  *   ai_resolved      — a divergent item the SEARCH resolver settled at a 4-digit heading
  *   no_match         — no mechanism produced a code
  *   confirmed/rejected — set by a human in the review queue (never overwritten here)
@@ -149,17 +149,17 @@ class Consensus
         $none = ['final_code' => null, 'final_catalog_id' => null, 'kind' => null];
 
         // Agreement is measured on the 4-digit HEADING, not the full code (see agreementOf).
-        // The winning heading wins with a strict MAJORITY of the mechanisms that ran — for
-        // the 3-mechanism flow that is exactly "2 of 3" (abstentions count toward the
-        // denominator, so a lone code among abstentions is not a majority). Short → conflict.
+        // The winning heading must be UNANIMOUS across every mechanism that ran (abstentions
+        // count toward the denominator, so a lone code among abstentions is not unanimous).
+        // Anything short of that — including a bare majority — is a conflict, routed to the
+        // web-search resolver for a second opinion instead of auto-accepting.
         $ag = self::agreementOf($results);
 
         if ($ag['count'] === 0) {
             return ['resolution' => 'no_match'] + $none;
         }
 
-        $threshold = intdiv($ag['total'], 2) + 1;
-        if ($ag['count'] < $threshold) {
+        if ($ag['count'] < $ag['total']) {
             return ['resolution' => 'conflict'] + $none;
         }
 

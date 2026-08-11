@@ -252,6 +252,75 @@ class AnswerCacheTest extends TestCase
         $this->assertDatabaseCount('answer_cache', 0);
     }
 
+    // --- wouldPromote() / wouldPromoteGroundedSearch() (side-effect-free measurement,
+    // used by the Testing funnel report) — must mirror promote()'s real gate exactly. ---
+
+    public function test_would_promote_mirrors_promote_when_live(): void
+    {
+        $this->promoteLive();
+        $item = $this->agreedItem('Would Promote Item');
+
+        $this->assertTrue(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+    }
+
+    public function test_would_promote_is_false_for_a_bare_majority(): void
+    {
+        $this->promoteLive();
+        $item = $this->agreedItem('Ambiguous Item');
+
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 2, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+    }
+
+    public function test_would_promote_is_false_in_shadow_mode_even_though_unanimous(): void
+    {
+        config()->set('classify.memory_promotion.enabled', true);
+        config()->set('classify.memory_promotion.shadow', true);
+        $item = $this->agreedItem('Shadowed Item');
+
+        // Unlike a hypothetical "would qualify" count, this reflects what ACTUALLY
+        // happens: shadow mode never writes, so wouldPromote() must read false.
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+    }
+
+    public function test_would_promote_is_false_when_disabled(): void
+    {
+        config()->set('classify.memory_promotion.enabled', false);
+        $item = $this->agreedItem('Disabled Item');
+
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+    }
+
+    public function test_would_promote_grounded_search_true_when_confident_and_grounded(): void
+    {
+        config()->set('classify.memory_promotion.grounded_search.enabled', true);
+        $item = $this->item('Laptop Item');
+        $vector = $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'kind' => 'good', 'status' => 'needs_review']);
+        $search = $item->results()->create(['mechanism' => 'search', 'matched_code' => '8471900000', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95]);
+
+        $this->assertTrue(app(AnswerCacheService::class)->wouldPromoteGroundedSearch($item, $search, collect([$vector])));
+    }
+
+    public function test_would_promote_grounded_search_false_when_ungrounded(): void
+    {
+        config()->set('classify.memory_promotion.grounded_search.enabled', true);
+        $item = $this->item('Random Item');
+        // Vector proposed something else entirely — search's heading doesn't overlap it.
+        $vector = $item->results()->create(['mechanism' => 'vector', 'matched_code' => '620800', 'kind' => 'good', 'status' => 'needs_review']);
+        $search = $item->results()->create(['mechanism' => 'search', 'matched_code' => '8471900000', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95]);
+
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromoteGroundedSearch($item, $search, collect([$vector])));
+    }
+
+    public function test_would_promote_grounded_search_false_when_disabled(): void
+    {
+        config()->set('classify.memory_promotion.grounded_search.enabled', false);
+        $item = $this->item('Laptop Item 2');
+        $vector = $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'kind' => 'good', 'status' => 'needs_review']);
+        $search = $item->results()->create(['mechanism' => 'search', 'matched_code' => '8471900000', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95]);
+
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromoteGroundedSearch($item, $search, collect([$vector])));
+    }
+
     public function test_promote_never_overwrites_a_seeded_fedor_answer(): void
     {
         $this->promoteLive();

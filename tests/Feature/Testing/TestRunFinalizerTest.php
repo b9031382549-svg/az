@@ -37,12 +37,23 @@ class TestRunFinalizerTest extends TestCase
         $this->assertSame('conflict', $item->fresh()->resolution); // 1 of 3 coded is not a majority
     }
 
-    public function test_two_of_three_agree_resolves_at_the_heading(): void
+    public function test_two_of_three_agree_is_a_conflict(): void
     {
         [, $item] = $this->runItem(['vector', 'broker', 'direct']);
         $this->storeResult($item, 'vector', '0901000000');
         $this->storeResult($item, 'broker', '0901110000');
         $this->storeResult($item, 'direct', '0902000000');
+
+        $this->assertFalse(app(TestRunFinalizer::class)->finalize($item)); // search off
+        $this->assertSame('conflict', $item->fresh()->resolution); // a bare 2-of-3 is no longer unanimous
+    }
+
+    public function test_three_of_three_agree_resolves_at_the_heading(): void
+    {
+        [, $item] = $this->runItem(['vector', 'broker', 'direct']);
+        $this->storeResult($item, 'vector', '0901000000');
+        $this->storeResult($item, 'broker', '0901110000');
+        $this->storeResult($item, 'direct', '0901220000');
 
         $this->assertFalse(app(TestRunFinalizer::class)->finalize($item));
         $this->assertSame('agreed', $item->fresh()->resolution);

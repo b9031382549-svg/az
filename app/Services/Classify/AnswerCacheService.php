@@ -85,11 +85,58 @@ class AnswerCacheService
     }
 
     /**
+     * The unanimity + well-formedness gate promote() enforces, isolated from the
+     * enabled/shadow toggles so it can be reused by both the real write path and
+     * wouldPromote()'s side-effect-free measurement.
+     *
+     * @param  array{count: int, total: int, heading: ?string, kind: ?string}  $agreement
+     */
+    private function eligibleAgreement(ClassificationItem $item, array $agreement, int $minAgreement): bool
+    {
+        $count = (int) ($agreement['count'] ?? 0);
+        $total = (int) ($agreement['total'] ?? 0);
+
+        // Unanimity: every mechanism that ran agreed on ONE heading, and enough of them
+        // ran to be a real independent corroboration (>= min_agreement).
+        if ($total < $minAgreement || $count !== $total) {
+            return false;
+        }
+
+        $isService = ((string) ($item->kind ?? '')) === 'service';
+        $heading = (string) ($item->final_code ?? '');
+        // A good must carry a real 4-digit heading; a service is stored heading-null.
+        if (! $isService && ! preg_match('/^\d{4}$/', $heading)) {
+            return false;
+        }
+
+        return trim((string) $item->source_text) !== '';
+    }
+
+    /**
+     * Whether promote() would ACTUALLY write a row for this item right now — the real
+     * enabled + shadow + unanimity + well-formedness gate, with no side effects. Used by
+     * the Testing report to measure real promotion volume (not a hypothetical "if the
+     * flags were on" count) without triggering a write.
+     *
+     * @param  array{count: int, total: int, heading: ?string, kind: ?string}  $agreement  from Consensus::agreementOf()
+     */
+    public function wouldPromote(ClassificationItem $item, array $agreement): bool
+    {
+        $cfg = (array) config('classify.memory_promotion', []);
+        $min = (int) ($cfg['min_agreement'] ?? 2);
+
+        return ($cfg['enabled'] ?? false)
+            && ! ($cfg['shadow'] ?? true)
+            && $this->eligibleAgreement($item, $agreement, $min);
+    }
+
+    /**
      * Write a UNANIMOUS ensemble answer back into the PRODUCTION memory (scope 0) so an
      * identical name later resolves for free with no AI. Called by Consensus after an item
-     * settles to 'agreed'; enforces the unanimity gate — every authoritative mechanism
-     * that ran agreed on the winning heading, and at least min_agreement of them ran (a
-     * plain 2-of-3 majority or a web-search resolution is deliberately NOT promoted).
+     * settles to 'agreed'; enforces the unanimity gate via eligibleAgreement() — every
+     * authoritative mechanism that ran agreed on the winning heading, and at least
+     * min_agreement of them ran (a plain 2-of-3 majority or a web-search resolution is
+     * deliberately NOT promoted).
      *
      * Fully error-isolated (like SearchCache): a write-back is a nice-to-have, it must
      * NEVER fail the classification queue or thrash a job. insertOrIgnore on the
@@ -105,27 +152,16 @@ class AnswerCacheService
             return;
         }
 
+        $min = (int) ($cfg['min_agreement'] ?? 2);
+        if (! $this->eligibleAgreement($item, $agreement, $min)) {
+            return;
+        }
+
         $count = (int) ($agreement['count'] ?? 0);
         $total = (int) ($agreement['total'] ?? 0);
-        $min = (int) ($cfg['min_agreement'] ?? 2);
-
-        // Unanimity: every mechanism that ran agreed on ONE heading, and enough of them
-        // ran to be a real independent corroboration (>= min_agreement).
-        if ($total < $min || $count !== $total) {
-            return;
-        }
-
-        $kind = (string) ($item->kind ?? '');
+        $isService = ((string) ($item->kind ?? '')) === 'service';
         $heading = (string) ($item->final_code ?? '');
-        $isService = $kind === 'service';
-        // A good must carry a real 4-digit heading; a service is stored heading-null.
-        if (! $isService && ! preg_match('/^\d{4}$/', $heading)) {
-            return;
-        }
         $name = (string) $item->source_text;
-        if (trim($name) === '') {
-            return;
-        }
 
         // Shadow rollout: record what WOULD be promoted, write nothing — so the real
         // volume/quality can be measured before the write-back is switched live.
@@ -198,6 +234,50 @@ class AnswerCacheService
     }
 
     /**
+     * The confidence + grounding + well-formedness gate promoteGroundedSearch() enforces,
+     * isolated from the enabled toggle. Returns the normalized [name, heading, isService]
+     * (see normalizedAnswer()) or [null, null, false] when not eligible.
+     *
+     * @param  Collection<int, ClassificationResult>  $authoritativeResults  the original
+     *                                                                       pre-conflict vector/broker/direct rows, to check grounding against.
+     * @return array{0: ?string, 1: ?string, 2: bool}
+     */
+    private function eligibleGroundedSearch(ClassificationItem $item, ClassificationResult $search, Collection $authoritativeResults): array
+    {
+        if ($search->matched_code === null || $search->confidence === null) {
+            return [null, null, false];
+        }
+        $minConf = (float) config('classify.search_resolver.grounded_min_confidence', 0.98);
+        if ($search->confidence < $minConf) {
+            return [null, null, false];
+        }
+        $heading = mb_substr((string) $search->matched_code, 0, 4);
+        if (! Consensus::headingOverlaps($heading, $authoritativeResults)) {
+            return [null, null, false];
+        }
+
+        return $this->normalizedAnswer($item->source_text, $search->kind, $heading);
+    }
+
+    /**
+     * Whether promoteGroundedSearch() would ACTUALLY write a row for this search result
+     * right now — the real enabled + confidence + grounding + well-formedness gate, with
+     * no side effects. Used by the Testing report to measure real promotion volume.
+     *
+     * @param  Collection<int, ClassificationResult>  $authoritativeResults
+     */
+    public function wouldPromoteGroundedSearch(ClassificationItem $item, ClassificationResult $search, Collection $authoritativeResults): bool
+    {
+        if (! (bool) config('classify.memory_promotion.grounded_search.enabled', false)) {
+            return false;
+        }
+
+        [$name] = $this->eligibleGroundedSearch($item, $search, $authoritativeResults);
+
+        return $name !== null;
+    }
+
+    /**
      * Write a GROUNDED search-resolved (ai_resolved) answer into memory — the PRODUCTION
      * cache (scope 0) for a live item, or the item's OWN DATASET memory for a Testing-run
      * item (so a Testing run's search discoveries never pollute prod — see groundedSearchScope()).
@@ -219,19 +299,7 @@ class AnswerCacheService
             return;
         }
 
-        if ($search->matched_code === null || $search->confidence === null) {
-            return;
-        }
-        $minConf = (float) config('classify.search_resolver.grounded_min_confidence', 0.98);
-        if ($search->confidence < $minConf) {
-            return;
-        }
-        $heading = mb_substr((string) $search->matched_code, 0, 4);
-        if (! Consensus::headingOverlaps($heading, $authoritativeResults)) {
-            return;
-        }
-
-        [$name, $heading, $isService] = $this->normalizedAnswer($item->source_text, $search->kind, $heading);
+        [$name, $heading, $isService] = $this->eligibleGroundedSearch($item, $search, $authoritativeResults);
         if ($name === null) {
             return;
         }

@@ -94,6 +94,46 @@ class TestingPagesTest extends TestCase
             ->assertSee('12 345'); // tokens
     }
 
+    public function test_run_page_renders_the_funnel_table_when_present(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $dataset = TestDataset::create(['name' => 'd', 'mechanisms' => self::MECH]);
+        $bucket = fn (int $ran, int $correct) => ['ran' => $ran, 'answered' => $ran, 'correct' => $correct];
+        $run = TestRun::create([
+            'test_dataset_id' => $dataset->id, 'description' => 'r', 'batch' => 'testrun:y',
+            'mechanisms' => ['enabled' => ['vector', 'broker', 'direct'], 'shadow' => [], 'cache' => false, 'search' => true],
+            'config' => [], 'status' => 'done', 'total' => 3,
+            'accuracy' => [
+                'columns' => [
+                    'memory' => $bucket(0, 0), 'vector' => $bucket(3, 2), 'broker' => $bucket(3, 1),
+                    'direct' => $bucket(3, 2), 'search' => $bucket(2, 1), 'majority' => $bucket(1, 1),
+                    'overall' => $bucket(3, 2),
+                ],
+                'total' => 3, 'tokens' => 100,
+                'funnel' => [
+                    'total' => 3,
+                    'prevote' => [
+                        1 => ['ran' => 0, 'answered' => 0, 'correct' => 0, 'promoted' => 0],
+                        2 => ['ran' => 2, 'answered' => 2, 'correct' => 1, 'promoted' => 0],
+                        3 => ['ran' => 1, 'answered' => 1, 'correct' => 1, 'promoted' => 1],
+                    ],
+                    'search_by_origin' => [
+                        1 => ['ran' => 0, 'answered' => 0, 'correct' => 0, 'promoted' => 0],
+                        2 => ['ran' => 2, 'answered' => 2, 'correct' => 1, 'promoted' => 1],
+                    ],
+                ],
+            ],
+        ]);
+
+        Livewire::test(TestingRun::class, ['run' => $run])
+            ->assertOk()
+            ->assertSee(__('Main algorithm'))
+            ->assertSee(__('Reference accuracy check'))
+            ->assertSee(__('Sent to memory & training'))
+            ->assertSee(__('Match :n/:m', ['n' => 3, 'm' => 3]))
+            ->assertSee(__('Search confirms :n/:m', ['n' => 2, 'm' => 3]));
+    }
+
     public function test_dataset_page_renders_the_accuracy_chart_once_a_run_is_done(): void
     {
         $this->actingAs(User::factory()->create());
