@@ -131,12 +131,14 @@ class AnswerCacheService
     }
 
     /**
-     * Write a UNANIMOUS ensemble answer back into the PRODUCTION memory (scope 0) so an
-     * identical name later resolves for free with no AI. Called by Consensus after an item
-     * settles to 'agreed'; enforces the unanimity gate via eligibleAgreement() — every
+     * Write a UNANIMOUS ensemble answer back into memory — the PRODUCTION cache (scope 0)
+     * for a live item, or the item's OWN DATASET memory for a Testing-run item (see
+     * memoryScope()), so an identical name later resolves for free with no AI. Called by
+     * Consensus after a PROD item settles to 'agreed', and by TestRunFinalizer after a
+     * test-run item does; enforces the unanimity gate via eligibleAgreement() — every
      * authoritative mechanism that ran agreed on the winning heading, and at least
      * min_agreement of them ran (a plain 2-of-3 majority or a web-search resolution is
-     * deliberately NOT promoted).
+     * deliberately NOT promoted this way — see promoteGroundedSearch() for that path).
      *
      * Fully error-isolated (like SearchCache): a write-back is a nice-to-have, it must
      * NEVER fail the classification queue or thrash a job. insertOrIgnore on the
@@ -164,7 +166,8 @@ class AnswerCacheService
         $name = (string) $item->source_text;
 
         // Shadow rollout: record what WOULD be promoted, write nothing — so the real
-        // volume/quality can be measured before the write-back is switched live.
+        // volume/quality can be measured before the write-back is switched live. Applies
+        // uniformly to both scopes, same as grounded_search's own enabled flag.
         if ($cfg['shadow'] ?? true) {
             Log::info('memory_promotion.shadow', [
                 'item_id' => $item->id,
@@ -179,7 +182,7 @@ class AnswerCacheService
 
         try {
             AnswerCache::insertOrIgnore([
-                'test_dataset_id' => 0, // production scope — the cache the live classifier reads
+                'test_dataset_id' => $this->memoryScope($item),
                 'source' => (string) ($cfg['source'] ?? 'auto:consensus'),
                 'name' => $name,
                 'name_key' => AnswerCache::keyFor($name),
@@ -280,7 +283,7 @@ class AnswerCacheService
     /**
      * Write a GROUNDED search-resolved (ai_resolved) answer into memory — the PRODUCTION
      * cache (scope 0) for a live item, or the item's OWN DATASET memory for a Testing-run
-     * item (so a Testing run's search discoveries never pollute prod — see groundedSearchScope()).
+     * item (so a Testing run's search discoveries never pollute prod — see memoryScope()).
      * "Grounded" means the resolver's heading overlaps with at least one of the original
      * pre-conflict vector/broker/direct candidates AND its self-reported confidence clears
      * search_resolver.grounded_min_confidence — measured 93-96% real accuracy (vs ~64% for
@@ -307,7 +310,7 @@ class AnswerCacheService
         // Scope the write: a prod item → production memory (scope 0); a Testing-run item →
         // its run's OWN dataset memory, so a test run's search discoveries build that
         // dataset's flywheel instead of leaking into (and lowering the quality of) prod.
-        $scope = $this->groundedSearchScope($item);
+        $scope = $this->memoryScope($item);
 
         try {
             AnswerCache::insertOrIgnore([
@@ -329,12 +332,12 @@ class AnswerCacheService
     }
 
     /**
-     * Which answer_cache scope a grounded promotion targets for this item: a live/prod
-     * item (no test_run_id) → 0 (production memory, the only scope the live classifier
-     * reads); a Testing-run item → that run's dataset, so its search discoveries warm the
-     * DATASET's own isolated memory and never touch production.
+     * Which answer_cache scope an automated promotion (promote() or promoteGroundedSearch())
+     * targets for this item: a live/prod item (no test_run_id) → 0 (production memory, the
+     * only scope the live classifier reads); a Testing-run item → that run's OWN dataset, so
+     * a test run's discoveries warm that dataset's isolated memory and never touch production.
      */
-    private function groundedSearchScope(ClassificationItem $item): int
+    private function memoryScope(ClassificationItem $item): int
     {
         if ($item->test_run_id === null) {
             return 0;

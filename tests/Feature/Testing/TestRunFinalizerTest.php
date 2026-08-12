@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Testing;
 
+use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
 use App\Models\TestDataset;
 use App\Models\TestRun;
@@ -58,6 +59,55 @@ class TestRunFinalizerTest extends TestCase
         $this->assertFalse(app(TestRunFinalizer::class)->finalize($item));
         $this->assertSame('agreed', $item->fresh()->resolution);
         $this->assertSame('0901', $item->fresh()->final_code);
+    }
+
+    public function test_three_of_three_agree_promotes_into_the_datasets_own_memory(): void
+    {
+        config()->set('classify.memory_promotion.enabled', true);
+        config()->set('classify.memory_promotion.shadow', false);
+        [$run, $item] = $this->runItem(['vector', 'broker', 'direct']);
+        $this->storeResult($item, 'vector', '0901000000');
+        $this->storeResult($item, 'broker', '0901110000');
+        $this->storeResult($item, 'direct', '0901220000');
+
+        app(TestRunFinalizer::class)->finalize($item);
+
+        // Scoped to the dataset's OWN memory, never production (scope 0) — same write
+        // path a unanimous prod item takes via Consensus::maybePromote(), just scoped.
+        $row = AnswerCache::where('test_dataset_id', $run->test_dataset_id)
+            ->where('name_key', AnswerCache::keyFor('x'))->first();
+        $this->assertNotNull($row);
+        $this->assertSame('0901', $row->heading);
+        $this->assertSame('auto:consensus', $row->source);
+        $this->assertDatabaseCount('answer_cache', 1); // nothing leaked into scope 0
+    }
+
+    public function test_a_bare_majority_conflict_never_promotes(): void
+    {
+        config()->set('classify.memory_promotion.enabled', true);
+        config()->set('classify.memory_promotion.shadow', false);
+        [, $item] = $this->runItem(['vector', 'broker', 'direct']);
+        $this->storeResult($item, 'vector', '0901000000');
+        $this->storeResult($item, 'broker', '0901110000');
+        $this->storeResult($item, 'direct', '0902000000');
+
+        app(TestRunFinalizer::class)->finalize($item);
+
+        $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    public function test_promotion_off_by_default_writes_nothing(): void
+    {
+        // Explicit, not assumed: local .env may default this on for dev.
+        config()->set('classify.memory_promotion.enabled', false);
+        [, $item] = $this->runItem(['vector', 'broker', 'direct']);
+        $this->storeResult($item, 'vector', '0901000000');
+        $this->storeResult($item, 'broker', '0901110000');
+        $this->storeResult($item, 'direct', '0901220000');
+
+        app(TestRunFinalizer::class)->finalize($item);
+
+        $this->assertDatabaseCount('answer_cache', 0);
     }
 
     public function test_conflict_with_search_claims_exactly_once(): void
