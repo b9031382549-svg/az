@@ -21,7 +21,10 @@ use Throwable;
  * timeout and can't trip REDIS_QUEUE_RETRY_AFTER). Actions:
  *   provision-serving  — bring a slot up to serve $adapterId
  *   serve-base         — bring a slot up serving the base model only (no adapter/training)
- *   start-finetune     — export corpus + provision a training slot + begin a run
+ *   start-finetune     — export corpus + provision a training slot + begin a run; trains on
+ *                        the production corpus by default, or ONE Testing dataset's own
+ *                        isolated memory when $datasetId is given (an experiment/comparison
+ *                        cycle — see FinetuneManager::start())
  *   destroy            — tear a slot down (idempotent)
  *   tick               — advance the whole state machine one pass
  *
@@ -42,6 +45,7 @@ class GpuActionJob implements ShouldQueue
         public string $action,
         public ?int $serverId = null,
         public ?int $adapterId = null,
+        public ?int $datasetId = null,
     ) {}
 
     public function handle(GpuServerManager $servers, FinetuneManager $finetune, GpuCoordinator $coordinator): void
@@ -66,7 +70,7 @@ class GpuActionJob implements ShouldQueue
         match ($this->action) {
             'provision-serving' => $servers->provisionServing($server, FinetuneAdapter::findOrFail($this->adapterId)),
             'serve-base' => $servers->provisionBaseServing($server),
-            'start-finetune' => $finetune->start($server),
+            'start-finetune' => $finetune->start($server, $this->datasetId),
             'destroy' => $servers->destroy($server),
             default => null,
         };
