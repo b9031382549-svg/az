@@ -15,7 +15,9 @@ use Tests\TestCase;
  * (unanimous/majority/divergent), excluding no-evidence rows from those buckets, and
  * the "promoted" counts reflecting the REAL memory_promotion/grounded_search gates
  * (AnswerCacheService::wouldPromote()/wouldPromoteGroundedSearch()) rather than a
- * hypothetical one.
+ * hypothetical one — both paths fire for real during a test run (scoped to the
+ * dataset's own memory via TestRunFinalizer / SearchResolverService), exactly like
+ * prod fires them scoped to production.
  */
 class RunScorerFunnelTest extends TestCase
 {
@@ -73,7 +75,8 @@ class RunScorerFunnelTest extends TestCase
 
         $funnel = app(RunScorer::class)->score($run)['funnel'];
 
-        // Row 1: unanimous + gates on → wouldPromote() passes.
+        // Row 1: unanimous + gates on → wouldPromote() passes (and, for real, would land
+        // in this dataset's own memory scope via TestRunFinalizer → promote()).
         $this->assertSame(1, $funnel['prevote'][3]['promoted']);
 
         // Row 2: confident (0.95 >= 0.90) AND grounded → promoted. Row 3 in the same

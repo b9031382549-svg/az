@@ -3,6 +3,7 @@
 namespace App\Services\Testing;
 
 use App\Models\ClassificationItem;
+use App\Services\Classify\AnswerCacheService;
 use App\Services\Classify\Consensus;
 
 /**
@@ -18,7 +19,10 @@ use App\Services\Classify\Consensus;
  */
 class TestRunFinalizer
 {
-    public function __construct(private readonly Consensus $consensus) {}
+    public function __construct(
+        private readonly Consensus $consensus,
+        private readonly AnswerCacheService $answerCache,
+    ) {}
 
     /**
      * @param  bool  $allowSearch  false on a hard-fail path — resolve the item but do NOT
@@ -52,6 +56,15 @@ class TestRunFinalizer
         }
 
         $item->update($this->consensus->resolve($results));
+
+        // Same unanimous write-back prod gets (Consensus::maybePromote()), scoped to THIS
+        // dataset's own memory instead of production — AnswerCacheService::promote()
+        // resolves the scope from the item's test_run_id, so a unanimous test-run answer
+        // now warms that dataset's flywheel exactly like a unanimous prod item warms
+        // production. Still gated by memory_promotion.enabled/shadow, same as prod.
+        if ($item->resolution === 'agreed') {
+            $this->answerCache->promote($item, Consensus::agreementOf($results));
+        }
 
         if (! $allowSearch || $item->resolution !== 'conflict' || ! ($mech['search'] ?? false)) {
             return false;

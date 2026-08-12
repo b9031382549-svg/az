@@ -115,12 +115,14 @@ class RunScorer
         );
 
         // The funnel: for every non-cache-hit row, how many of the authoritative
-        // mechanisms landed on the same heading (1..$authCount, "prevote"), and — for
-        // the ones short of unanimity — whether the web search that resolved them was
-        // confident+grounded enough to ACTUALLY write back into memory (wouldPromote*,
-        // the real enabled/shadow gate, not a hypothetical one). See RunScorer's class
-        // doc and AnswerCacheService::wouldPromote()/wouldPromoteGroundedSearch(). Each
-        // bucket reuses tally()'s ['ran','answered','correct'] shape plus 'promoted'.
+        // mechanisms landed on the same heading (1..$authCount, "prevote"), and whether
+        // that answer (unanimous) or the web search that resolved a short-of-unanimous
+        // conflict was confident+grounded enough to ACTUALLY write back into memory
+        // (wouldPromote/wouldPromoteGroundedSearch — the real enabled/shadow gate, not a
+        // hypothetical one; neither is gated on test_run_id, so both fire for real during
+        // a test run exactly like prod — see AnswerCacheService::memoryScope() and
+        // TestRunFinalizer). Each bucket reuses tally()'s ['ran','answered','correct']
+        // shape plus 'promoted'.
         $prevote = [];
         for ($n = 1; $n <= $authCount; $n++) {
             $prevote[$n] = ['ran' => 0, 'answered' => 0, 'correct' => 0, 'promoted' => 0];
@@ -170,8 +172,9 @@ class RunScorer
             $this->tally($prevote[$idx], $ag['heading'], $ag['kind'], $expHeading, $expService);
 
             if ($idx === $authCount) {
-                // Unanimous — this is exactly what Consensus::maybePromote() would have
-                // fed into AnswerCacheService::promote() on the live path.
+                // Unanimous — this is exactly what TestRunFinalizer feeds into
+                // AnswerCacheService::promote() (scoped to this dataset's own memory, the
+                // same gate/write path a unanimous PROD item goes through via Consensus).
                 if ($this->answerCache->wouldPromote($item, $ag)) {
                     $prevote[$idx]['promoted']++;
                 }
