@@ -279,6 +279,110 @@ class CatalogRetriever
         }
     }
 
+    /**
+     * PURE-vector candidates: the FT embedder's nearest catalog codes for the raw
+     * query — no expansion, no lexical, no precedents, no heading-fusion. Used by the
+     * "vector-first re-rank" path so a strong embedder feeds the LLM a clean, short,
+     * high-recall shortlist instead of a muddied fused one.
+     *
+     * @return array<int, object>
+     */
+    public function semanticCandidates(string $query, int $limit = 10, ?string $kind = null): array
+    {
+        $q = trim($query);
+        if ($q === '' || DB::connection()->getDriverName() !== 'pgsql') {
+            return [];
+        }
+        // Configurable index table so a fine-tuned embedder can search its own
+        // catalog (e.g. ft.catalog) without touching the stock one. Identifier only.
+        $table = preg_replace('/[^a-z0-9_.]/i', '', (string) config('classify.catalog_table', 'catalog'));
+        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($q));
+        $kindSql = $kind ? 'AND kind = ?' : '';
+        $bind = $kind ? [$vector, $kind, $vector] : [$vector, $vector];
+
+        $rows = DB::select(
+            "SELECT id, code, name, kind, 1 - (embedding <=> ?::vector) AS sim
+             FROM {$table} WHERE embedding IS NOT NULL {$kindSql}
+             ORDER BY embedding <=> ?::vector LIMIT {$limit}",
+            $bind,
+        );
+        foreach ($rows as $r) {
+            $r->semantic_sim = round((float) $r->sim, 4);
+            $r->score = round((float) $r->sim, 4);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Richer vector-first candidates: heading-DIVERSE semantic (≤1 code per 4-digit
+     * heading, so a short list covers MANY distinct headings — lifts the ceiling)
+     * UNION a few lexical (trigram) matches (recovers items the vector misses on
+     * exact tokens). Every candidate carries a cosine sim (for the gate/fallback and
+     * the re-rank prompt). candidates[0] stays the cosine top-1 (fallback target).
+     *
+     * @return array<int, object>
+     */
+    public function vectorFirstCandidates(string $query, int $headings = 10, int $lexicalUnion = 6): array
+    {
+        $q = trim($query);
+        if ($q === '' || DB::connection()->getDriverName() !== 'pgsql') {
+            return [];
+        }
+        $table = preg_replace('/[^a-z0-9_.]/i', '', (string) config('classify.catalog_table', 'catalog'));
+        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($q));
+
+        // Semantic, over-fetched, then thinned to one code per heading.
+        $sem = DB::select(
+            "SELECT id, code, name, kind, 1 - (embedding <=> ?::vector) AS sim
+             FROM {$table} WHERE embedding IS NOT NULL
+             ORDER BY embedding <=> ?::vector LIMIT ?",
+            [$vector, $vector, max($headings * 6, 40)],
+        );
+        $out = [];
+        $seenHeading = [];
+        $seenCode = [];
+        foreach ($sem as $r) {
+            $h = substr((string) $r->code, 0, 4);
+            if (isset($seenHeading[$h])) {
+                continue;
+            }
+            $seenHeading[$h] = true;
+            $seenCode[$r->code] = true;
+            $r->semantic_sim = round((float) $r->sim, 4);
+            $r->score = $r->semantic_sim;
+            $out[] = $r;
+            if (count($out) >= $headings) {
+                break;
+            }
+        }
+
+        // Lexical union: trigram matches on the folded search_text, with their cosine
+        // sim attached so downstream treats them uniformly. Appended (never reorders
+        // the semantic head), deduped by code.
+        if ($lexicalUnion > 0) {
+            $folded = AzFold::fold($q);
+            $lex = DB::select(
+                "SELECT id, code, name, kind, 1 - (embedding <=> ?::vector) AS sim,
+                        word_similarity(?, search_text) AS lex
+                 FROM {$table} WHERE embedding IS NOT NULL
+                 ORDER BY word_similarity(?, search_text) DESC LIMIT ?",
+                [$vector, $folded, $folded, $lexicalUnion],
+            );
+            foreach ($lex as $r) {
+                if (isset($seenCode[$r->code])) {
+                    continue;
+                }
+                $seenCode[$r->code] = true;
+                $r->semantic_sim = round((float) $r->sim, 4);
+                $r->score = $r->semantic_sim;
+                $out[] = $r;
+            }
+        }
+
+        return $out;
+    }
+
     /** @return array<int, object> */
     private function semantic(string $vector, int $per, string $kindSql, array $kindBind): array
     {

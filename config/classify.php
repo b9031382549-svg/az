@@ -94,6 +94,30 @@ return [
         'heading_codes' => (int) env('CLASSIFY_HEADING_CODES', 1),
     ],
 
+    // The table the semantic (vector) search reads. 'catalog' is the stock index;
+    // point it at a schema-qualified fine-tuned clone (e.g. 'ft.catalog') to A/B a
+    // fine-tuned embedder WITHOUT overwriting the stock embeddings. On prod the
+    // catalog is simply re-embedded in place, so this stays 'catalog'.
+    'catalog_table' => (string) env('CLASSIFY_CATALOG_TABLE', 'catalog'),
+
+    // Vector-first re-rank (for a STRONG fine-tuned embedder). Instead of the heavy
+    // expansion + fusion + 2-tier pipeline (which was tuned to rescue the weak stock
+    // vector and DEGRADES a strong one), hand the LLM the embedder's clean top-N and
+    // let it pick, falling back to the nearest candidate when it abstains. Measured
+    // (v2 fine-tune): full mechanism 66.6% vs vector-first 78.2% at the 4-digit heading.
+    'vector_first' => [
+        'enabled' => (bool) env('CLASSIFY_VECTOR_FIRST', false),
+        'top_n' => (int) env('CLASSIFY_VECTOR_FIRST_TOP_N', 10),
+        // Richer list: heading-diverse (≤1 code/heading → more distinct headings in
+        // the same length, lifts the ceiling) + N lexical trigram matches (recover
+        // items the vector misses on exact tokens). 0/false = plain top_n (78.2% base).
+        'heading_diverse' => (bool) env('CLASSIFY_VF_HEADING_DIVERSE', false),
+        'lexical' => (int) env('CLASSIFY_VF_LEXICAL', 0),
+        // Show each candidate's cosine to the re-rank model (a "the vector prefers
+        // this" signal). Gated so the default heavy-mechanism prompt is untouched.
+        'show_sim' => (bool) env('CLASSIFY_VF_SHOW_SIM', false),
+    ],
+
     // Independent search mechanisms run in parallel per item; their results are
     // stored side by side (classification_results) and reconciled into a
     // consensus. 'enabled' is the active set, in priority order. New mechanisms

@@ -52,6 +52,13 @@ class ClassifierService
         }
 
         try {
+            // Vector-first mode: a strong fine-tuned embedder feeds the LLM a clean
+            // top-N and it picks (with a nearest-candidate fallback) — no expansion or
+            // fusion. See config('classify.vector_first').
+            if (config('classify.vector_first.enabled')) {
+                return $this->classifyVectorFirst($text, $result);
+            }
+
             [$queries, $expandUsage] = $this->expandForRetrieval($text, $identity);
 
             $candidates = $this->retriever->candidates($queries, (int) config('classify.candidates'));
@@ -164,6 +171,97 @@ class ClassifierService
      * @param  array<int, object>  $candidates
      * @return array{kind:?string, code:?string, confidence:float, reason:?string, usage:array<string,int>, model:string, tier:int, escalated:bool}
      */
+    /**
+     * Vector-first classify: pure FT-vector top-N → LLM picks (with fallback). Returns
+     * the SAME result shape as classify(), so callers/mechanisms are unchanged.
+     *
+     * @param  array<string, mixed>  $result  the initialised result skeleton
+     * @return array<string, mixed>
+     */
+    private function classifyVectorFirst(string $text, array $result): array
+    {
+        $topN = max(1, (int) config('classify.vector_first.top_n', 10));
+        $lexical = (int) config('classify.vector_first.lexical', 0);
+        $candidates = (config('classify.vector_first.heading_diverse') || $lexical > 0)
+            ? $this->retriever->vectorFirstCandidates($text, $topN, $lexical)
+            : $this->retriever->semanticCandidates($text, $topN);
+        if (empty($candidates)) {
+            $result['reason'] = 'No catalog candidates found.';
+            $result['trace'] = ['input' => $text, 'mode' => 'vector_first', 'candidates' => [], 'gate' => ['status' => 'no_match']];
+
+            return $result;
+        }
+
+        $result['candidates'] = array_map(fn ($c) => [
+            'code' => $c->code, 'kind' => $c->kind, 'name' => $c->name,
+            'score' => $c->score ?? null, 'semantic_sim' => $c->semantic_sim ?? null,
+        ], $candidates);
+
+        $pick = $this->pickFromCandidates($text, $candidates); // never null here (candidates non-empty)
+        $match = Arr::first($candidates, fn ($c) => $c->code === $pick['code']);
+
+        $confidence = round((float) $pick['confidence'], 3);
+        $semanticSim = $match->semantic_sim ?? null;
+        $result['kind'] = $match->kind;
+        $result['code'] = $match->code;
+        $result['catalog_id'] = $match->id;
+        $result['name'] = $match->name;
+        $result['confidence'] = $confidence;
+        $result['semantic_sim'] = $semanticSim;
+        $result['tier'] = 1;
+        $result['reason'] = ($pick['fallback'] ?? false) ? 'vector top-1 (re-rank abstained)' : null;
+
+        $confident = $confidence >= (float) config('classify.auto_confirm');
+        $backed = $semanticSim !== null && $semanticSim >= (float) config('classify.min_semantic');
+        $result['status'] = ($confident && $backed) ? 'auto_confirmed' : 'needs_review';
+
+        $result['trace'] = [
+            'input' => $text, 'mode' => 'vector_first',
+            'candidates' => $result['candidates'],
+            'gate' => [
+                'confidence' => $confidence, 'semantic_sim' => $semanticSim,
+                'fallback' => $pick['fallback'] ?? false, 'status' => $result['status'],
+            ],
+        ];
+
+        return $result;
+    }
+
+    /**
+     * "Vector-first" pick: run the SAME two-tier re-rank over an externally supplied
+     * candidate list (e.g. the pure FT-vector top-N) and resolve the chosen code.
+     * No expansion, no fusion — just "here are N strong candidates, choose one".
+     * Falls back to the nearest candidate when the re-rank abstains.
+     *
+     * @param  array<int, object>  $candidates
+     * @return array{code: ?string, confidence: float, semantic_sim: ?float, fallback: bool}|null
+     */
+    public function pickFromCandidates(string $text, array $candidates): ?array
+    {
+        if (empty($candidates)) {
+            return null;
+        }
+        $picked = $this->rerank($text, $candidates);
+        $match = $picked['code']
+            ? Arr::first($candidates, fn ($c) => $c->code === $picked['code'])
+            : null;
+
+        // Fallback: when the re-rank abstains (no valid pick), trust the strong
+        // embedder's nearest candidate rather than dropping to no_match.
+        $fallback = false;
+        if (! $match) {
+            $match = $candidates[array_key_first($candidates)];
+            $fallback = true;
+        }
+
+        return [
+            'code' => $match->code,
+            'confidence' => $fallback ? 0.0 : (float) ($picked['confidence'] ?? 0),
+            'semantic_sim' => $match->semantic_sim ?? null,
+            'fallback' => $fallback,
+        ];
+    }
+
     private function rerank(string $text, array $candidates, ?string $identity = null): array
     {
         $list = $this->candidateList($candidates);
@@ -253,7 +351,10 @@ class ClassifierService
             // these ~24 candidates, and catalog names are breadcrumbs whose
             // distinguishing detail is in the tail. Worst case is a few thousand
             // tokens — cheap for the accuracy it buys.
-            $line = ($i + 1).". code={$c->code} [{$c->kind}] ".$c->name;
+            $sim = config('classify.vector_first.show_sim') && isset($c->semantic_sim) && $c->semantic_sim !== null
+                ? sprintf(' (~%.2f)', $c->semantic_sim)
+                : '';
+            $line = ($i + 1).". code={$c->code} [{$c->kind}]{$sim} ".$c->name;
 
             // Also show the colloquial synonyms, so the model can match everyday
             // invoice terms the terse breadcrumb name omits (e.g. "qrelka",
