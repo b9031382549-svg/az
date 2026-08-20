@@ -27,27 +27,38 @@ class InvoiceImporter
     /**
      * Inspect a file without importing: validate the header and return a sample.
      *
-     * @return array{ok: bool, error: ?string, count: int, header: array<int,mixed>, sample: array<int, array<string,mixed>>}
+     * @return array{ok: bool, error: ?string, count: int, duplicates: int, header: array<int,mixed>, sample: array<int, array<string,mixed>>}
      */
     public function preview(string $path, int $limit = 8): array
     {
         try {
             [$header, $rows] = $this->read($path);
         } catch (Throwable $e) {
-            return ['ok' => false, 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()]), 'count' => 0, 'header' => [], 'sample' => []];
+            return ['ok' => false, 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()]), 'count' => 0, 'duplicates' => 0, 'header' => [], 'sample' => []];
         }
 
         $ok = is_array($header) && count($header) >= count(self::COLUMNS);
         $count = 0;
+        $duplicates = 0;
         $sample = [];
+        $existingKeys = $this->existingKeys();
 
         foreach ($rows as $row) {
             if ($this->isBlank($row)) {
                 continue;
             }
             $count++;
+            $mapped = $this->mapRow($row);
+            $key = $this->naturalKey($mapped);
+            if ($key !== null) {
+                if (isset($existingKeys[$key])) {
+                    $duplicates++;
+                } else {
+                    $existingKeys[$key] = true;
+                }
+            }
             if (count($sample) < $limit) {
-                $sample[] = $this->mapRow($row);
+                $sample[] = $mapped;
             }
         }
 
@@ -55,6 +66,7 @@ class InvoiceImporter
             'ok' => $ok,
             'error' => $ok ? null : __('Unexpected columns: expected at least :min, got :got.', ['min' => count(self::COLUMNS), 'got' => is_array($header) ? count($header) : 0]),
             'count' => $count,
+            'duplicates' => $duplicates,
             'header' => is_array($header) ? $header : [],
             'sample' => $sample,
         ];
@@ -63,33 +75,46 @@ class InvoiceImporter
     /**
      * Import every non-blank row into e_invoices.
      *
-     * @return array{imported: int, total: int, error: ?string}
+     * @return array{imported: int, skipped: int, total: int, error: ?string}
      */
-    public function import(string $path, bool $fresh = false): array
+    public function import(string $path, bool $skipDuplicates = false): array
     {
         try {
             [$header, $rows] = $this->read($path);
         } catch (Throwable $e) {
-            return ['imported' => 0, 'total' => $this->total(), 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()])];
+            return ['imported' => 0, 'skipped' => 0, 'total' => $this->total(), 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()])];
         }
 
         if (! is_array($header) || count($header) < count(self::COLUMNS)) {
-            return ['imported' => 0, 'total' => $this->total(), 'error' => __('Unexpected columns in file.')];
+            return ['imported' => 0, 'skipped' => 0, 'total' => $this->total(), 'error' => __('Unexpected columns in file.')];
         }
 
-        if ($fresh) {
-            DB::table('e_invoices')->truncate();
-        }
+        $existingKeys = $skipDuplicates ? $this->existingKeys() : [];
 
         $now = Carbon::now();
         $buffer = [];
         $imported = 0;
+        $skipped = 0;
 
         foreach ($rows as $row) {
             if ($this->isBlank($row)) {
                 continue;
             }
-            $buffer[] = $this->mapRow($row) + ['created_at' => $now, 'updated_at' => $now];
+
+            $mapped = $this->mapRow($row);
+            $key = $this->naturalKey($mapped);
+
+            if ($skipDuplicates && $key !== null && isset($existingKeys[$key])) {
+                $skipped++;
+
+                continue;
+            }
+
+            if ($key !== null) {
+                $existingKeys[$key] = true;
+            }
+
+            $buffer[] = $mapped + ['created_at' => $now, 'updated_at' => $now];
             $imported++;
 
             if (count($buffer) >= 1000) {
@@ -101,7 +126,16 @@ class InvoiceImporter
             DB::table('e_invoices')->insert($buffer);
         }
 
-        return ['imported' => $imported, 'total' => $this->total(), 'error' => null];
+        return ['imported' => $imported, 'skipped' => $skipped, 'total' => $this->total(), 'error' => null];
+    }
+
+    /** Wipe every invoice row. The only place this class truncates. */
+    public function deleteAll(): int
+    {
+        $count = $this->total();
+        DB::table('e_invoices')->truncate();
+
+        return $count;
     }
 
     /**
@@ -133,6 +167,40 @@ class InvoiceImporter
     private function total(): int
     {
         return (int) DB::table('e_invoices')->count();
+    }
+
+    /** Natural business key for de-duplication: series+number. Null when either is missing. */
+    private function naturalKey(array $mapped): ?string
+    {
+        $series = $mapped['series'] ?? null;
+        $number = $mapped['number'] ?? null;
+
+        if (! is_string($series) || $series === '' || ! is_string($number) || $number === '') {
+            return null;
+        }
+
+        return $series.'|'.$number;
+    }
+
+    /** @return array<string, true> */
+    private function existingKeys(): array
+    {
+        $keys = [];
+
+        DB::table('e_invoices')
+            ->select('series', 'number')
+            ->whereNotNull('series')
+            ->where('series', '!=', '')
+            ->whereNotNull('number')
+            ->where('number', '!=', '')
+            ->orderBy('id')
+            ->chunk(2000, function ($rows) use (&$keys) {
+                foreach ($rows as $row) {
+                    $keys[$row->series.'|'.$row->number] = true;
+                }
+            });
+
+        return $keys;
     }
 
     private function isBlank(array $row): bool
