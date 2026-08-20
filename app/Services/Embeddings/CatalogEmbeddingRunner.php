@@ -85,6 +85,17 @@ class CatalogEmbeddingRunner
      * mid-path boilerplate. This improves recall for items whose meaning depends
      * on the category, not just the leaf word.
      */
+    /**
+     * The exact passage string that gets embedded for a catalog row. Public so a
+     * fine-tuned re-embed (into catalog_ft on the GPU box) can index the SAME text
+     * as the stock catalog — otherwise the baseline↔FT comparison would confound
+     * passage construction with the model change.
+     */
+    public function passage(string $name, ?string $synonyms = null): string
+    {
+        return $this->embedText($name, $synonyms);
+    }
+
     private function embedText(string $name, ?string $synonyms = null): string
     {
         $segments = array_values(array_filter(array_map(
