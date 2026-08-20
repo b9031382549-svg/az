@@ -99,13 +99,17 @@ class GpuServer extends Model
 
     /**
      * Map a logical "gpu:" model name to the concrete model this server's vLLM serves.
-     * 'tuned' → the fine-tuned adapter (served as `xif`); 'base' → the stock model
-     * (served as `base`); anything else is passed through verbatim (escape hatch).
+     * 'base' → the stock model (always served as `base`). 'tuned' → the fine-tuned adapter
+     * (`xif`) ONLY when this slot actually has an adapter deployed; a base-only slot serves
+     * no `xif`, so 'tuned' degrades to `base` there rather than request a model vLLM isn't
+     * serving. Combined with the resolver's no-active-server → Token Factory fallback, a
+     * stage pinned to `gpu:tuned` auto-routes: adapter slot → adapter, base slot → GPU base,
+     * no slot → Token Factory base. Anything else passes through verbatim (escape hatch).
      */
     public function modelFor(string $logical): string
     {
         return match ($logical) {
-            'tuned' => 'xif',
+            'tuned' => $this->served_adapter_id ? 'xif' : 'base',
             'base' => 'base',
             default => $logical,
         };
