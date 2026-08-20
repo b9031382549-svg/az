@@ -65,6 +65,29 @@ class GpuEndpointResolverTest extends TestCase
             && $r['model'] === 'xif');
     }
 
+    public function test_gpu_tuned_degrades_to_base_on_a_base_only_serving_slot(): void
+    {
+        // Slot is serving but has NO adapter deployed (base-only) → vLLM serves no `xif`,
+        // so gpu:tuned must degrade to the GPU's `base` model, not request a missing one.
+        GpuServer::query()->where('slot', 'A')->update([
+            'is_active' => true,
+            'role' => 'serving',
+            'status' => GpuServer::STATUS_SERVING,
+            'base_url' => 'https://gpu-a.test:8000/v1',
+            'api_key' => 'sk-a',
+            'served_adapter_id' => null,
+        ]);
+
+        OpenRouterClient::fromConfig()->complete(
+            [['role' => 'user', 'content' => 'hi']],
+            ['model' => 'gpu:tuned'],
+        );
+
+        Http::assertSent(fn ($r) => str_starts_with($r->url(), 'https://gpu-a.test:8000/v1/chat/completions')
+            && $r->hasHeader('Authorization', 'Bearer sk-a')
+            && $r['model'] === 'base');
+    }
+
     public function test_gpu_base_routes_to_active_server_base_model(): void
     {
         $this->activateServer('B', 'https://gpu-b.test:8000/v1', 'sk-b');
