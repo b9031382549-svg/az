@@ -62,7 +62,7 @@
     @if($existing > 0)
       <div class="mt-3 flex items-start gap-2.5 text-sm card-flat p-3.5 border-amber/40">
         <span class="text-amber">⚠</span>
-        <span>The database already holds <b>{{ number_format($existing, 0, '.', ' ') }}</b> invoices. A new import is <b>added on top</b> by default — tick <b>“Skip duplicates”</b> on the next step to avoid re-adding invoices already in the database (matched by series + number).</span>
+        <span>{!! __('The database already holds <b>:n</b> invoices. A new import is <b>added on top</b> by default — tick <b>“Skip duplicates”</b> on the next step to avoid re-adding invoices already in the database (matched by series + number).', ['n' => number_format($existing, 0, '.', ' ')]) !!}</span>
       </div>
     @endif
   @endif
@@ -115,14 +115,22 @@
         <div class="mt-4 card-flat p-3.5 text-sm flex items-start gap-2.5 {{ $skipDuplicates ? 'border-ledger/40' : 'border-amber/40' }}">
           @if($skipDuplicates)
             <span class="text-ledger">↻</span>
-            <span><b>{{ number_format($preview['count'] - ($preview['duplicates'] ?? 0), 0, '.', ' ') }}</b> new invoices will be added. <b>{{ number_format($preview['duplicates'] ?? 0, 0, '.', ' ') }}</b> already in the database (matched by series + number) will be skipped. Final total: <b>{{ number_format($existing + $preview['count'] - ($preview['duplicates'] ?? 0), 0, '.', ' ') }}</b>.</span>
+            <span>{!! __('<b>:new</b> new invoices will be added. <b>:dupes</b> already in the database (matched by series + number) will be skipped. Final total: <b>:total</b>.', [
+              'new' => number_format($preview['count'] - ($preview['duplicates'] ?? 0), 0, '.', ' '),
+              'dupes' => number_format($preview['duplicates'] ?? 0, 0, '.', ' '),
+              'total' => number_format($existing + $preview['count'] - ($preview['duplicates'] ?? 0), 0, '.', ' '),
+            ]) !!}</span>
           @else
             <span class="text-amber">⚠</span>
-            <span><b>{{ number_format($preview['count'], 0, '.', ' ') }}</b> rows will be <b>added</b> on top of {{ number_format($existing, 0, '.', ' ') }} → total <b>{{ number_format($existing + $preview['count'], 0, '.', ' ') }}</b>.
+            <span>{!! __('<b>:n</b> rows will be <b>added</b> on top of :existing → total <b>:total</b>.', [
+              'n' => number_format($preview['count'], 0, '.', ' '),
+              'existing' => number_format($existing, 0, '.', ' '),
+              'total' => number_format($existing + $preview['count'], 0, '.', ' '),
+            ]) !!}
             @if(($preview['duplicates'] ?? 0) > 0)
-              <b>{{ number_format($preview['duplicates'], 0, '.', ' ') }}</b> of these look like duplicates already in the database.
+              {!! __('<b>:n</b> of these look like duplicates already in the database.', ['n' => number_format($preview['duplicates'], 0, '.', ' ')]) !!}
             @endif
-            Tick “Skip duplicates” to avoid re-adding them.</span>
+            {{ __('Tick “Skip duplicates” to avoid re-adding them.') }}</span>
           @endif
         </div>
       @endif
