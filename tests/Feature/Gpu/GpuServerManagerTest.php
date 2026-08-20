@@ -131,6 +131,25 @@ class GpuServerManagerTest extends TestCase
         $this->assertFalse($this->slot('A')->fresh()->is_active);
     }
 
+    public function test_switch_accepts_a_ready_to_switch_candidate(): void
+    {
+        // The whole point of a retrain: the trained slot parks in `ready_to_switch` (warm,
+        // vLLM up) — switching to it must be accepted AND flip its status to `serving`, or
+        // isServing()/the resolver won't route traffic to it once active. Regression for the
+        // bug where switchActiveTo required STATUS_SERVING and rejected trained candidates.
+        $mgr = $this->manager(new FakeOrchestrator);
+        $this->slot('A')->update(['is_active' => true, 'status' => GpuServer::STATUS_SERVING, 'base_url' => 'http://a:8000/v1']);
+        $this->slot('B')->update(['status' => GpuServer::STATUS_READY_TO_SWITCH, 'base_url' => 'http://b:8000/v1']);
+
+        $previous = $mgr->switchActiveTo($this->slot('B'));
+
+        $this->assertSame('A', $previous->slot);
+        $b = $this->slot('B')->fresh();
+        $this->assertTrue($b->is_active);
+        $this->assertSame(GpuServer::STATUS_SERVING, $b->status); // ready_to_switch → serving
+        $this->assertTrue($b->isServing());                      // so the resolver routes to it
+    }
+
     public function test_switch_rejects_a_slot_that_is_not_serving(): void
     {
         $this->slot('B')->update(['status' => GpuServer::STATUS_BOOTING]);
@@ -150,6 +169,21 @@ class GpuServerManagerTest extends TestCase
         $this->assertNull($a->instance_id);
         $this->assertFalse($a->is_active);
         $this->assertSame('computeinstance-x', $fake->destroyedId);
+    }
+
+    public function test_destroy_clears_stale_status_detail(): void
+    {
+        // A clean teardown must not leave an old message on an off slot (regression for the
+        // transient-DNS "Destroy warning …" that lingered after the instance was long gone).
+        $fake = new FakeOrchestrator;
+        $this->slot('A')->update([
+            'status' => GpuServer::STATUS_SERVING, 'instance_id' => 'computeinstance-x',
+            'status_detail' => 'Destroy warning: some transient blip',
+        ]);
+
+        $this->manager($fake)->destroy($this->slot('A'));
+
+        $this->assertNull($this->slot('A')->status_detail);
     }
 
     public function test_safety_destroys_idle_active_and_over_ceiling_but_spares_candidate(): void

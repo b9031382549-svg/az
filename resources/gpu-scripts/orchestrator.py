@@ -18,7 +18,7 @@ CONTRACT: stdout is JSON only. Success -> {"ok": true, ...}; failure -> {"ok": f
 NOT RUNNABLE END-TO-END until a golden snapshot exists (that bake needs a rented VM — the
 paid boundary). The command construction + parsing below is what will drive it then.
 """
-import argparse, json, os, subprocess, sys, re, shlex
+import argparse, json, os, subprocess, sys, re, shlex, time
 
 PLATFORM = os.environ.get("GPU_PLATFORM", "gpu-h200-sxm")     # e.g. gpu-h100-sxm
 PRESET = os.environ.get("GPU_PRESET", "1gpu-16vcpu-200gb")
@@ -243,16 +243,27 @@ def cmd_start_training(a):
     scp(os.path.join(os.path.dirname(__file__), "train_lora.py"),
         f"ubuntu@{a.ip}:/home/ubuntu/train_lora.py", timeout=120, key=a.ssh_key)
     hb = "/home/ubuntu/heartbeat.json"
-    launch = (
-        "pkill -f 'vllm serve' 2>/dev/null; sleep 2; "
+    # The bootstrap — free the GPU, apt-install the build deps ONLY if the snapshot lacks them,
+    # then run the trainer — executes as ONE detached background job (nohup … & disown) so the
+    # launch ssh returns in seconds. NOTHING slow may sit on the ssh-timeout path: the apt
+    # fallback once ran a COLD install here (deps weren't baked → `dpkg -s` fell through) and
+    # blew past the 120s budget, failing the whole retrain. Backgrounding it means a cold apt
+    # can take as long as it needs; progress is observed via the heartbeat + train.log by
+    # training-status. Free the GPU by PORT (`fuser -k 8000/tcp`), NOT `pkill -f 'vllm serve'`
+    # (that matches this launcher's own command line → suicide). SAVED is touched only on a
+    # clean trainer exit; a nonzero exit leaves no SAVED → training-status reports "failed".
+    bootstrap = (
+        "fuser -k 8000/tcp 2>/dev/null; sleep 3; "
         "rm -f /home/ubuntu/heartbeat.json /home/ubuntu/SAVED; "
-        "sudo apt-get install -y -qq python3-dev build-essential >/dev/null 2>&1 || true; "
-        f"nohup /home/ubuntu/venv/bin/python /home/ubuntu/train_lora.py "
+        "dpkg -s build-essential python3-dev >/dev/null 2>&1 || "
+        "sudo apt-get -o DPkg::Lock::Timeout=60 install -y -qq python3-dev build-essential >/dev/null 2>&1 || true; "
+        f"/home/ubuntu/venv/bin/python /home/ubuntu/train_lora.py "
         f"--data /home/ubuntu/train.jsonl --base /home/ubuntu/llama70 "
         f"--out /home/ubuntu/adapter_new --epochs {a.epochs} --heartbeat {hb} "
-        f"> /home/ubuntu/train.log 2>&1 && touch /home/ubuntu/SAVED &"
+        "&& touch /home/ubuntu/SAVED"
     )
-    rc, _, se = ssh(a.ip, launch, timeout=120, key=a.ssh_key)
+    launch = f"nohup bash -c {shlex.quote(bootstrap)} < /dev/null > /home/ubuntu/train.log 2>&1 & disown"
+    rc, _, se = ssh(a.ip, launch, timeout=60, key=a.ssh_key)
     if rc != 0:
         fail(f"train launch failed: {se.strip()}")
     out({"ok": True, "heartbeat": hb})
@@ -273,7 +284,10 @@ def cmd_training_status(a):
                       timeout=20, key=a.ssh_key)
     alive = "ALIVE" in so2
     saved = "SAVED" in so2
-    state = "training" if alive else ("done" if saved else "failed")
+    # SAVED wins over ALIVE: once the adapter is on disk + the marker is set, training is
+    # DONE — even if the python process lingers (unsloth/torch/NCCL teardown can hang at exit
+    # after save_pretrained; a live-but-saved process must not pin the run in 'training').
+    state = "done" if saved else ("training" if alive else "failed")
     out({"ok": True, "state": state, "process_alive": alive, "saved": saved,
          "step": hb.get("step"), "total_steps": hb.get("total_steps"),
          "loss": hb.get("loss"), "eta_seconds": hb.get("eta_seconds")})
@@ -294,14 +308,34 @@ def cmd_fetch_adapter(a):
     out({"ok": True, "vps_path": a.vps_path, "sha256": sha})
 
 
+def _confirm_gone(iid, attempts=4):
+    """Is the instance actually gone? A transient CLI/DNS failure (e.g. the worker's docker
+    resolver blipping) can break `delete`'s wait-for-op even though the delete op was created
+    and completes server-side. So don't trust the delete error alone — GET the instance and
+    retry through transient failures: NotFound = truly gone (success); a clean GET = still
+    there (real failure); never-confirmed = conservatively False (surface the warning)."""
+    for i in range(attempts):
+        try:
+            _instance_view(iid)
+            return False  # GET succeeded → instance still exists → the delete really failed
+        except RuntimeError as e:
+            if "not found" in str(e).lower():
+                return True  # confirmed gone
+            if i < attempts - 1:
+                time.sleep(5)  # transient (DNS/Unavailable) → give the op + resolver a moment
+    return False
+
+
 def cmd_destroy(a):
     """Delete the instance (boot disk auto-deletes with it). The golden snapshot and the
     VPS adapters survive — nothing durable lives on the VM."""
     try:
         nebius(["compute", "instance", "delete", "--id", a.instance])
     except RuntimeError as e:
-        # Treat an already-gone instance as success (idempotent teardown).
-        if "not found" not in str(e).lower():
+        # "not found" = already gone (idempotent). Any other error might be a transient blip
+        # DURING the op-wait while the delete actually succeeds — verify before crying failure,
+        # so a flaky DNS lookup can't leave a scary permanent warning on an off slot.
+        if "not found" not in str(e).lower() and not _confirm_gone(a.instance):
             fail(e)
     out({"ok": True, "instance_id": a.instance, "destroyed": True})
 

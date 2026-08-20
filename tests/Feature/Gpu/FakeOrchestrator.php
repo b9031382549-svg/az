@@ -61,8 +61,13 @@ class FakeOrchestrator extends GpuOrchestrator
         return ['ok' => true];
     }
 
+    public bool $failStartTraining = false;
+
     public function startTraining(string $ip, string $dataPath, float $epochs): array
     {
+        if ($this->failStartTraining) {
+            throw new \RuntimeException('train launch failed: timeout after 120s');
+        }
         $this->trainingStarted = true;
 
         return ['ok' => true, 'heartbeat' => '/home/ubuntu/heartbeat.json'];

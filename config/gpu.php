@@ -66,6 +66,9 @@ return [
     'train' => [
         'epochs' => (float) env('GPU_TRAIN_EPOCHS', 1),
         'cap' => (int) env('GPU_TRAIN_CAP', 200),   // per-heading cap for finetune:export-examples
+        // Total-example cap for a run. 0 = full corpus (production). Set small (e.g. 100)
+        // for a fast, cheap TEST cycle — the corpus export then trains on a tiny sample.
+        'max_examples' => (int) env('GPU_TRAIN_MAX_EXAMPLES', 0),
     ],
 
     // Per-orchestrator-call subprocess timeout (seconds). Every subcommand is bounded

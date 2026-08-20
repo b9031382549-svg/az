@@ -70,6 +70,15 @@ class FinetuneManager
             };
         } catch (Throwable $e) {
             $run->update(['status' => FinetuneRun::STATUS_FAILED, 'error' => mb_substr($e->getMessage(), 0, 480), 'finished_at' => now()]);
+            // A failed run must not strand its (billing) training VM: the coordinator won't
+            // poll a failed run again, and its server-poll skips a slot that still holds a
+            // current_run_id — so nothing else would tear this slot down before the 24h
+            // ceiling. destroy() kills the VM + resets the slot; best-effort so a teardown
+            // hiccup can never mask the original failure.
+            try {
+                $this->servers->destroy($server);
+            } catch (Throwable) {
+            }
         }
     }
 
@@ -199,7 +208,13 @@ class FinetuneManager
     private function exportCorpus(int $runId): array
     {
         $path = rtrim((string) config('gpu.train_data_default'), '/')."/train-run-{$runId}.jsonl";
-        Artisan::call('finetune:export-examples', ['--output' => $path, '--cap' => (int) config('gpu.train.cap')]);
+        $args = ['--output' => $path, '--cap' => (int) config('gpu.train.cap')];
+        // A small max_examples (env GPU_TRAIN_MAX_EXAMPLES) trains on a tiny sample — for a
+        // fast, cheap TEST cycle. 0 = the full production corpus.
+        if (($limit = (int) config('gpu.train.max_examples')) > 0) {
+            $args['--limit'] = $limit;
+        }
+        Artisan::call('finetune:export-examples', $args);
         $rows = is_file($path) ? (int) substr_count((string) file_get_contents($path), "\n") : 0;
 
         return [$path, $rows];

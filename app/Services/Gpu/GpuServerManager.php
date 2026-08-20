@@ -112,7 +112,12 @@ class GpuServerManager
      */
     public function switchActiveTo(GpuServer $server): ?GpuServer
     {
-        if (! $server->isServing()) {
+        // A valid target is warm (vLLM up, base_url set) and either already `serving` or a
+        // freshly-trained `ready_to_switch` candidate. The latter is the WHOLE point of a
+        // retrain — so accept it, and flip it to `serving` below (its status must become
+        // `serving` or isServing()/the resolver won't route traffic to it once active).
+        $switchable = [GpuServer::STATUS_SERVING, GpuServer::STATUS_READY_TO_SWITCH];
+        if (! in_array($server->status, $switchable, true) || blank($server->base_url)) {
             throw new RuntimeException("Slot {$server->slot} is not serving yet — cannot switch to it.");
         }
         $previous = GpuServer::active();
@@ -121,6 +126,7 @@ class GpuServerManager
             GpuServer::query()->where('is_active', true)->update(['is_active' => false]);
             $server->is_active = true;
             $server->role = 'serving';
+            $server->status = GpuServer::STATUS_SERVING;
             $server->last_request_at = now();
             $server->save();
         });
@@ -131,12 +137,15 @@ class GpuServerManager
     /** Destroy the VM and reset the slot to off. Idempotent; keeps the adapter + image. */
     public function destroy(GpuServer $server): void
     {
+        $warning = null;
         if ($server->instance_id) {
             try {
                 $this->orchestrator->destroy($server->instance_id);
             } catch (Throwable $e) {
-                // Log via status_detail but still reset — a stuck instance must not pin the slot.
-                $server->status_detail = 'Destroy warning: '.$e->getMessage();
+                // Keep going — a stuck instance must not pin the slot — but surface a GENUINE
+                // failure. (The orchestrator already verifies a transient-error delete actually
+                // failed before throwing, so this only fires when the VM really survived.)
+                $warning = 'Destroy warning: '.$e->getMessage();
             }
         }
         $server->fill([
@@ -150,6 +159,9 @@ class GpuServerManager
             'served_adapter_id' => null,
             'current_run_id' => null,
             'hard_deadline_at' => null,
+            // Cleared on a clean teardown so a stale message never lingers on an off slot;
+            // only a real destroy failure leaves a warning behind.
+            'status_detail' => $warning,
         ])->save();
     }
 
