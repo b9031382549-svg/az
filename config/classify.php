@@ -123,9 +123,12 @@ return [
     // consensus. 'enabled' is the active set, in priority order. New mechanisms
     // are wired in AppServiceProvider's MechanismRegistry binding.
     'mechanisms' => [
+        // The auto-resolve rule (Consensus::resolve) needs broker AND direct (they must
+        // agree) AND vector (its top-K must corroborate), so all three are authoritative by
+        // default — dropping one makes every item a conflict.
         'enabled' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker')),
+            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker,direct')),
         ))),
         // Mechanisms that RUN and are stored but do NOT drive the consensus — for
         // measuring/calibrating a mechanism before it becomes authoritative. Now

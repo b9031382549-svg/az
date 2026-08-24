@@ -186,15 +186,15 @@ class RunScorer
             $idx = min($ag['count'], $authCount);
             $this->tally($prevote[$idx], $ag['heading'], $ag['kind'], $expHeading, $expService);
 
-            if ($idx === $authCount) {
-                // Unanimous — this is exactly what TestRunFinalizer feeds into
-                // AnswerCacheService::promote() (scoped to this dataset's own memory, the
-                // same gate/write path a unanimous PROD item goes through via Consensus).
-                if ($this->answerCache->wouldPromote($item)) {
-                    $prevote[$idx]['promoted']++;
-                }
+            // Promotion is item-level now (resolution === 'agreed' via broker == direct +
+            // vector top-K), so it can land in ANY prevote bucket — vector's raw top-1 need
+            // not match the winning heading. Count it wherever the item bucketed.
+            if ($this->answerCache->wouldPromote($item)) {
+                $prevote[$idx]['promoted']++;
+            }
 
-                continue;
+            if ($idx === $authCount) {
+                continue; // fully unanimous on matched_code → never went to search
             }
 
             $search = $byMech->get('search');

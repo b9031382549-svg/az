@@ -149,16 +149,26 @@ class ClassifyAccuracyTest extends Command
             if (! in_array($key, $methods, true)) {
                 continue;
             }
-            [$code, $kind, $status] = $this->safeMechanism($class, $name);
-            $item->results()->create([
+            [$code, $kind, $status, $candidates] = $this->safeMechanism($class, $name);
+            $row = $item->results()->create([
                 'mechanism' => $key,
                 'matched_code' => $code,
                 'kind' => $kind,
                 'status' => $status,
                 'confidence' => null,
+                'candidates' => $candidates,
             ]);
             $rec[$key] = $this->pred($code, $kind);
-            $rec[$key.'_ok'] = $this->isCorrect($rec[$key], $gold);
+            if ($key === 'vector') {
+                // Vector is scored as top-K membership (recall@K) — the same signal
+                // consensus consumes — not its raw top-1, so this harness never drifts
+                // from the Testing report (see RunScorer / HeadingMatch docblock).
+                $target = $gold['is_service'] ? '99' : $gold['heading'];
+                $rec[$key.'_ok'] = $target !== null
+                    && Consensus::vectorContains($row, $target, $gold['is_service'] ? 'service' : null);
+            } else {
+                $rec[$key.'_ok'] = $this->isCorrect($rec[$key], $gold);
+            }
         }
 
         // 4) Search resolver — its own accuracy number; independent of the other
@@ -216,11 +226,13 @@ class ClassifyAccuracyTest extends Command
         try {
             $r = app($class)->classify($name);
 
-            return [$r->matchedCode, $r->kind, $r->status];
+            // Candidates must be carried so the stored vector row corroborates via its
+            // top-K in Consensus::resolve() (mirrors MechanismResult::toRow()).
+            return [$r->matchedCode, $r->kind, $r->status, $r->candidates];
         } catch (Throwable $e) {
             $this->warn('  '.class_basename($class).' failed: '.$this->short($e->getMessage(), 120));
 
-            return [null, null, 'error'];
+            return [null, null, 'error', []];
         }
     }
 

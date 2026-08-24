@@ -45,6 +45,21 @@ class ConsensusTest extends TestCase
         $this->assertSame('9018', $item->fresh()->final_code);
     }
 
+    public function test_membership_agreed_item_is_the_unanimous_confidence_tier(): void
+    {
+        // Regression: broker == direct at 9018, vector's TOP-1 is a different code (6215)
+        // but 9018 is inside its top-K. The item is 'agreed', and the confidence tier must
+        // read 'unanimous' (the strong tier) — not 'majority' from a stale matched_code count.
+        $item = $this->item();
+        $this->seedTriad($item, '9018390000', '9018110000', ['6215200000', '9018900000']);
+
+        (new Consensus)->finalize($item);
+
+        $item->load('results');
+        $this->assertSame('agreed', $item->fresh()->resolution);
+        $this->assertSame('unanimous', $item->fresh()->load('results')->confidenceTier());
+    }
+
     public function test_finalize_conflicts_when_vector_does_not_corroborate(): void
     {
         $item = $this->item();

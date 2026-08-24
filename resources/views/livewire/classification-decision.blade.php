@@ -165,7 +165,7 @@
             <p class="kicker mb-1">{{ __('Output') }}</p>
             @if($consensus['agreed'])
               <p><span class="font-mono">{{ $consensus['heading'] }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($consensus['heading']), 55) }}</span></p>
-              <p class="text-ledger text-xs mt-0.5">{{ __(':n of :t mechanisms agreed on the heading', ['n' => $consensus['top_count'], 't' => $consensus['total']]) }}</p>
+              <p class="text-ledger text-xs mt-0.5">{{ __('broker=direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 5)]) }}</p>
             @else
               <p class="text-muted">{{ __('the mechanisms did not agree on a heading') }}</p>
               <p class="text-amber text-xs mt-0.5">{{ $searchRan ? __('conflict → web search') : __('conflict → a human') }}</p>

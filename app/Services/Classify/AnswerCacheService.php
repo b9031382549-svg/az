@@ -125,14 +125,14 @@ class AnswerCacheService
     }
 
     /**
-     * Write a UNANIMOUS ensemble answer back into memory — the PRODUCTION cache (scope 0)
+     * Write an AGREED ensemble answer back into memory — the PRODUCTION cache (scope 0)
      * for a live item, or the item's OWN DATASET memory for a Testing-run item (see
      * memoryScope()), so an identical name later resolves for free with no AI. Called by
      * Consensus after a PROD item settles to 'agreed', and by TestRunFinalizer after a
-     * test-run item does; enforces the unanimity gate via eligibleAgreement() — every
-     * authoritative mechanism that ran agreed on the winning heading, and at least
-     * min_agreement of them ran (a plain 2-of-3 majority or a web-search resolution is
-     * deliberately NOT promoted this way — see promoteGroundedSearch() for that path).
+     * test-run item does; the gate (eligiblePromotion) is simply that well-formed 'agreed'
+     * resolution — which Consensus::resolve reaches only when broker == direct AND the
+     * vector top-K corroborates. A web-search resolution is deliberately NOT promoted this
+     * way — see promoteGroundedSearch() for that path.
      *
      * Fully error-isolated (like SearchCache): a write-back is a nice-to-have, it must
      * NEVER fail the classification queue or thrash a job. insertOrIgnore on the

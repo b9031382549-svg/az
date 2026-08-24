@@ -1,5 +1,6 @@
 {
     "broker=direct, corroborated by the vector top-:k": "broker=direct, vektor top-:k ilə təsdiqləndi",
+    "broker=direct, in the vector top-:k": "broker=direct, vektor top-:k daxilində",
     "Consensus rule: the item resolves when broker and direct agree on a heading and it appears in the vector top-:k shortlist.": "Konsensus qaydası: broker və direct bir mövqedə razılaşdıqda və o, vektorun top-:k siyahısında olduqda element həll olunur.",
     "ranked shortlist; the top-:k gate consensus membership": "sıralanmış siyahı; top-:k konsensus üzvlüyünü müəyyən edir",
     "(no properties)": "(xassə yoxdur)",
