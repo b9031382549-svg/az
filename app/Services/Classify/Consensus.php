@@ -87,7 +87,7 @@ class Consensus
 
         $item->update($this->resolve($authResults));
 
-        $this->maybePromote($item, $authResults);
+        $this->maybePromote($item);
         $this->maybeSearchResolve($item);
     }
 
@@ -97,10 +97,8 @@ class Consensus
      * rather than this method, and the guard is a second belt-and-suspenders check so an
      * irreversible write can never leak into the shared production cache from a test. The
      * unanimity gate + shadow/write policy lives in AnswerCacheService::promote().
-     *
-     * @param  Collection<int, ClassificationResult>  $authResults
      */
-    private function maybePromote(ClassificationItem $item, Collection $authResults): void
+    private function maybePromote(ClassificationItem $item): void
     {
         // Only a REAL upload's unanimous item is promoted. Skip:
         //  - test-run items (test_run_id set) — they reach TestRunFinalizer, not this
@@ -114,7 +112,7 @@ class Consensus
             return;
         }
 
-        app(AnswerCacheService::class)->promote($item, self::agreementOf($authResults));
+        app(AnswerCacheService::class)->promote($item);
     }
 
     /**
@@ -148,27 +146,59 @@ class Consensus
     {
         $none = ['final_code' => null, 'final_catalog_id' => null, 'kind' => null];
 
-        // Agreement is measured on the 4-digit HEADING, not the full code (see agreementOf).
-        // The winning heading must be UNANIMOUS across every mechanism that ran (abstentions
-        // count toward the denominator, so a lone code among abstentions is not unanimous).
-        // Anything short of that — including a bare majority — is a conflict, routed to the
-        // web-search resolver for a second opinion instead of auto-accepting.
-        $ag = self::agreementOf($results);
+        // Auto-resolve rule: the two GENERATIVE mechanisms (broker, direct) must commit
+        // the SAME answer (same 4-digit heading, or both services), and the vector — which
+        // no longer picks a single code but returns its ranked retrieval shortlist — must
+        // CORROBORATE that answer by carrying it in its top-K candidates (membership, not a
+        // vote). Anything short of that is a conflict routed to the web-search resolver.
+        $byMech = $results->keyBy('mechanism');
+        $broker = $byMech->get('broker');
+        $direct = $byMech->get('direct');
+        $vector = $byMech->get('vector');
 
-        if ($ag['count'] === 0) {
-            return ['resolution' => 'no_match'] + $none;
+        $bCode = $broker?->matched_code;
+        $bKind = $broker?->kind;
+
+        if ($bCode !== null && $bCode !== ''
+            && HeadingMatch::same($bCode, $bKind, $direct?->matched_code, $direct?->kind)
+            && self::vectorContains($vector, $bCode, $bKind)) {
+            $service = HeadingMatch::isService($bKind, $bCode);
+
+            return [
+                'resolution' => 'agreed',
+                'final_code' => $service ? '99' : HeadingMatch::heading($bCode),
+                'final_catalog_id' => null,
+                'kind' => $service ? 'service' : ($bKind ?? $direct?->kind),
+            ];
         }
 
-        if ($ag['count'] < $ag['total']) {
-            return ['resolution' => 'conflict'] + $none;
+        // Nothing carried any candidate at all → no_match (don't pay for a web search).
+        $anyCoded = $results->contains(fn ($r) => $r->matched_code !== null && $r->matched_code !== '');
+
+        return ($anyCoded ? ['resolution' => 'conflict'] : ['resolution' => 'no_match']) + $none;
+    }
+
+    /**
+     * Does the vector mechanism's top-K retrieval shortlist carry the given answer? The
+     * vector no longer emits a single pick — its ordered `candidates` list IS its output,
+     * and consensus/grounding test membership (service-aware, via HeadingMatch::same) in
+     * the first K candidates rather than equality with one code. K = classify.vector.membership_k.
+     */
+    public static function vectorContains(?object $vector, ?string $code, ?string $kind): bool
+    {
+        if ($vector === null || $code === null || $code === '') {
+            return false;
         }
 
-        return [
-            'resolution' => 'agreed',
-            'final_code' => $ag['heading'],
-            'final_catalog_id' => null,
-            'kind' => $ag['kind'],
-        ];
+        $k = max(1, (int) config('classify.vector.membership_k', 5));
+
+        foreach (array_slice((array) $vector->candidates, 0, $k) as $c) {
+            if (is_array($c) && HeadingMatch::same($code, $kind, $c['code'] ?? null, $c['kind'] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -220,7 +250,15 @@ class Consensus
             return false;
         }
 
-        return $results->contains(fn ($r) => $r->matched_code !== null
-            && mb_substr((string) $r->matched_code, 0, 4) === $heading);
+        return $results->contains(function ($r) use ($heading) {
+            // The vector grounds via its top-K shortlist (membership), not a single code;
+            // every other mechanism grounds via its committed matched_code.
+            if ($r->mechanism === 'vector') {
+                return self::vectorContains($r, $heading, null);
+            }
+
+            return $r->matched_code !== null
+                && HeadingMatch::same($heading, null, $r->matched_code, $r->kind);
+        });
     }
 }

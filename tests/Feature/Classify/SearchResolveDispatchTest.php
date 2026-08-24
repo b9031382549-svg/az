@@ -78,10 +78,13 @@ class SearchResolveDispatchTest extends TestCase
     public function test_agreed_item_does_not_dispatch(): void
     {
         Queue::fake();
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
         $item = $this->item();
-        // Same heading (1104) → agreed, no conflict.
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '1104100000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        // broker == direct at 1104 and the vector shortlist carries it → agreed, no conflict.
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '1104900000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '1104100000', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '1104100000', 'status' => 'auto_confirmed', 'kind' => 'good',
+            'candidates' => [['code' => '1104100000', 'kind' => 'good']]]);
 
         app(Consensus::class)->finalize($item);
 

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\Classify\Consensus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -101,20 +100,6 @@ class ClassificationItem extends Model
     }
 
     /**
-     * How the authoritative voting mechanisms agreed on the final heading, computed from
-     * the loaded `results` — excludes the cache/search trace rows (only the mechanisms
-     * that actually voted count). Requires `results` to be loaded.
-     *
-     * @return array{count: int, total: int, heading: ?string, kind: ?string}
-     */
-    public function agreement(): array
-    {
-        return Consensus::agreementOf(
-            $this->results->whereNotIn('mechanism', ['cache', 'search'])->values()
-        );
-    }
-
-    /**
      * A coarse confidence tier for the FINAL decision, by EVIDENCE TYPE rather than any
      * self-reported number: verified (cache hit / human confirm), unanimous (every voting
      * mechanism agreed — the Memory-eligible tier, ~92-97% vs the benchmark), majority (a
@@ -129,11 +114,11 @@ class ClassificationItem extends Model
         if ($this->resolution === 'ai_resolved') {
             return 'resolved';
         }
+        // 'agreed' is now the strong ensemble signal by construction — broker == direct
+        // AND the vector top-K corroborates (Consensus::resolve) — so it maps to the
+        // Memory-eligible tier. (A bare 2-of-3 no longer reaches 'agreed'.)
         if ($this->resolution === 'agreed') {
-            $ag = $this->agreement();
-            $min = (int) config('classify.memory_promotion.min_agreement', 2);
-
-            return $ag['total'] >= $min && $ag['count'] === $ag['total'] ? 'unanimous' : 'majority';
+            return 'unanimous';
         }
 
         return 'weak';

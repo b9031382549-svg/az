@@ -123,9 +123,12 @@ return [
     // consensus. 'enabled' is the active set, in priority order. New mechanisms
     // are wired in AppServiceProvider's MechanismRegistry binding.
     'mechanisms' => [
+        // The auto-resolve rule (Consensus::resolve) needs broker AND direct (they must
+        // agree) AND vector (its top-K must corroborate), so all three are authoritative by
+        // default — dropping one makes every item a conflict.
         'enabled' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker')),
+            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker,direct')),
         ))),
         // Mechanisms that RUN and are stored but do NOT drive the consensus — for
         // measuring/calibrating a mechanism before it becomes authoritative. Now
@@ -196,6 +199,12 @@ return [
     // with the broker, so this costs no extra call.
     'vector' => [
         'use_brief_query' => (bool) env('CLASSIFY_VECTOR_USE_BRIEF_QUERY', true),
+        // The vector no longer LLM-picks a single code — it returns its ranked shortlist,
+        // and consensus/grounding test whether an answer is among its top-K candidates
+        // (membership) rather than equal to one pick. K balances coverage vs precision
+        // (measured on the 2.2k gold set: K=5 ≈ recall@5 90%+, tight precision). Retrieval
+        // still fetches vector_first.top_n candidates; only the first K gate agreement.
+        'membership_k' => (int) env('CLASSIFY_VECTOR_MEMBERSHIP_K', 5),
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):

@@ -197,31 +197,30 @@ class ClassifierService
             'score' => $c->score ?? null, 'semantic_sim' => $c->semantic_sim ?? null,
         ], $candidates);
 
-        $pick = $this->pickFromCandidates($text, $candidates); // never null here (candidates non-empty)
-        $match = Arr::first($candidates, fn ($c) => $c->code === $pick['code']);
-
-        $confidence = round((float) $pick['confidence'], 3);
-        $semanticSim = $match->semantic_sim ?? null;
-        $result['kind'] = $match->kind;
-        $result['code'] = $match->code;
-        $result['catalog_id'] = $match->id;
-        $result['name'] = $match->name;
-        $result['confidence'] = $confidence;
+        // Vector no longer LLM-re-ranks to a single answer: the fine-tuned embedder's
+        // ranked candidate list IS the mechanism's output. `matched_code` is its nearest
+        // neighbour (top-1) kept only as a representative scalar for display/API; consensus
+        // and the search resolver consume the top-K headings via
+        // ClassificationResult::topHeadings() instead of this single code. Dropping the
+        // re-rank removes one LLM call per item and was measured net-negative on accuracy.
+        $top = $candidates[array_key_first($candidates)];
+        $semanticSim = $top->semantic_sim ?? null;
+        $result['kind'] = $top->kind;
+        $result['code'] = $top->code;
+        $result['catalog_id'] = $top->id;
+        $result['name'] = $top->name;
+        $result['confidence'] = $semanticSim !== null ? round((float) $semanticSim, 3) : null;
         $result['semantic_sim'] = $semanticSim;
-        $result['tier'] = 1;
-        $result['reason'] = ($pick['fallback'] ?? false) ? 'vector top-1 (re-rank abstained)' : null;
+        $result['tier'] = null;
 
-        $confident = $confidence >= (float) config('classify.auto_confirm');
+        // The nearest match is "backed" when its cosine clears the semantic floor.
         $backed = $semanticSim !== null && $semanticSim >= (float) config('classify.min_semantic');
-        $result['status'] = ($confident && $backed) ? 'auto_confirmed' : 'needs_review';
+        $result['status'] = $backed ? 'auto_confirmed' : 'needs_review';
 
         $result['trace'] = [
             'input' => $text, 'mode' => 'vector_first',
             'candidates' => $result['candidates'],
-            'gate' => [
-                'confidence' => $confidence, 'semantic_sim' => $semanticSim,
-                'fallback' => $pick['fallback'] ?? false, 'status' => $result['status'],
-            ],
+            'gate' => ['semantic_sim' => $semanticSim, 'status' => $result['status']],
         ];
 
         return $result;

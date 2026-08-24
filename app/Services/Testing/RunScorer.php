@@ -146,6 +146,21 @@ class RunScorer
                 if ($r === null) {
                     continue; // this mechanism did not run for this row
                 }
+                // The vector no longer commits a single pick — its answer is the ranked
+                // shortlist. Score it as MEMBERSHIP (recall@K): correct when the expected
+                // answer sits in its top-K candidates, matching how consensus consumes it.
+                if ($mech === 'vector') {
+                    $columns[$col]['ran']++;
+                    if (! empty((array) $r->candidates)) {
+                        $columns[$col]['answered']++;
+                    }
+                    $target = $expService ? '99' : $expHeading;
+                    if ($target !== null && Consensus::vectorContains($r, $target, $expService ? 'service' : null)) {
+                        $columns[$col]['correct']++;
+                    }
+
+                    continue;
+                }
                 $this->tally($columns[$col], $r->matched_code, $r->kind, $expHeading, $expService);
             }
 
@@ -171,15 +186,15 @@ class RunScorer
             $idx = min($ag['count'], $authCount);
             $this->tally($prevote[$idx], $ag['heading'], $ag['kind'], $expHeading, $expService);
 
-            if ($idx === $authCount) {
-                // Unanimous — this is exactly what TestRunFinalizer feeds into
-                // AnswerCacheService::promote() (scoped to this dataset's own memory, the
-                // same gate/write path a unanimous PROD item goes through via Consensus).
-                if ($this->answerCache->wouldPromote($item, $ag)) {
-                    $prevote[$idx]['promoted']++;
-                }
+            // Promotion is item-level now (resolution === 'agreed' via broker == direct +
+            // vector top-K), so it can land in ANY prevote bucket — vector's raw top-1 need
+            // not match the winning heading. Count it wherever the item bucketed.
+            if ($this->answerCache->wouldPromote($item)) {
+                $prevote[$idx]['promoted']++;
+            }
 
-                continue;
+            if ($idx === $authCount) {
+                continue; // fully unanimous on matched_code → never went to search
             }
 
             $search = $byMech->get('search');

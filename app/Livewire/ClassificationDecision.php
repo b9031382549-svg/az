@@ -96,16 +96,16 @@ class ClassificationDecision extends Component
         $search = $results->firstWhere('mechanism', 'search');
         $adj = $this->item->adjudications->sortByDesc('id')->first();
 
-        // Recompute the unanimous heading consensus for the AI-stage output line — same
-        // agreement math Consensus::resolve() uses, so this preview can never drift from
-        // the item's actual resolution. The >= 2 floor mirrors resolve()'s own unanimity
-        // gate: a lone single-mechanism result (total === 1, e.g. a still mid-flight item)
-        // is never "agreed" on its own.
+        // Reproduce the item's ACTUAL decision (broker == direct + vector top-K membership)
+        // via the same Consensus::resolve() the pipeline ran, so this AI-stage preview can
+        // never drift from the item's real resolution. agreementOf is kept only for the
+        // descriptive "how many mechanisms' top pick shared a heading" count.
+        $decision = app(Consensus::class)->resolve($mechResults);
         $ag = Consensus::agreementOf($mechResults);
         $consensus = [
             'ran' => $mechResults->isNotEmpty(),
-            'heading' => $ag['heading'],
-            'agreed' => $ag['total'] >= 2 && $ag['count'] === $ag['total'],
+            'heading' => $decision['final_code'] ?? $ag['heading'],
+            'agreed' => $decision['resolution'] === 'agreed',
             'top_count' => $ag['count'],
             'total' => $ag['total'],
         ];
