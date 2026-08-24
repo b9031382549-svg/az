@@ -146,6 +146,8 @@ class TestRunFinalizerTest extends TestCase
         $item->results()->create([
             'mechanism' => $mech, 'matched_code' => $code,
             'kind' => $code !== null ? 'good' : null, 'status' => $status,
+            // The vector's answer is its ranked shortlist; its top candidate is its code.
+            'candidates' => ($mech === 'vector' && $code !== null) ? [['code' => $code, 'kind' => 'good']] : [],
         ]);
     }
 }

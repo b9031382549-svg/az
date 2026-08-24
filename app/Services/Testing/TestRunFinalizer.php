@@ -63,7 +63,7 @@ class TestRunFinalizer
         // now warms that dataset's flywheel exactly like a unanimous prod item warms
         // production. Still gated by memory_promotion.enabled/shadow, same as prod.
         if ($item->resolution === 'agreed') {
-            $this->answerCache->promote($item, Consensus::agreementOf($results));
+            $this->answerCache->promote($item);
         }
 
         if (! $allowSearch || $item->resolution !== 'conflict' || ! ($mech['search'] ?? false)) {

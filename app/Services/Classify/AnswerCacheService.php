@@ -85,20 +85,17 @@ class AnswerCacheService
     }
 
     /**
-     * The unanimity + well-formedness gate promote() enforces, isolated from the
+     * The agreement + well-formedness gate promote() enforces, isolated from the
      * enabled/shadow toggles so it can be reused by both the real write path and
-     * wouldPromote()'s side-effect-free measurement.
-     *
-     * @param  array{count: int, total: int, heading: ?string, kind: ?string}  $agreement
+     * wouldPromote()'s side-effect-free measurement. The agreement signal IS the item's
+     * 'agreed' resolution — Consensus reaches it only when broker == direct and the vector
+     * top-K corroborates (see Consensus::resolve), so a well-formed agreed item is the
+     * strong ensemble corroboration worth remembering. Search-resolved answers take the
+     * separate promoteGroundedSearch() path, never this one.
      */
-    private function eligibleAgreement(ClassificationItem $item, array $agreement, int $minAgreement): bool
+    private function eligiblePromotion(ClassificationItem $item): bool
     {
-        $count = (int) ($agreement['count'] ?? 0);
-        $total = (int) ($agreement['total'] ?? 0);
-
-        // Unanimity: every mechanism that ran agreed on ONE heading, and enough of them
-        // ran to be a real independent corroboration (>= min_agreement).
-        if ($total < $minAgreement || $count !== $total) {
+        if ($item->resolution !== 'agreed') {
             return false;
         }
 
@@ -117,17 +114,14 @@ class AnswerCacheService
      * enabled + shadow + unanimity + well-formedness gate, with no side effects. Used by
      * the Testing report to measure real promotion volume (not a hypothetical "if the
      * flags were on" count) without triggering a write.
-     *
-     * @param  array{count: int, total: int, heading: ?string, kind: ?string}  $agreement  from Consensus::agreementOf()
      */
-    public function wouldPromote(ClassificationItem $item, array $agreement): bool
+    public function wouldPromote(ClassificationItem $item): bool
     {
         $cfg = (array) config('classify.memory_promotion', []);
-        $min = (int) ($cfg['min_agreement'] ?? 2);
 
         return ($cfg['enabled'] ?? false)
             && ! ($cfg['shadow'] ?? true)
-            && $this->eligibleAgreement($item, $agreement, $min);
+            && $this->eligiblePromotion($item);
     }
 
     /**
@@ -144,23 +138,18 @@ class AnswerCacheService
      * NEVER fail the classification queue or thrash a job. insertOrIgnore on the
      * (test_dataset_id, name_key) unique key makes a concurrent duplicate — or a name that
      * already has a seeded Fedor answer — a harmless no-op (never overwrites, never 23505).
-     *
-     * @param  array{count: int, total: int, heading: ?string, kind: ?string}  $agreement  from Consensus::agreementOf()
      */
-    public function promote(ClassificationItem $item, array $agreement): void
+    public function promote(ClassificationItem $item): void
     {
         $cfg = (array) config('classify.memory_promotion', []);
         if (! ($cfg['enabled'] ?? false)) {
             return;
         }
 
-        $min = (int) ($cfg['min_agreement'] ?? 2);
-        if (! $this->eligibleAgreement($item, $agreement, $min)) {
+        if (! $this->eligiblePromotion($item)) {
             return;
         }
 
-        $count = (int) ($agreement['count'] ?? 0);
-        $total = (int) ($agreement['total'] ?? 0);
         $isService = ((string) ($item->kind ?? '')) === 'service';
         $heading = (string) ($item->final_code ?? '');
         $name = (string) $item->source_text;
@@ -174,7 +163,7 @@ class AnswerCacheService
                 'name' => mb_substr($name, 0, 120),
                 'heading' => $isService ? null : $heading,
                 'is_service' => $isService,
-                'agreement' => "{$count}/{$total}",
+                'rule' => 'broker=direct+vector-topk',
             ]);
 
             return;
@@ -189,7 +178,7 @@ class AnswerCacheService
                 'heading' => $isService ? null : $heading,
                 'is_service' => $isService,
                 'tier' => 'auto',
-                'meta' => json_encode(['agreement' => "{$count}/{$total}", 'item_id' => $item->id],
+                'meta' => json_encode(['rule' => 'broker=direct+vector-topk', 'item_id' => $item->id],
                     JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
                 'created_at' => now(),
                 'updated_at' => now(),

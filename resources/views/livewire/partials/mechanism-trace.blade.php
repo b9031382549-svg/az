@@ -119,7 +119,8 @@
   </div>
 
 @else
-  {{-- VECTOR: retrieval + rerank trace --}}
+  {{-- VECTOR: retrieval shortlist (no LLM pick) — consensus tests top-K membership --}}
+  @php $mk = (int) config('classify.vector.membership_k', 5); @endphp
   <div class="space-y-3 text-sm">
     <div><span class="text-faint">{{ __('Input') }}:</span> {{ $t['input'] ?? $item->source_text }}
       @if($srcTranslation)<div class="text-muted mt-0.5">↳ {{ __('Translation') }}: <em>{{ $srcTranslation }}</em></div>@endif
@@ -133,15 +134,15 @@
       </div>
     @endif
     <div class="rounded-lg border hair p-3">
-      <span class="kicker">{{ __('Candidates') }} ({{ count($t['candidates'] ?? []) }}) — {{ __('the shortlist the model chose from') }}</span>
+      <span class="kicker">{{ __('Candidates') }} ({{ count($t['candidates'] ?? []) }}) — {{ __('ranked shortlist; the top-:k gate consensus membership', ['k' => $mk]) }}</span>
       <div class="mt-2 text-xs space-y-0.5 max-h-72 overflow-auto">
         <div class="flex items-start gap-2 text-faint">
           <span class="w-28 shrink-0">{{ __('Code') }}</span><span class="flex-1">{{ __('Name') }}</span><span class="w-12 shrink-0 text-right">score</span><span class="w-14 shrink-0 text-right">cosine</span>
         </div>
-        @foreach(($t['candidates'] ?? []) as $c)
-          @php $chosen = (string)($c['code'] ?? '') === (string)$res->matched_code; @endphp
-          <div class="flex items-start gap-2 {{ $chosen ? 'font-medium text-ink' : 'text-muted' }}">
-            <span class="w-28 shrink-0 font-mono">{{ $chosen ? '→ ' : '' }}{{ $c['code'] ?? '' }}</span>
+        @foreach(($t['candidates'] ?? []) as $i => $c)
+          @php $inTopK = $i < $mk; @endphp
+          <div class="flex items-start gap-2 {{ $inTopK ? 'text-ink' : 'text-faint' }}">
+            <span class="w-28 shrink-0 font-mono">{{ $inTopK ? '● ' : '' }}{{ $c['code'] ?? '' }}</span>
             <span class="flex-1 break-words">{{ $nm($c['code'] ?? '') ?: ($c['name'] ?? '') }}</span>
             <span class="w-12 shrink-0 text-right tnum">{{ isset($c['score']) ? number_format((float)$c['score'], 3) : '' }}</span>
             <span class="w-14 shrink-0 text-right tnum">{{ isset($c['semantic_sim']) && $c['semantic_sim'] !== null ? number_format((float)$c['semantic_sim'], 2) : '—' }}</span>

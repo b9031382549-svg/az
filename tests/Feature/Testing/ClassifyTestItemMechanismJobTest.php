@@ -35,13 +35,17 @@ class ClassifyTestItemMechanismJobTest extends TestCase
 
     public function test_a_successful_mechanism_stores_its_row_and_reconciles(): void
     {
+        // A lone coded mechanism carries a candidate but cannot reach the broker=direct
+        // +vector agreement rule, so it reconciles to a conflict — the row is still stored.
         $item = $this->item(['vector']);
         $this->bindVector(fn () => new MechanismResult('0901000000', null, 'good', 0.9, 'auto_confirmed'));
 
         (new ClassifyTestItemMechanismJob($item->id, 'vector'))->handle(app(TestRunFinalizer::class));
 
-        $this->assertSame('agreed', $item->fresh()->resolution);
-        $this->assertSame('0901', $item->fresh()->final_code);
+        $this->assertDatabaseHas('classification_results', [
+            'classification_item_id' => $item->id, 'mechanism' => 'vector', 'matched_code' => '0901000000',
+        ]);
+        $this->assertSame('conflict', $item->fresh()->resolution);
     }
 
     private function bindVector(callable $classify): void

@@ -39,6 +39,9 @@ class ClassifierServiceDecisionTest extends TestCase
     /** @param array<int, object> $candidates */
     private function singleTierService(array $candidates, OpenRouterClient $llm): ClassifierService
     {
+        // These characterize the legacy expand→retrieve→two-tier-rerank engine (still live
+        // code); the vector_first path deliberately skips the LLM pick (see its own test).
+        config()->set('classify.vector_first.enabled', false);
         config()->set('classify.expand_query', false);
         config()->set('classify.two_tier', false);
         config()->set('classify.auto_confirm', 0.8);
@@ -93,8 +96,46 @@ class ClassifierServiceDecisionTest extends TestCase
         $this->assertNull($r['code']);
     }
 
+    public function test_vector_first_takes_top_1_without_an_llm_pick(): void
+    {
+        // The vector_first path no longer LLM-re-ranks: matched_code is the nearest
+        // candidate, status gates on semantic backing alone, and the LLM is never called.
+        config()->set('classify.vector_first.enabled', true);
+        config()->set('classify.min_semantic', 0.5);
+
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldNotReceive('jsonWithUsage');
+
+        $retriever = Mockery::mock(CatalogRetriever::class);
+        $retriever->shouldReceive('semanticCandidates')->andReturn([
+            $this->candidate('8471300000', 0.72),
+            $this->candidate('8528720000', 0.61),
+        ]);
+
+        $r = (new ClassifierService($retriever, $llm))->classify('laptop');
+
+        $this->assertSame('8471300000', $r['code']);        // raw top-1, no rerank
+        $this->assertSame('auto_confirmed', $r['status']);  // backed: 0.72 >= 0.5
+        $this->assertCount(2, $r['candidates']);            // the shortlist is preserved
+    }
+
+    public function test_vector_first_needs_review_when_top_1_not_semantically_backed(): void
+    {
+        config()->set('classify.vector_first.enabled', true);
+        config()->set('classify.min_semantic', 0.5);
+
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $retriever = Mockery::mock(CatalogRetriever::class);
+        $retriever->shouldReceive('semanticCandidates')->andReturn([$this->candidate('8471300000', 0.31)]);
+
+        $r = (new ClassifierService($retriever, $llm))->classify('laptop');
+
+        $this->assertSame('needs_review', $r['status']); // 0.31 < 0.5
+    }
+
     public function test_two_tier_escalates_when_tier1_not_confident(): void
     {
+        config()->set('classify.vector_first.enabled', false);
         config()->set('classify.expand_query', false);
         config()->set('classify.two_tier', true);
         config()->set('classify.auto_confirm', 0.8);

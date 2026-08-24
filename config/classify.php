@@ -196,6 +196,12 @@ return [
     // with the broker, so this costs no extra call.
     'vector' => [
         'use_brief_query' => (bool) env('CLASSIFY_VECTOR_USE_BRIEF_QUERY', true),
+        // The vector no longer LLM-picks a single code — it returns its ranked shortlist,
+        // and consensus/grounding test whether an answer is among its top-K candidates
+        // (membership) rather than equal to one pick. K balances coverage vs precision
+        // (measured on the 2.2k gold set: K=5 ≈ recall@5 90%+, tight precision). Retrieval
+        // still fetches vector_first.top_n candidates; only the first K gate agreement.
+        'membership_k' => (int) env('CLASSIFY_VECTOR_MEMBERSHIP_K', 5),
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):

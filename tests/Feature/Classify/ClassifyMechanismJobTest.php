@@ -39,17 +39,21 @@ class ClassifyMechanismJobTest extends TestCase
 
     public function test_job_writes_result_and_finalizes_consensus(): void
     {
-        config()->set('classify.mechanisms.enabled', ['fake']);
-        $registry = $this->registryWith('fake', new MechanismResult(
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
+        // broker + direct already agree at 8471; the vector job below corroborates it.
+        $item = $this->item();
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471300000', 'kind' => 'good', 'status' => 'auto_confirmed']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '8471600000', 'kind' => 'good', 'status' => 'auto_confirmed']);
+        $registry = $this->registryWith('vector', new MechanismResult(
             matchedCode: '8471300000', catalogId: null, kind: 'good',
             confidence: 0.9, status: 'auto_confirmed',
+            candidates: [['code' => '8471300000', 'kind' => 'good']],
         ));
-        $item = $this->item();
 
-        (new ClassifyMechanismJob($item->id, 'fake'))->handle($registry, new Consensus);
+        (new ClassifyMechanismJob($item->id, 'vector'))->handle($registry, new Consensus);
 
         $this->assertDatabaseHas('classification_results', [
-            'classification_item_id' => $item->id, 'mechanism' => 'fake', 'matched_code' => '8471300000',
+            'classification_item_id' => $item->id, 'mechanism' => 'vector', 'matched_code' => '8471300000',
         ]);
         $this->assertSame('agreed', $item->fresh()->resolution);
         $this->assertSame('8471', $item->fresh()->final_code); // resolved at the 4-digit heading
@@ -71,6 +75,7 @@ class ClassifyMechanismJobTest extends TestCase
     public function test_job_is_idempotent_on_retry(): void
     {
         config()->set('classify.mechanisms.enabled', ['fake']);
+        config()->set('classify.search_resolver.enabled', false); // isolate row-writing idempotency
         $registry = $this->registryWith('fake', new MechanismResult(
             matchedCode: 'C1', catalogId: null, kind: 'good', confidence: 0.9, status: 'auto_confirmed',
         ));

@@ -151,6 +151,13 @@ class TestingRun extends Component
             $cells = [];
             foreach (['memory' => 'cache', 'vector' => 'vector', 'broker' => 'broker', 'direct' => 'direct', 'search' => 'search'] as $col => $mech) {
                 $r = $byMech->get($mech);
+                if ($mech === 'vector') {
+                    // The vector is scored on top-K membership, not a single pick — the cell
+                    // shows its top headings and hits when the expected answer is among them.
+                    $cells[$col] = $r ? $this->vectorCell($r, $row) : null;
+
+                    continue;
+                }
                 $cells[$col] = $r ? $this->cell($r->matched_code, $r->kind, $row) : null;
             }
 
@@ -179,6 +186,23 @@ class TestingRun extends Component
         return [
             'heading' => HeadingMatch::isService($kind, $code) ? 'SVC' : (HeadingMatch::heading($code) ?? '—'),
             'ok' => HeadingMatch::correct($code, $kind, $row->expected_heading, (bool) $row->expected_is_service),
+        ];
+    }
+
+    /**
+     * The vector cell: its top-K headings, hitting when the expected answer is among them
+     * (recall@K membership — the same signal consensus consumes), not a single top-1 pick.
+     *
+     * @return array{heading:string, ok:bool}
+     */
+    private function vectorCell(object $r, TestDatasetRow $row): array
+    {
+        $headings = $r->topHeadings();
+        $target = $row->expected_is_service ? '99' : $row->expected_heading;
+
+        return [
+            'heading' => $headings === [] ? '—' : implode(' ', array_slice($headings, 0, 3)).(count($headings) > 3 ? '…' : ''),
+            'ok' => $target !== null && Consensus::vectorContains($r, $target, $row->expected_is_service ? 'service' : null),
         ];
     }
 }

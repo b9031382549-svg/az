@@ -42,4 +42,22 @@ class HeadingMatch
             && $predHeading !== null
             && $predHeading === $expectedHeading;
     }
+
+    /**
+     * Do two (code, kind) predictions denote the SAME answer — both services, or the
+     * same 4-digit goods heading? The symmetric sibling of correct(), used by the
+     * consensus rule (broker == direct) and the vector top-K membership check so
+     * "same answer" is decided in exactly one place (services included).
+     */
+    public static function same(?string $aCode, ?string $aKind, ?string $bCode, ?string $bKind): bool
+    {
+        if ($aCode === null || $aCode === '' || $bCode === null || $bCode === '') {
+            return false;
+        }
+
+        $bService = self::isService($bKind, $bCode);
+        $bHeading = $bService ? null : self::heading($bCode);
+
+        return self::correct($aCode, $aKind, $bHeading, $bService);
+    }
 }

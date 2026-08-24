@@ -3,13 +3,13 @@
 namespace Tests\Feature\Classify;
 
 use App\Models\ClassificationItem;
-use App\Models\ClassificationResult;
 use App\Services\Classify\Consensus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-// The consensus policy: mechanisms auto-resolve when >=2 agree on the 4-digit
-// heading; any divergence (differing headings, or a partial answer) goes to a human.
+// Consensus::finalize() integration: an item auto-resolves only once every authoritative
+// mechanism has reported AND the auto-resolve rule holds — broker == direct and the vector
+// top-K corroborates (see ConsensusMajorityTest for the pure resolve() rule matrix).
 class ConsensusTest extends TestCase
 {
     use RefreshDatabase;
@@ -17,126 +17,78 @@ class ConsensusTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Existing cases test pure all-must-report behaviour; shadow has its own
-        // tests below.
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
         config()->set('classify.mechanisms.shadow', []);
     }
 
-    public function test_shadow_mechanism_is_stored_but_does_not_drive_consensus(): void
+    /** @param array<int, string> $vectorCandidates */
+    private function seedTriad(ClassificationItem $item, ?string $broker, ?string $direct, array $vectorCandidates): void
     {
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker']);
-        config()->set('classify.mechanisms.shadow', ['broker']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => $broker, 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => $direct, 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        $item->results()->create([
+            'mechanism' => 'vector',
+            'matched_code' => $vectorCandidates[0] ?? null,
+            'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good',
+            'candidates' => array_map(fn ($c) => ['code' => $c, 'kind' => 'good'], $vectorCandidates),
+        ]);
+    }
 
+    public function test_finalize_agrees_when_broker_direct_match_and_vector_corroborates(): void
+    {
         $item = $this->item();
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'kind' => 'good']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => 'C2', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $this->seedTriad($item, '9018390000', '9018110000', ['6215200000', '9018900000']);
 
         (new Consensus)->finalize($item);
 
-        // Broker (shadow) disagreement is ignored — vector alone drives it.
         $this->assertSame('agreed', $item->fresh()->resolution);
-        $this->assertSame('C1', $item->fresh()->final_code);
+        $this->assertSame('9018', $item->fresh()->final_code);
     }
 
-    public function test_without_shadow_the_same_disagreement_is_a_conflict(): void
+    public function test_finalize_conflicts_when_vector_does_not_corroborate(): void
     {
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker']);
-        config()->set('classify.mechanisms.shadow', []);
-
         $item = $this->item();
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'kind' => 'good']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => 'C2', 'status' => 'auto_confirmed', 'kind' => 'good']);
+        $this->seedTriad($item, '9018390000', '9018110000', ['6215200000', '3004900000']);
 
         (new Consensus)->finalize($item);
 
         $this->assertSame('conflict', $item->fresh()->resolution);
     }
 
-    private function makeResult(?string $code, string $status = 'auto_confirmed', ?int $catalogId = 1): ClassificationResult
-    {
-        return new ClassificationResult([
-            'mechanism' => 'm', 'matched_code' => $code, 'status' => $status,
-            'catalog_id' => $catalogId, 'kind' => 'good',
-        ]);
-    }
-
-    public function test_agreed_when_all_same_code_and_confident(): void
-    {
-        $d = (new Consensus)->resolve(collect([$this->makeResult('C1'), $this->makeResult('C1')]));
-
-        $this->assertSame('agreed', $d['resolution']);
-        $this->assertSame('C1', $d['final_code']);
-        $this->assertNull($d['final_catalog_id']); // resolved at the heading, not a catalog leaf
-    }
-
-    public function test_heading_agreement_resolves_regardless_of_per_mechanism_confidence(): void
-    {
-        // The old 'review' state is gone — a shared heading is 'agreed' even if one
-        // mechanism was not individually confident.
-        $d = (new Consensus)->resolve(collect([
-            $this->makeResult('C1', 'auto_confirmed'),
-            $this->makeResult('C1', 'needs_review'),
-        ]));
-
-        $this->assertSame('agreed', $d['resolution']);
-        $this->assertSame('C1', $d['final_code']);
-    }
-
-    public function test_conflict_when_codes_differ(): void
-    {
-        $d = (new Consensus)->resolve(collect([$this->makeResult('C1'), $this->makeResult('C2')]));
-
-        $this->assertSame('conflict', $d['resolution']);
-        $this->assertNull($d['final_code']);
-    }
-
-    public function test_conflict_when_one_mechanism_abstains(): void
-    {
-        $d = (new Consensus)->resolve(collect([$this->makeResult('C1'), $this->makeResult(null, 'no_match', null)]));
-
-        $this->assertSame('conflict', $d['resolution']);
-    }
-
-    public function test_no_match_when_all_abstain(): void
-    {
-        $d = (new Consensus)->resolve(collect([
-            $this->makeResult(null, 'no_match', null),
-            $this->makeResult(null, 'error', null),
-        ]));
-
-        $this->assertSame('no_match', $d['resolution']);
-    }
-
     public function test_finalize_stays_pending_until_all_mechanisms_report(): void
     {
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker']);
         $item = $this->item();
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '9018390000', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '9018110000', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        // vector has not reported yet.
 
         (new Consensus)->finalize($item);
 
         $this->assertSame('pending', $item->fresh()->resolution);
     }
 
-    public function test_finalize_resolves_when_all_mechanisms_report(): void
+    public function test_shadow_mechanism_does_not_block_the_authoritative_decision(): void
     {
-        config()->set('classify.mechanisms.enabled', ['vector', 'broker']);
+        // A shadowed extra mechanism runs and is stored but is excluded from the
+        // authoritative set, so it neither blocks reporting nor changes the outcome.
+        config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct', 'extra']);
+        config()->set('classify.mechanisms.shadow', ['extra']);
+
         $item = $this->item();
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
-        $item->results()->create(['mechanism' => 'broker', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        $this->seedTriad($item, '9018390000', '9018110000', ['9018900000']);
+        $item->results()->create(['mechanism' => 'extra', 'matched_code' => '6215200000', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
 
         (new Consensus)->finalize($item);
 
         $this->assertSame('agreed', $item->fresh()->resolution);
-        $this->assertSame('C1', $item->fresh()->final_code);
+        $this->assertSame('9018', $item->fresh()->final_code);
     }
 
     public function test_finalize_never_overwrites_a_human_decision(): void
     {
-        config()->set('classify.mechanisms.enabled', ['vector']);
         $item = $this->item('confirmed');
         $item->update(['final_code' => 'HUMAN']);
-        $item->results()->create(['mechanism' => 'vector', 'matched_code' => 'C1', 'status' => 'auto_confirmed', 'catalog_id' => null, 'kind' => 'good']);
+        $this->seedTriad($item, '9018390000', '9018110000', ['9018900000']);
 
         (new Consensus)->finalize($item);
 

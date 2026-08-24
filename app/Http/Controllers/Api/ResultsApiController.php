@@ -88,7 +88,10 @@ class ResultsApiController extends Controller
         $data['confirmed_at'] = optional($it->confirmed_at)->toIso8601String();
         $data['results'] = $results->map(fn ($r) => [
             'mechanism' => $r->mechanism,
+            // For the vector, matched_code is its top-1 representative; its real answer is
+            // the top_headings shortlist that consensus tests membership in.
             'matched_code' => $r->matched_code,
+            'top_headings' => $r->mechanism === 'vector' ? $r->topHeadings() : [],
             'name' => optional(CatalogCode::where('code', $r->matched_code)->first('name'))->name,
             'kind' => $r->kind,
             'confidence' => $r->confidence,

@@ -187,7 +187,7 @@ class AnswerCacheTest extends TestCase
         $this->promoteLive();
         $item = $this->agreedItem('Some New Brand Cornflakes');
 
-        app(AnswerCacheService::class)->promote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']);
+        app(AnswerCacheService::class)->promote($item);
 
         $row = AnswerCache::where('test_dataset_id', 0)->where('name_key', AnswerCache::keyFor('Some New Brand Cornflakes'))->first();
         $this->assertNotNull($row);
@@ -201,7 +201,7 @@ class AnswerCacheTest extends TestCase
         $this->promoteLive();
         $item = $this->agreedItem('Some Consulting Service', '99', 'service');
 
-        app(AnswerCacheService::class)->promote($item, ['count' => 2, 'total' => 2, 'heading' => '99', 'kind' => 'service']);
+        app(AnswerCacheService::class)->promote($item);
 
         $row = AnswerCache::where('test_dataset_id', 0)->where('name_key', AnswerCache::keyFor('Some Consulting Service'))->first();
         $this->assertNotNull($row);
@@ -209,24 +209,25 @@ class AnswerCacheTest extends TestCase
         $this->assertTrue((bool) $row->is_service);
     }
 
-    public function test_promote_does_not_write_a_bare_majority(): void
+    public function test_promote_does_not_write_a_non_agreed_item(): void
     {
         $this->promoteLive();
-        $item = $this->agreedItem('Ambiguous Item');
+        // A conflict/ai_resolved item is not the strong broker=direct+vector signal — the
+        // only thing this path promotes is a well-formed 'agreed' resolution.
+        $item = $this->agreedItem('Ambiguous Item', '1104', 'good', ['resolution' => 'conflict', 'final_code' => null]);
 
-        // 2 of 3 agreed — not unanimous (count !== total).
-        app(AnswerCacheService::class)->promote($item, ['count' => 2, 'total' => 3, 'heading' => '1104', 'kind' => 'good']);
+        app(AnswerCacheService::class)->promote($item);
 
         $this->assertDatabaseCount('answer_cache', 0);
     }
 
-    public function test_promote_does_not_write_a_lone_single_mechanism(): void
+    public function test_promote_does_not_write_a_malformed_heading(): void
     {
         $this->promoteLive();
-        $item = $this->agreedItem('Only One Voted');
+        // Agreed but the final_code is not a real 4-digit heading (and not a service).
+        $item = $this->agreedItem('Malformed', 'nope');
 
-        // Unanimous but only 1 mechanism ran — no independent corroboration (< min_agreement).
-        app(AnswerCacheService::class)->promote($item, ['count' => 1, 'total' => 1, 'heading' => '1104', 'kind' => 'good']);
+        app(AnswerCacheService::class)->promote($item);
 
         $this->assertDatabaseCount('answer_cache', 0);
     }
@@ -237,7 +238,7 @@ class AnswerCacheTest extends TestCase
         config()->set('classify.memory_promotion.shadow', true);
         $item = $this->agreedItem('Shadowed Item');
 
-        app(AnswerCacheService::class)->promote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']);
+        app(AnswerCacheService::class)->promote($item);
 
         $this->assertDatabaseCount('answer_cache', 0);
     }
@@ -247,7 +248,7 @@ class AnswerCacheTest extends TestCase
         config()->set('classify.memory_promotion.enabled', false);
         $item = $this->agreedItem('Disabled Item');
 
-        app(AnswerCacheService::class)->promote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']);
+        app(AnswerCacheService::class)->promote($item);
 
         $this->assertDatabaseCount('answer_cache', 0);
     }
@@ -260,18 +261,18 @@ class AnswerCacheTest extends TestCase
         $this->promoteLive();
         $item = $this->agreedItem('Would Promote Item');
 
-        $this->assertTrue(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+        $this->assertTrue(app(AnswerCacheService::class)->wouldPromote($item));
     }
 
-    public function test_would_promote_is_false_for_a_bare_majority(): void
+    public function test_would_promote_is_false_for_a_non_agreed_item(): void
     {
         $this->promoteLive();
-        $item = $this->agreedItem('Ambiguous Item');
+        $item = $this->agreedItem('Ambiguous Item', '1104', 'good', ['resolution' => 'conflict', 'final_code' => null]);
 
-        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 2, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item));
     }
 
-    public function test_would_promote_is_false_in_shadow_mode_even_though_unanimous(): void
+    public function test_would_promote_is_false_in_shadow_mode_even_though_agreed(): void
     {
         config()->set('classify.memory_promotion.enabled', true);
         config()->set('classify.memory_promotion.shadow', true);
@@ -279,7 +280,7 @@ class AnswerCacheTest extends TestCase
 
         // Unlike a hypothetical "would qualify" count, this reflects what ACTUALLY
         // happens: shadow mode never writes, so wouldPromote() must read false.
-        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item));
     }
 
     public function test_would_promote_is_false_when_disabled(): void
@@ -287,14 +288,16 @@ class AnswerCacheTest extends TestCase
         config()->set('classify.memory_promotion.enabled', false);
         $item = $this->agreedItem('Disabled Item');
 
-        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item, ['count' => 3, 'total' => 3, 'heading' => '1104', 'kind' => 'good']));
+        $this->assertFalse(app(AnswerCacheService::class)->wouldPromote($item));
     }
 
     public function test_would_promote_grounded_search_true_when_confident_and_grounded(): void
     {
         config()->set('classify.memory_promotion.grounded_search.enabled', true);
         $item = $this->item('Laptop Item');
-        $vector = $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'kind' => 'good', 'status' => 'needs_review']);
+        // Grounding is now membership in the vector's top-K shortlist, not its single pick.
+        $vector = $item->results()->create(['mechanism' => 'vector', 'kind' => 'good', 'status' => 'needs_review',
+            'candidates' => [['code' => '8528720000', 'kind' => 'good'], ['code' => '8471300000', 'kind' => 'good']]]);
         $search = $item->results()->create(['mechanism' => 'search', 'matched_code' => '8471900000', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95]);
 
         $this->assertTrue(app(AnswerCacheService::class)->wouldPromoteGroundedSearch($item, $search, collect([$vector])));
@@ -304,8 +307,9 @@ class AnswerCacheTest extends TestCase
     {
         config()->set('classify.memory_promotion.grounded_search.enabled', true);
         $item = $this->item('Random Item');
-        // Vector proposed something else entirely — search's heading doesn't overlap it.
-        $vector = $item->results()->create(['mechanism' => 'vector', 'matched_code' => '620800', 'kind' => 'good', 'status' => 'needs_review']);
+        // The search heading (8471) is not among the vector's top-K candidates.
+        $vector = $item->results()->create(['mechanism' => 'vector', 'kind' => 'good', 'status' => 'needs_review',
+            'candidates' => [['code' => '6208000000', 'kind' => 'good'], ['code' => '6215200000', 'kind' => 'good']]]);
         $search = $item->results()->create(['mechanism' => 'search', 'matched_code' => '8471900000', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95]);
 
         $this->assertFalse(app(AnswerCacheService::class)->wouldPromoteGroundedSearch($item, $search, collect([$vector])));
@@ -315,7 +319,8 @@ class AnswerCacheTest extends TestCase
     {
         config()->set('classify.memory_promotion.grounded_search.enabled', false);
         $item = $this->item('Laptop Item 2');
-        $vector = $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'kind' => 'good', 'status' => 'needs_review']);
+        $vector = $item->results()->create(['mechanism' => 'vector', 'kind' => 'good', 'status' => 'needs_review',
+            'candidates' => [['code' => '8471300000', 'kind' => 'good']]]);
         $search = $item->results()->create(['mechanism' => 'search', 'matched_code' => '8471900000', 'kind' => 'good', 'status' => 'auto_confirmed', 'confidence' => 0.95]);
 
         $this->assertFalse(app(AnswerCacheService::class)->wouldPromoteGroundedSearch($item, $search, collect([$vector])));
@@ -329,7 +334,7 @@ class AnswerCacheTest extends TestCase
             'name_key' => AnswerCache::keyFor('Barley'), 'heading' => '1104', 'is_service' => false]);
         $item = $this->agreedItem('Barley', '9999'); // consensus would say something else
 
-        app(AnswerCacheService::class)->promote($item, ['count' => 3, 'total' => 3, 'heading' => '9999', 'kind' => 'good']);
+        app(AnswerCacheService::class)->promote($item);
 
         // insertOrIgnore on the unique (scope, name_key) key → the seed is untouched.
         $row = AnswerCache::where('test_dataset_id', 0)->where('name_key', AnswerCache::keyFor('Barley'))->first();
@@ -338,16 +343,14 @@ class AnswerCacheTest extends TestCase
         $this->assertDatabaseCount('answer_cache', 1);
     }
 
-    public function test_finalize_promotes_a_unanimous_prod_item(): void
+    public function test_finalize_promotes_an_agreed_prod_item(): void
     {
         $this->promoteLive();
         config()->set('classify.mechanisms.enabled', ['vector', 'broker', 'direct']);
         config()->set('classify.mechanisms.shadow', []);
 
         $item = $this->item('Brand New Widget');
-        foreach (['vector', 'broker', 'direct'] as $m) {
-            $item->results()->create(['mechanism' => $m, 'matched_code' => '847130', 'kind' => 'good', 'status' => 'auto_confirmed']);
-        }
+        $this->seedTriad($item, '8471300000', '8471600000', ['8471900000', '8528720000']);
 
         app(Consensus::class)->finalize($item);
 
@@ -365,17 +368,24 @@ class AnswerCacheTest extends TestCase
         config()->set('classify.mechanisms.shadow', []);
 
         // benchmark:seed fans gold names through the prod pipeline on a "gold-<source>"
-        // batch purely to MEASURE — a unanimous gold item must NOT leak into live memory.
+        // batch purely to MEASURE — an agreed gold item must NOT leak into live memory.
         $item = ClassificationItem::create(['batch' => 'gold-ivan', 'source_text' => 'Gold Sample Item',
             'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'pending']);
-        foreach (['vector', 'broker', 'direct'] as $m) {
-            $item->results()->create(['mechanism' => $m, 'matched_code' => '847130', 'kind' => 'good', 'status' => 'auto_confirmed']);
-        }
+        $this->seedTriad($item, '8471300000', '8471600000', ['8471900000']);
 
         app(Consensus::class)->finalize($item);
 
         $this->assertSame('agreed', $item->fresh()->resolution);
         $this->assertDatabaseCount('answer_cache', 0);
+    }
+
+    /** @param array<int, string> $vectorCandidates */
+    private function seedTriad(ClassificationItem $item, string $broker, string $direct, array $vectorCandidates): void
+    {
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => $broker, 'kind' => 'good', 'status' => 'auto_confirmed']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => $direct, 'kind' => 'good', 'status' => 'auto_confirmed']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => $vectorCandidates[0] ?? null, 'kind' => 'good', 'status' => 'auto_confirmed',
+            'candidates' => array_map(fn ($c) => ['code' => $c, 'kind' => 'good'], $vectorCandidates)]);
     }
 
     public function test_finalize_never_promotes_a_test_run_item_into_production(): void
