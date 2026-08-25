@@ -146,29 +146,32 @@ class Consensus
     {
         $none = ['final_code' => null, 'final_catalog_id' => null, 'kind' => null];
 
-        // Auto-resolve rule: the two GENERATIVE mechanisms (broker, direct) must commit
-        // the SAME answer (same 4-digit heading, or both services), and the vector — which
-        // no longer picks a single code but returns its ranked retrieval shortlist — must
-        // CORROBORATE that answer by carrying it in its top-K candidates (membership, not a
-        // vote). Anything short of that is a conflict routed to the web-search resolver.
+        // Auto-resolve rule: DIRECT (the generative mechanism, on the fine-tuned adapter)
+        // commits an answer AND the VECTOR corroborates it by carrying that heading in its
+        // top-K retrieval shortlist (membership, not a vote) — two independent signals, an
+        // LLM's recall confirmed by semantic retrieval. Anything short of that is a conflict
+        // routed to the web-search resolver.
+        //
+        // The BROKER mechanism is DISABLED (see config/classify.php → mechanisms.enabled;
+        // its class + registry entry are kept for easy re-enable). It is intentionally NOT
+        // consulted here: measured on the leak-free held-out set it capped coverage (broker
+        // == direct only ~54%) at a slim precision gain. To make it authoritative again,
+        // re-add it to CLASSIFY_MECHANISMS and reinstate a `broker == direct` clause below.
         $byMech = $results->keyBy('mechanism');
-        $broker = $byMech->get('broker');
         $direct = $byMech->get('direct');
         $vector = $byMech->get('vector');
 
-        $bCode = $broker?->matched_code;
-        $bKind = $broker?->kind;
+        $dCode = $direct?->matched_code;
+        $dKind = $direct?->kind;
 
-        if ($bCode !== null && $bCode !== ''
-            && HeadingMatch::same($bCode, $bKind, $direct?->matched_code, $direct?->kind)
-            && self::vectorContains($vector, $bCode, $bKind)) {
-            $service = HeadingMatch::isService($bKind, $bCode);
+        if ($dCode !== null && $dCode !== '' && self::vectorContains($vector, $dCode, $dKind)) {
+            $service = HeadingMatch::isService($dKind, $dCode);
 
             return [
                 'resolution' => 'agreed',
-                'final_code' => $service ? '99' : HeadingMatch::heading($bCode),
+                'final_code' => $service ? '99' : HeadingMatch::heading($dCode),
                 'final_catalog_id' => null,
-                'kind' => $service ? 'service' : ($bKind ?? $direct?->kind),
+                'kind' => $service ? 'service' : $dKind,
             ];
         }
 

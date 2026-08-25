@@ -21,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     private const MECHANISMS = [
         'vector' => VectorMechanism::class,
+        // 'broker' is DISABLED 2026-08-21 — dropped from config('classify.mechanisms.enabled')
+        // default (rule is DIRECT + vector top-K; see Consensus::resolve). The mapping is
+        // kept so re-enabling is just adding 'broker' back to CLASSIFY_MECHANISMS.
         'broker' => BrokerDescentMechanism::class,
         'direct' => DirectLlmMechanism::class,
     ];

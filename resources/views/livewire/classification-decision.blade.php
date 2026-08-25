@@ -150,7 +150,7 @@
           <div class="flex items-center gap-2.5">
             <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">2</span>
             <span class="font-medium">{{ __('AI search') }}</span>
-            <span class="text-faint text-xs">{{ __('broker=direct, corroborated by the vector top-:k', ['k' => config('classify.vector.membership_k', 5)]) }}</span>
+            <span class="text-faint text-xs">{{ __('direct, corroborated by the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</span>
           </div>
           <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($consensus['agreed'] ? 'good' : 'warn') }}">{{ $consensus['agreed'] ? __('agreed') : __('diverged') }}</span>
         </div>
@@ -165,7 +165,7 @@
             <p class="kicker mb-1">{{ __('Output') }}</p>
             @if($consensus['agreed'])
               <p><span class="font-mono">{{ $consensus['heading'] }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($consensus['heading']), 55) }}</span></p>
-              <p class="text-ledger text-xs mt-0.5">{{ __('broker=direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 5)]) }}</p>
+              <p class="text-ledger text-xs mt-0.5">{{ __('direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
             @else
               <p class="text-muted">{{ __('the mechanisms did not agree on a heading') }}</p>
               <p class="text-amber text-xs mt-0.5">{{ $searchRan ? __('conflict → web search') : __('conflict → a human') }}</p>
@@ -218,7 +218,7 @@
                 @include('livewire.partials.mechanism-trace')
               </div>
             @endforeach
-            <p class="text-xs text-muted">{{ __('Consensus rule: the item resolves when broker and direct agree on a heading and it appears in the vector top-:k shortlist.', ['k' => config('classify.vector.membership_k', 5)]) }}</p>
+            <p class="text-xs text-muted">{{ __('Consensus rule: the item resolves when the direct answer appears in the vector top-:k shortlist.', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
           </div>
         </details>
       </li>
