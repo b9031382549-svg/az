@@ -175,6 +175,13 @@ return [
         // gate below (decisive_axis + material.basis). Degrades to canonicalize()
         // essence on error/disabled, so it never blocks a classification.
         'use_brief' => (bool) env('CLASSIFY_BROKER_USE_BRIEF', true),
+        // Glossary grounding: before the brief, look the item's distinctive tokens up in
+        // the catalog (the project's own AZ product dictionary) and inject the CLEAN
+        // spelled term + kind-of-goods, so the brief stops misreading garbled AZ words
+        // (BALGABAG→balqabaq/pumpkin). Deterministic catalog lookup, not vector retrieval.
+        // Cached under a '-gloss' prompt-version suffix so it never masks base briefs. OFF
+        // by default (measured marginal: +3 isolated identity, within noise).
+        'brief_glossary' => (bool) env('CLASSIFY_BROKER_BRIEF_GLOSSARY', false),
         'brief_model' => (string) env('CLASSIFY_BROKER_BRIEF_MODEL', 'openai/gpt-4o'),
         // (Disabled) The base brief could escalate to a WEB-SEARCH model for unfamiliar
         // brands. The flow no longer searches the web at the input — a blank model keeps
@@ -190,6 +197,16 @@ return [
         // digits 5-10 (which the 4-digit consensus discards) and can abstain when the
         // leaf/fallback fails. Stopping at the heading keeps those as correct votes.
         'answer_granularity' => (string) env('CLASSIFY_BROKER_ANSWER_GRANULARITY', 'code'),
+        // Chapter shortlist: before the root descent, ONE model call proposes the N most
+        // plausible chapters from the item + brief — the model's OWN HS knowledge, NOT
+        // retrieval, so the broker stays independent of the vector mechanism. The root
+        // fork then decides among those N with full cards; undecided → escape to the full
+        // 97-chapter root. OFF by default (measured net-NEGATIVE at scale: −12 on 300 —
+        // the ~11% recall miss cuts off the true chapter; kept flagged, do NOT enable).
+        'chapter_shortlist' => (bool) env('CLASSIFY_BROKER_CHAPTER_SHORTLIST', false),
+        'chapter_shortlist_n' => (int) env('CLASSIFY_BROKER_CHAPTER_SHORTLIST_N', 7),
+        // '' → reuse broker.model for the shortlist call.
+        'chapter_shortlist_model' => (string) env('CLASSIFY_BROKER_CHAPTER_SHORTLIST_MODEL', ''),
     ],
 
     // Vector (retrieval) mechanism. use_brief_query: seed retrieval with the shared
