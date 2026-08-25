@@ -101,6 +101,23 @@ final class BrokerDescentMechanism implements ClassifierMechanism
             }
 
             $children = RubricatorNode::whereNull('parent_id')->orderBy('code')->get();
+            $rootChildren = $children; // full 97-chapter root, kept for the shortlist escape
+
+            // Chapter shortlist: narrow the 97-way root to the model's OWN top-N
+            // candidate chapters (its HS knowledge + the brief, not retrieval) so the
+            // fork is small enough that its cards/rules are actually weighed. An
+            // undecided narrowed root escapes to the full root below, so omitting a
+            // chapter can never lose it — the shortlist only helps.
+            $shortlisted = false;
+            if ((bool) config('classify.broker.chapter_shortlist', false)) {
+                $cand = $this->proposeChapters($q, $model, $usage);
+                $trace['chapter_shortlist'] = $cand;
+                $narrowed = $rootChildren->filter(fn ($c) => in_array((string) $c->code, $cand, true))->values();
+                if ($narrowed->count() >= 2) {
+                    $children = $narrowed;
+                    $shortlisted = true;
+                }
+            }
 
             // In 4-digit ('heading') mode the answer is fixed once the descent reaches a
             // 4-digit node; going deeper into 6-digit subpositions only spends a decide()
@@ -132,6 +149,18 @@ final class BrokerDescentMechanism implements ClassifierMechanism
                 $chosen = $this->pick($children, $decision['choice']);
                 $ok = $this->decisive($decision, $chosen, $cfg);
                 $trace['steps'][] = $this->forkStep($decision, $ok);
+
+                // Shortlist escape: an undecided narrowed root re-decides over the FULL
+                // 97 chapters (old behaviour) rather than abstaining — so the shortlist
+                // never loses a chapter it happened to omit.
+                if (! $ok && $shortlisted && $node === null && $children->count() !== $rootChildren->count()) {
+                    $children = $rootChildren;
+                    $shortlisted = false;
+                    $decision = $this->decide($q, $children, $model, $usage);
+                    $chosen = $this->pick($children, $decision['choice']);
+                    $ok = $this->decisive($decision, $chosen, $cfg);
+                    $trace['steps'][] = $this->forkStep($decision, $ok);
+                }
 
                 // One targeted fact-acquisition retry on an undecided fork.
                 if (! $ok && $decision['question'] !== null && $lookups < (int) ($cfg['max_lookups'] ?? 1)) {
@@ -495,6 +524,86 @@ final class BrokerDescentMechanism implements ClassifierMechanism
         ];
     }
 
+    /**
+     * The broker's OWN candidate chapters — one model call over the 97 chapter titles
+     * + the reasoning query, returning the N most plausible 2-digit chapters. Uses the
+     * model's parametric HS knowledge, NOT retrieval, so the broker stays independent
+     * of the vector mechanism. Narrows the root fork so its cards/rules are weighed.
+     *
+     * @return array<int, string> valid 2-digit chapter codes, most likely first
+     */
+    private function proposeChapters(string $q, string $model, array &$usage): array
+    {
+        $n = max(2, (int) config('classify.broker.chapter_shortlist_n', 7));
+        $override = (string) config('classify.broker.chapter_shortlist_model', '');
+        $model = $override !== '' ? $override : $model;
+
+        // Real chapters (2-digit rubricator roots) with titles, so the model picks
+        // existing chapters rather than hallucinating codes.
+        $roots = RubricatorNode::whereNull('parent_id')->orderBy('code')->get();
+        $valid = $roots->pluck('code')->map(fn ($c) => (string) $c)->all();
+        $lines = $roots->map(fn ($c) => $c->code.' — '.($c->title ?: $c->code))->implode("\n");
+
+        $messages = [
+            ['role' => 'system', 'content' => $this->shortlistPrompt($n)],
+            ['role' => 'user', 'content' => "CHAPTERS:\n{$lines}\n\nITEM: {$q}"],
+        ];
+        $response = $this->llm->jsonWithUsage($messages, ['model' => $model]);
+        LlmLog::record('broker_chapters', $response['model'], $response['usage'], $response['latency_ms'] ?? 0,
+            'ok', $response['raw'] ?? null, $messages, 'broker', null, ['item' => mb_substr($q, 0, 80)]);
+        $this->addUsage($usage, $response['usage']);
+
+        $out = [];
+        foreach ((array) ($response['data']['chapters'] ?? []) as $c) {
+            $digits = preg_replace('/\D/', '', (string) $c);
+            if ($digits === '') {
+                continue;
+            }
+            $code = str_pad(substr($digits, 0, 2), 2, '0', STR_PAD_LEFT);
+            if (in_array($code, $valid, true) && ! in_array($code, $out, true)) {
+                $out[] = $code;
+            }
+        }
+
+        return array_slice($out, 0, $n);
+    }
+
+    /**
+     * Public probe: the broker's candidate chapters for a raw item (builds the same
+     * essence+brief reasoning query the live descent uses). Used by broker:chapter-
+     * propose-recall to measure the shortlist's chapter recall before it goes live.
+     *
+     * @return array<int, string>
+     */
+    public function candidateChaptersFor(string $text): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return [];
+        }
+        // Mirror the query build at the top of classify() (essence → brief), minus the
+        // trace. Kept in sync deliberately so the probe measures the live shortlist.
+        $this->brief = null;
+        $this->backingQuery = $text;
+        $q = $text;
+        $usage = $this->zeroUsage();
+        try {
+            $essence = trim($this->classifier->canonicalize($text));
+            if ($essence !== '' && mb_strtolower($essence) !== mb_strtolower($text)) {
+                $q = $text."\nNormalized: ".$essence;
+            }
+            $brief = $this->briefs->brief($text);
+            if ($brief !== null) {
+                $this->brief = $brief;
+                $q = $this->briefQuery($text, $brief);
+            }
+        } catch (Throwable $e) {
+            // fall through with whatever $q we have
+        }
+
+        return $this->proposeChapters($q, (string) config('classify.broker.model', 'openai/gpt-4o'), $usage);
+    }
+
     /** One LEAF-PICK call: choose the final 10-digit code among sibling leaves. */
     private function leafPick(string $text, Collection $leaves, string $model, array &$usage): array
     {
@@ -686,6 +795,24 @@ final class BrokerDescentMechanism implements ClassifierMechanism
 
         Respond with strict JSON only:
         {"criterion":"<what separates the branches>","choice":"<chosen child code or null>","confidence":0.0,"decisive":true,"question":"<the missing fact question, or empty>","reason":"<short>"}
+        PROMPT;
+    }
+
+    private function shortlistPrompt(int $n): string
+    {
+        return <<<PROMPT
+        You are a customs classification expert working with Azerbaijan's XİF MN
+        (HS) nomenclature. You are given the full list of 2-digit CHAPTERS (code —
+        title) and one ITEM.
+
+        List the {$n} chapters the item is MOST LIKELY to be classified under, MOST
+        LIKELY FIRST. Judge by what the item functionally IS and what it is used for,
+        not by a surface word match. Be INCLUSIVE at the margin: if a chapter has any
+        reasonable chance, include it — omitting the correct chapter is far worse than
+        adding one extra candidate. Choose ONLY from the listed 2-digit chapter codes.
+
+        Respond with strict JSON only:
+        {"chapters":["NN","NN",...],"reason":"<short>"}
         PROMPT;
     }
 

@@ -5,6 +5,7 @@ namespace App\Services\Classify;
 use App\Models\ItemTranslation;
 use App\Models\ProductBrief;
 use App\Services\Llm\OpenRouterClient;
+use App\Support\AzGlossary;
 use App\Support\LlmLog;
 use Throwable;
 
@@ -22,7 +23,10 @@ use Throwable;
  */
 class ProductBriefService
 {
-    public function __construct(private readonly OpenRouterClient $llm) {}
+    public function __construct(
+        private readonly OpenRouterClient $llm,
+        private readonly AzGlossary $glossary,
+    ) {}
 
     /**
      * Return the normalized brief array, or null when briefs are disabled or the
@@ -40,6 +44,14 @@ class ProductBriefService
         $sourceHash = ItemTranslation::hashFor($text);
         $version = (string) config('classify.broker.brief_prompt_version', 'b1');
 
+        // Catalog glossary grounding — the '-gloss' cache suffix keeps glossary briefs
+        // in their own cache namespace, so they never mask or pollute the base briefs.
+        $glossaryOn = (bool) config('classify.broker.brief_glossary', false);
+        $hints = $glossaryOn ? $this->glossary->hintsFor($text) : [];
+        if ($glossaryOn) {
+            $version .= '-gloss';
+        }
+
         $cached = ProductBrief::where('source_hash', $sourceHash)
             ->where('prompt_version', $version)
             ->first();
@@ -48,7 +60,7 @@ class ProductBriefService
         }
 
         // Fast base pass (no web search).
-        $result = $this->callBrief($text, (string) config('classify.broker.brief_model', 'openai/gpt-4o'), false);
+        $result = $this->callBrief($text, (string) config('classify.broker.brief_model', 'openai/gpt-4o'), false, $hints);
 
         // Escalate to a search-capable model ONLY when the base pass is unsure — an
         // unfamiliar brand or garbled term it could not confidently identify. Confident
@@ -56,7 +68,7 @@ class ProductBriefService
         $searchModel = (string) config('classify.broker.brief_search_model', '');
         $below = (float) config('classify.broker.brief_search_below', 0.55);
         if ($searchModel !== '' && ($result === null || ($result['brief']['confidence'] ?? 1.0) < $below)) {
-            $searched = $this->callBrief($text, $searchModel, true);
+            $searched = $this->callBrief($text, $searchModel, true, $hints);
             if ($searched !== null) {
                 $result = $searched;
             }
@@ -95,12 +107,23 @@ class ProductBriefService
      *
      * @return array{brief: array<string, mixed>, model: string, usage: array<string, int>}|null
      */
-    private function callBrief(string $text, string $model, bool $search): ?array
+    private function callBrief(string $text, string $model, bool $search, array $hints = []): ?array
     {
         try {
             $messages = [['role' => 'system', 'content' => $this->prompt()]];
             if ($search) {
                 $messages[] = ['role' => 'system', 'content' => 'You have WEB SEARCH. If you cannot confidently identify this item from its text alone — an unfamiliar brand, product name, or garbled/transliterated term — search the web to find what it ACTUALLY is (its category, active ingredient, material), then describe it. Prefer the real identification over a guess.'];
+            }
+            if ($hints !== []) {
+                $lines = array_map(
+                    fn ($h) => "- {$h['token']} → e.g. \"{$h['example']}\"".($h['area'] !== '' ? " [{$h['area']}]" : ''),
+                    $hints,
+                );
+                $messages[] = ['role' => 'system', 'content' => 'GLOSSARY — distinctive tokens from the item matched against the XİF MN '
+                    .'catalog (the authoritative AZ product vocabulary). Each shows the CLEAN '
+                    .'spelling and the kind of goods that word names there. Use them to read a '
+                    .'garbled/transliterated head-noun correctly; they are evidence about the '
+                    ."WORD, not a code to copy:\n".implode("\n", $lines)];
             }
             $messages[] = ['role' => 'user', 'content' => "ITEM: {$text}"];
 
