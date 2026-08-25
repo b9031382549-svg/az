@@ -23,7 +23,7 @@ class Testing extends Component
     // circular without a train/test split; see the plan's Phase 2).
     public bool $useVector = true;
 
-    public bool $useBroker = true;
+    public bool $useBroker = false;
 
     public bool $useDirect = true;
 

@@ -104,7 +104,7 @@ class RunScorer
         $items = $run->items()->with('results')->get()->keyBy('test_dataset_row_id');
 
         $authoritative = Consensus::computeAuthoritative(
-            (array) ($run->mechanisms['enabled'] ?? ['vector', 'broker', 'direct']),
+            (array) ($run->mechanisms['enabled'] ?? ['vector', 'direct']),
             (array) ($run->mechanisms['shadow'] ?? []),
         );
         $authCount = count($authoritative);

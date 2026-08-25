@@ -135,9 +135,10 @@ return [
             explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,direct')),
         ))),
         // Mechanisms that RUN and are stored but do NOT drive the consensus — for
-        // measuring/calibrating a mechanism before it becomes authoritative. Now
-        // empty: the broker is AUTHORITATIVE (vector↔broker disagreement becomes a
-        // conflict routed to a human). Re-shadow it with CLASSIFY_SHADOW_MECHANISMS=broker.
+        // measuring/calibrating a mechanism before it becomes authoritative. Empty by
+        // default. (The broker is DISABLED entirely, not shadowed — it is absent from the
+        // enabled set above; to measure it without letting it decide, add it to BOTH
+        // CLASSIFY_MECHANISMS and CLASSIFY_SHADOW_MECHANISMS.)
         'shadow' => array_values(array_filter(array_map(
             'trim',
             explode(',', (string) env('CLASSIFY_SHADOW_MECHANISMS', '')),

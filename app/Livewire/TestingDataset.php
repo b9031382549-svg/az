@@ -25,7 +25,7 @@ class TestingDataset extends Component
     // Run mechanism overrides — seeded from the dataset default, tweakable per run.
     public bool $useVector = true;
 
-    public bool $useBroker = true;
+    public bool $useBroker = false;
 
     public bool $useDirect = true;
 
@@ -50,7 +50,7 @@ class TestingDataset extends Component
     {
         $this->dataset = $dataset;
         $m = $dataset->mechanisms ?? [];
-        $enabled = (array) ($m['enabled'] ?? ['vector', 'broker', 'direct']);
+        $enabled = (array) ($m['enabled'] ?? ['vector', 'direct']);
         $this->useVector = in_array('vector', $enabled, true);
         $this->useBroker = in_array('broker', $enabled, true);
         $this->useDirect = in_array('direct', $enabled, true);
