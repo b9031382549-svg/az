@@ -123,17 +123,22 @@ return [
     // consensus. 'enabled' is the active set, in priority order. New mechanisms
     // are wired in AppServiceProvider's MechanismRegistry binding.
     'mechanisms' => [
-        // The auto-resolve rule (Consensus::resolve) needs broker AND direct (they must
-        // agree) AND vector (its top-K must corroborate), so all three are authoritative by
-        // default — dropping one makes every item a conflict.
+        // Active mechanisms. The auto-resolve rule (Consensus::resolve) is DIRECT + vector
+        // top-K membership, so only those two are authoritative by default.
+        // BROKER is DISABLED 2026-08-21 (removed from this default) — it capped coverage on
+        // the leak-free held-out set at a slim precision gain, and it is the heaviest
+        // mechanism (brief + per-fork decide + leaf + fact). Its class + registry entry are
+        // KEPT (App\Services\Classify\Mechanisms\BrokerDescentMechanism) so re-enabling is
+        // just adding 'broker' back here (and reinstating the broker clause in resolve()).
         'enabled' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,broker,direct')),
+            explode(',', (string) env('CLASSIFY_MECHANISMS', 'vector,direct')),
         ))),
         // Mechanisms that RUN and are stored but do NOT drive the consensus — for
-        // measuring/calibrating a mechanism before it becomes authoritative. Now
-        // empty: the broker is AUTHORITATIVE (vector↔broker disagreement becomes a
-        // conflict routed to a human). Re-shadow it with CLASSIFY_SHADOW_MECHANISMS=broker.
+        // measuring/calibrating a mechanism before it becomes authoritative. Empty by
+        // default. (The broker is DISABLED entirely, not shadowed — it is absent from the
+        // enabled set above; to measure it without letting it decide, add it to BOTH
+        // CLASSIFY_MECHANISMS and CLASSIFY_SHADOW_MECHANISMS.)
         'shadow' => array_values(array_filter(array_map(
             'trim',
             explode(',', (string) env('CLASSIFY_SHADOW_MECHANISMS', '')),
@@ -218,10 +223,11 @@ return [
         'use_brief_query' => (bool) env('CLASSIFY_VECTOR_USE_BRIEF_QUERY', true),
         // The vector no longer LLM-picks a single code — it returns its ranked shortlist,
         // and consensus/grounding test whether an answer is among its top-K candidates
-        // (membership) rather than equal to one pick. K balances coverage vs precision
-        // (measured on the 2.2k gold set: K=5 ≈ recall@5 90%+, tight precision). Retrieval
-        // still fetches vector_first.top_n candidates; only the first K gate agreement.
-        'membership_k' => (int) env('CLASSIFY_VECTOR_MEMBERSHIP_K', 5),
+        // (membership) rather than equal to one pick. K balances coverage vs precision on
+        // the leak-free 2.2k held-out set: K=1 ≈ 96%/72%, K=3 ≈ 93.5%/82%, K=5 ≈ 92%/85%
+        // (precision/coverage). K=3 is the chosen balance. Retrieval still fetches
+        // vector_first.top_n candidates; only the first K gate agreement.
+        'membership_k' => (int) env('CLASSIFY_VECTOR_MEMBERSHIP_K', 3),
     ],
 
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):

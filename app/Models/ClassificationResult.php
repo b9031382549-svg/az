@@ -39,7 +39,7 @@ class ClassificationResult extends Model
      */
     public function topHeadings(?int $k = null): array
     {
-        $k = max(1, (int) ($k ?? config('classify.vector.membership_k', 5)));
+        $k = max(1, (int) ($k ?? config('classify.vector.membership_k', 3)));
 
         $headings = [];
         foreach (array_slice((array) $this->candidates, 0, $k) as $c) {

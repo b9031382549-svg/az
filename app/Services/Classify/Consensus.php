@@ -10,20 +10,20 @@ use Illuminate\Support\Collection;
 /**
  * Reconciles the per-mechanism results of one item into a parent resolution.
  *
- * Policy: our answer is the 4-digit HEADING. An item auto-resolves ONLY when every
- * mechanism that ran (vector / broker / direct) lands on the same first 4 characters —
- * that heading is taken as correct. Anything short of unanimity (including a bare
- * majority) leaves the heading undecided and the item is a `conflict`, handed to the
- * web-search resolver. There is no AI judge in this flow (removed for now).
+ * Policy: our answer is the 4-digit HEADING. An item auto-resolves when DIRECT commits an
+ * answer AND the VECTOR corroborates it by carrying that heading in its top-K retrieval
+ * shortlist (membership — see resolve()). Anything short of that is a `conflict`, handed to
+ * the web-search resolver. The broker mechanism is DISABLED (kept for re-enable). There is
+ * no AI judge in this flow (removed for now).
  *
  * resolution vocabulary:
  *   pending          — not every enabled mechanism has reported yet
- *   agreed           — every mechanism that ran shares the same 4-digit heading (auto, confident)
- *   conflict         — the mechanisms did not unanimously agree (divergent, a bare majority, or too few)
+ *   agreed           — direct's answer is in the vector top-K (auto, confident)
+ *   conflict         — direct abstained or its answer is not in the vector top-K
  *   ai_resolved      — a divergent item the SEARCH resolver settled at a 4-digit heading
  *   no_match         — no mechanism produced a code
  *   confirmed/rejected — set by a human in the review queue (never overwritten here)
- *   blocked_on_fact  — set by the broker mechanism (Phase 7)
+ *   blocked_on_fact  — set by the broker mechanism (only when broker is re-enabled)
  *
  * When the mechanisms diverge ('conflict') a web-search resolver is dispatched once
  * (SearchResolveJob) — a confident hit flips the item to 'ai_resolved', otherwise it
@@ -92,15 +92,15 @@ class Consensus
     }
 
     /**
-     * Write a UNANIMOUS agreement back into the production memory so the same item later
-     * resolves for free. PROD ONLY: test-run items (test_run_id set) reach TestRunFinalizer
-     * rather than this method, and the guard is a second belt-and-suspenders check so an
+     * Write an AGREED item back into the production memory so the same item later resolves
+     * for free. PROD ONLY: test-run items (test_run_id set) reach TestRunFinalizer rather
+     * than this method, and the guard is a second belt-and-suspenders check so an
      * irreversible write can never leak into the shared production cache from a test. The
-     * unanimity gate + shadow/write policy lives in AnswerCacheService::promote().
+     * gate ('agreed' resolution) + shadow/write policy lives in AnswerCacheService::promote().
      */
     private function maybePromote(ClassificationItem $item): void
     {
-        // Only a REAL upload's unanimous item is promoted. Skip:
+        // Only a REAL upload's agreed item is promoted. Skip:
         //  - test-run items (test_run_id set) — they reach TestRunFinalizer, not this
         //    method; the guard is belt-and-suspenders on an irreversible write.
         //  - the benchmark eval path — `benchmark:seed` fans GOLD names through this same
@@ -146,29 +146,32 @@ class Consensus
     {
         $none = ['final_code' => null, 'final_catalog_id' => null, 'kind' => null];
 
-        // Auto-resolve rule: the two GENERATIVE mechanisms (broker, direct) must commit
-        // the SAME answer (same 4-digit heading, or both services), and the vector — which
-        // no longer picks a single code but returns its ranked retrieval shortlist — must
-        // CORROBORATE that answer by carrying it in its top-K candidates (membership, not a
-        // vote). Anything short of that is a conflict routed to the web-search resolver.
+        // Auto-resolve rule: DIRECT (the generative mechanism, on the fine-tuned adapter)
+        // commits an answer AND the VECTOR corroborates it by carrying that heading in its
+        // top-K retrieval shortlist (membership, not a vote) — two independent signals, an
+        // LLM's recall confirmed by semantic retrieval. Anything short of that is a conflict
+        // routed to the web-search resolver.
+        //
+        // The BROKER mechanism is DISABLED (see config/classify.php → mechanisms.enabled;
+        // its class + registry entry are kept for easy re-enable). It is intentionally NOT
+        // consulted here: measured on the leak-free held-out set it capped coverage (broker
+        // == direct only ~54%) at a slim precision gain. To make it authoritative again,
+        // re-add it to CLASSIFY_MECHANISMS and reinstate a `broker == direct` clause below.
         $byMech = $results->keyBy('mechanism');
-        $broker = $byMech->get('broker');
         $direct = $byMech->get('direct');
         $vector = $byMech->get('vector');
 
-        $bCode = $broker?->matched_code;
-        $bKind = $broker?->kind;
+        $dCode = $direct?->matched_code;
+        $dKind = $direct?->kind;
 
-        if ($bCode !== null && $bCode !== ''
-            && HeadingMatch::same($bCode, $bKind, $direct?->matched_code, $direct?->kind)
-            && self::vectorContains($vector, $bCode, $bKind)) {
-            $service = HeadingMatch::isService($bKind, $bCode);
+        if ($dCode !== null && $dCode !== '' && self::vectorContains($vector, $dCode, $dKind)) {
+            $service = HeadingMatch::isService($dKind, $dCode);
 
             return [
                 'resolution' => 'agreed',
-                'final_code' => $service ? '99' : HeadingMatch::heading($bCode),
+                'final_code' => $service ? '99' : HeadingMatch::heading($dCode),
                 'final_catalog_id' => null,
-                'kind' => $service ? 'service' : ($bKind ?? $direct?->kind),
+                'kind' => $service ? 'service' : $dKind,
             ];
         }
 
@@ -190,7 +193,7 @@ class Consensus
             return false;
         }
 
-        $k = max(1, (int) config('classify.vector.membership_k', 5));
+        $k = max(1, (int) config('classify.vector.membership_k', 3));
 
         foreach (array_slice((array) $vector->candidates, 0, $k) as $c) {
             if (is_array($c) && HeadingMatch::same($code, $kind, $c['code'] ?? null, $c['kind'] ?? null)) {
