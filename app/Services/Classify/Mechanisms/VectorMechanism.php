@@ -26,12 +26,22 @@ final class VectorMechanism implements ClassifierMechanism
         // The brief is cached/shared with the broker — no extra call. It only steers
         // retrieval + re-rank; vector still runs its own hybrid search independently.
         $identity = null;
-        if (config('classify.vector.use_brief_query', true)) {
+        $extra = [];
+        // Flow v2 multi-query needs the brief's az_reading + synonyms even if the legacy
+        // use_brief_query seeding is off, so fetch the brief when either wants it.
+        $needBrief = config('classify.vector.use_brief_query', true) || config('classify.flow.vector_multi_query');
+        if ($needBrief) {
             $brief = $this->briefs->brief($text);
-            $identity = is_array($brief) ? ($brief['identity'] ?? null) : null;
+            if (is_array($brief)) {
+                $identity = $brief['identity'] ?? null;
+                if (config('classify.flow.vector_multi_query')) {
+                    $az = trim((string) ($brief['az_reading'] ?? ''));
+                    $extra = array_merge($az !== '' ? [$az] : [], (array) ($brief['synonyms'] ?? []));
+                }
+            }
         }
 
-        return self::mapResult($this->classifier->classify($text, $identity));
+        return self::mapResult($this->classifier->classify($text, $identity, $extra));
     }
 
     /**

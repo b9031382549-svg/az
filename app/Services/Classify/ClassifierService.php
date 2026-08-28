@@ -21,11 +21,14 @@ class ClassifierService
      *
      * @return array<string, mixed>
      */
-    public function classify(string $text, ?string $identity = null): array
+    public function classify(string $text, ?string $identity = null, array $extraQueries = []): array
     {
         $text = trim($text);
         $identity = $identity !== null ? trim($identity) : null;
         $identity = ($identity ?? '') !== '' ? $identity : null;
+        // Flow v2: extra retrieval queries (brief az_reading + synonyms). Empty in the
+        // OFF path, so behaviour is unchanged.
+        $extraQueries = array_values(array_filter(array_map('trim', $extraQueries), fn ($q) => $q !== ''));
         $result = [
             'text' => $text,
             'kind' => null,
@@ -56,10 +59,13 @@ class ClassifierService
             // top-N and it picks (with a nearest-candidate fallback) — no expansion or
             // fusion. See config('classify.vector_first').
             if (config('classify.vector_first.enabled')) {
-                return $this->classifyVectorFirst($text, $result);
+                return $this->classifyVectorFirst($text, $result, $identity, $extraQueries);
             }
 
             [$queries, $expandUsage] = $this->expandForRetrieval($text, $identity);
+            if ($extraQueries !== [] && config('classify.flow.vector_multi_query')) {
+                $queries = array_values(array_filter(array_merge($queries, $extraQueries)));
+            }
 
             $candidates = $this->retriever->candidates($queries, (int) config('classify.candidates'));
             if (empty($candidates)) {
@@ -178,13 +184,28 @@ class ClassifierService
      * @param  array<string, mixed>  $result  the initialised result skeleton
      * @return array<string, mixed>
      */
-    private function classifyVectorFirst(string $text, array $result): array
+    private function classifyVectorFirst(string $text, array $result, ?string $identity = null, array $extraQueries = []): array
     {
         $topN = max(1, (int) config('classify.vector_first.top_n', 10));
         $lexical = (int) config('classify.vector_first.lexical', 0);
-        $candidates = (config('classify.vector_first.heading_diverse') || $lexical > 0)
-            ? $this->retriever->vectorFirstCandidates($text, $topN, $lexical)
-            : $this->retriever->semanticCandidates($text, $topN);
+
+        // Flow v2: brief-seeded FUSED multi-query retrieval [identity, az_reading,
+        // ...synonyms, raw] via candidates() (RRF over semantic + lexical + precedents),
+        // instead of the pure single-raw-query FT vector. Lifts the shortlist ceiling on
+        // hard/conflict items (78.6% → ~88% @K12 offline). OFF path is byte-for-byte the
+        // original vector_first retrieval below.
+        if (config('classify.flow.vector_multi_query') && ($identity !== null || $extraQueries !== [])) {
+            $queries = array_values(array_filter(array_merge(
+                $identity !== null ? [$identity] : [],
+                $extraQueries,
+                [$text],
+            )));
+            $candidates = $this->retriever->candidates($queries, max($topN, (int) config('classify.candidates', 24)));
+        } else {
+            $candidates = (config('classify.vector_first.heading_diverse') || $lexical > 0)
+                ? $this->retriever->vectorFirstCandidates($text, $topN, $lexical)
+                : $this->retriever->semanticCandidates($text, $topN);
+        }
         if (empty($candidates)) {
             $result['reason'] = 'No catalog candidates found.';
             $result['trace'] = ['input' => $text, 'mode' => 'vector_first', 'candidates' => [], 'gate' => ['status' => 'no_match']];

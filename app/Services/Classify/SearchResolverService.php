@@ -25,6 +25,7 @@ class SearchResolverService
         private readonly OpenRouterClient $llm,
         private readonly SearchCache $cache,
         private readonly AnswerCacheService $memory,
+        private readonly ProductBriefService $briefs,
     ) {}
 
     /**
@@ -38,6 +39,25 @@ class SearchResolverService
         $model = (string) config('classify.search_resolver.model', 'deepseek/deepseek-v4-flash:online');
         if ($text === '') {
             return;
+        }
+
+        // ── Flow v2: self-consistency ensemble chooser BEFORE the paid web search ──
+        // Vote the grounded chooser over 3 paraphrases (raw / identity / az_reading) against
+        // the vector shortlist. Agreement commits the voted heading and skips the web; a SPLIT
+        // vote is a self-consistency abstain that falls through to the web resolver. In shadow
+        // mode the verdict is recorded but the web answer is still served.
+        if (config('classify.flow.ensemble_resolver')) {
+            $ens = $this->ensemble($item, $text);
+            if ($ens !== null) {
+                $this->traceEnsemble($item, $ens);
+                $agreed = in_array($ens['agreement'], ['unanimous', 'majority'], true) && $ens['answer'] !== null;
+                if ($agreed && ! config('classify.flow.shadow')) {
+                    $this->applyEnsemble($item, $ens);
+
+                    return; // agreement → resolved locally, no paid web search
+                }
+                // shadow OR split → fall through to the web resolver below
+            }
         }
 
         $d = $this->ask($text, $model);
@@ -100,6 +120,185 @@ class SearchResolverService
             $authResults = $item->results()->whereIn('mechanism', $authoritative)->get();
             $this->memory->promoteGroundedSearch($item, $search, $authResults);
         }
+    }
+
+    /**
+     * Flow v2 — the self-consistency ensemble. Runs the grounded chooser over three
+     * paraphrases (raw text / brief identity / brief az_reading) against the vector
+     * mechanism's shortlist and votes. Returns the verdict, or null when it cannot run
+     * (no vector shortlist, or fewer than two distinct groundings for a meaningful vote).
+     *
+     * @return array{answer: ?string, kind: string, agreement: string, picks: array<int, string>, groundings: array<int, string>, shortlist: array<int, string>}|null
+     */
+    private function ensemble(ClassificationItem $item, string $text): ?array
+    {
+        $vector = $item->results()->where('mechanism', 'vector')->first();
+        $k = max(1, (int) config('classify.flow.ensemble.shortlist_k', 12));
+        $shortlist = $vector !== null ? $vector->topHeadings($k) : [];
+        if ($shortlist === []) {
+            return null; // nothing to choose from
+        }
+
+        $brief = $this->briefs->brief($text);
+        $identity = is_array($brief) ? trim((string) ($brief['identity'] ?? '')) : '';
+        $azReading = is_array($brief) ? trim((string) ($brief['az_reading'] ?? '')) : '';
+
+        // Distinct "what it is" framings; dedupe so identical groundings do not fake agreement.
+        $groundings = [];
+        foreach ([$text, $identity, $azReading] as $g) {
+            $g = trim($g);
+            if ($g !== '' && ! in_array($g, $groundings, true)) {
+                $groundings[] = $g;
+            }
+        }
+        if (count($groundings) < 2) {
+            return null; // no diversity → the self-consistency signal is meaningless
+        }
+
+        $list = '';
+        foreach ($shortlist as $h) {
+            $list .= '  '.$h.' - '.($this->headingName($h) ?? '')."\n";
+        }
+
+        $picks = [];
+        foreach ($groundings as $g) {
+            $picks[] = $this->ensembleChoose($g, $text, $list);
+        }
+
+        [$answer, $agreement] = $this->tally($picks, $shortlist);
+
+        return [
+            'answer' => $answer,
+            'kind' => $answer === '99' ? 'service' : 'good',
+            'agreement' => $agreement,
+            'picks' => $picks,
+            'groundings' => $groundings,
+            'shortlist' => $shortlist,
+        ];
+    }
+
+    /**
+     * One grounded chooser call (search-free): pick a heading from the shortlist for the
+     * given grounding. Returns a 4-digit heading / '99' / 'NONE' / 'ERR'.
+     */
+    private function ensembleChoose(string $grounding, string $text, string $list): string
+    {
+        $sys = 'You assign ONE Azerbaijani e-invoice line item to a 4-digit XIF MN / HS heading. '
+            .'You get a plain-language description of WHAT THE ITEM IS and a SHORTLIST of candidate '
+            .'headings. CHOOSE the one heading whose scope best matches — these are the ONLY allowed '
+            .'answers. If none truly fits, answer NONE. Respond strict JSON only: '
+            .'{"heading":"<one listed code, or NONE>"}';
+        $usr = "WHAT THE ITEM IS: {$grounding}\nORIGINAL TEXT: {$text}\n\nSHORTLIST (choose one):\n{$list}";
+
+        try {
+            $resp = $this->llm->complete(
+                [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => $usr]],
+                [
+                    'model' => (string) config('classify.flow.ensemble.model', 'deepseek/deepseek-v4-flash'),
+                    'timeout' => (int) config('classify.flow.ensemble.timeout', 60),
+                ],
+            );
+
+            // parse() collapses the JSON to a 4-digit heading / '99' / null; null → NONE-or-unreadable.
+            $d = $this->parse((string) ($resp['content'] ?? ''));
+
+            return $d !== null && $d['heading'] !== null ? $d['heading'] : 'NONE';
+        } catch (Throwable) {
+            return 'ERR';
+        }
+    }
+
+    /**
+     * Majority vote over the picks, restricted to headings actually on the shortlist.
+     * Returns [answer|null, agreement] with agreement ∈ unanimous|majority|split|weak.
+     *
+     * @param  array<int, string>  $picks
+     * @param  array<int, string>  $shortlist
+     * @return array{0: ?string, 1: string}
+     */
+    private function tally(array $picks, array $shortlist): array
+    {
+        $valid = array_values(array_filter(
+            $picks,
+            fn ($p) => $p !== 'NONE' && $p !== 'ERR' && in_array($p, $shortlist, true),
+        ));
+        if (count($valid) < 2) {
+            return [null, 'weak'];
+        }
+
+        $counts = array_count_values($valid);
+        arsort($counts);
+        $top = (string) array_key_first($counts); // (string): PHP casts numeric array keys to int
+        $topCount = $counts[$top];
+        $distinct = count($counts);
+
+        $agreement = match (true) {
+            $distinct === 1 => 'unanimous',
+            $topCount >= 2 => 'majority',
+            default => 'split',
+        };
+
+        return [in_array($agreement, ['unanimous', 'majority'], true) ? $top : null, $agreement];
+    }
+
+    /**
+     * Commit an agreed ensemble verdict: flip the still-conflicting item to 'ai_resolved'
+     * at the voted 4-digit heading. Conditional update so a human decision that landed while
+     * queued is never overwritten. Deliberately does NOT promote to answer_cache while the
+     * flow is under evaluation.
+     *
+     * @param  array{answer: ?string, kind: string, agreement: string, picks: array<int, string>, groundings: array<int, string>, shortlist: array<int, string>}  $ens
+     */
+    private function applyEnsemble(ClassificationItem $item, array $ens): void
+    {
+        ClassificationItem::whereKey($item->id)
+            ->whereIn('resolution', ['conflict', 'review'])
+            ->update([
+                'resolution' => 'ai_resolved',
+                'final_code' => $ens['answer'],
+                'final_catalog_id' => null,
+                'kind' => $ens['kind'],
+            ]);
+    }
+
+    /**
+     * Record the ensemble verdict as a non-authoritative mechanism='ensemble' trace row
+     * (ignored by Consensus), so the decision/review page and TestRun can inspect it.
+     *
+     * @param  array{answer: ?string, kind: string, agreement: string, picks: array<int, string>, groundings: array<int, string>, shortlist: array<int, string>}  $ens
+     */
+    private function traceEnsemble(ClassificationItem $item, array $ens): void
+    {
+        $conf = match ($ens['agreement']) {
+            'unanimous' => (float) config('classify.flow.ensemble.confidence_unanimous', 0.9),
+            'majority' => (float) config('classify.flow.ensemble.confidence_majority', 0.8),
+            default => null,
+        };
+        $committed = in_array($ens['agreement'], ['unanimous', 'majority'], true) && $ens['answer'] !== null;
+        $shadow = (bool) config('classify.flow.shadow');
+
+        $item->results()->updateOrCreate(
+            ['mechanism' => 'ensemble'],
+            [
+                'matched_code' => $ens['answer'],
+                'catalog_id' => null,
+                'kind' => $ens['kind'],
+                'status' => $committed ? ($shadow ? 'shadow' : 'auto_confirmed') : 'needs_review',
+                'confidence' => $conf,
+                'candidates' => [],
+                'explanation' => 'Ensemble ('.$ens['agreement'].'): '.implode(' / ', $ens['picks'])
+                    .($shadow && $committed ? ' [shadow — web answer served]' : ''),
+                'model' => (string) config('classify.flow.ensemble.model', 'deepseek/deepseek-v4-flash'),
+                'trace' => [
+                    'agreement' => $ens['agreement'],
+                    'answer' => $ens['answer'],
+                    'picks' => $ens['picks'],
+                    'shortlist' => $ens['shortlist'],
+                    'shadow' => $shadow,
+                    'committed' => $committed,
+                ],
+            ],
+        );
     }
 
     /** One search call → parsed {heading, kind, confidence, reason, sources}, or null. */
