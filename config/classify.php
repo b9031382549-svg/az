@@ -262,6 +262,12 @@ return [
         'shadow' => (bool) env('CLASSIFY_FLOW_SHADOW', true),
 
         'ensemble' => [
+            // WHAT-IS-IT understanding for the conflict tier — a WEB model (`:online`) so
+            // it can look up terse transliterated AZ tokens (çelik dübel, tut) instead of
+            // hallucinating them. This is the piece the search-free upstream brief cannot
+            // do; it is confined to conflicts (~11.5% of items), so the web cost is bounded.
+            'understand_model' => (string) env('CLASSIFY_FLOW_ENSEMBLE_UNDERSTAND_MODEL', 'deepseek/deepseek-v4-flash:online'),
+            'understand_timeout' => (int) env('CLASSIFY_FLOW_ENSEMBLE_UNDERSTAND_TIMEOUT', 120),
             // Chooser model — search-free and cheap; the web is reserved for the
             // split-vote fallback only.
             'model' => (string) env('CLASSIFY_FLOW_ENSEMBLE_MODEL', 'deepseek/deepseek-v4-flash'),
