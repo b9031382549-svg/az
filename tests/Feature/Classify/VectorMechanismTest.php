@@ -15,7 +15,7 @@ class VectorMechanismTest extends TestCase
     public function test_maps_classifier_result_to_mechanism_result(): void
     {
         $svc = Mockery::mock(ClassifierService::class);
-        $svc->shouldReceive('classify')->once()->with('Şpris', 'disposable syringe')->andReturn([
+        $svc->shouldReceive('classify')->once()->with('Şpris', 'disposable syringe', [])->andReturn([
             'code' => '9018311000', 'catalog_id' => 42, 'kind' => 'good',
             'confidence' => 0.9, 'status' => 'auto_confirmed',
             'candidates' => [['code' => '9018311000']], 'reason' => 'match',

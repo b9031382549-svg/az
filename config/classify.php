@@ -230,6 +230,51 @@ return [
         'membership_k' => (int) env('CLASSIFY_VECTOR_MEMBERSHIP_K', 3),
     ],
 
+    // ── Flow v2 (feat/flow-v2) ────────────────────────────────────────────────
+    // Flag-gated pipeline upgrades from the conflict-tier investigation (see memory
+    // az-conflict-understanding). EVERY flag defaults OFF so the OFF path is
+    // byte-for-byte today's behaviour; rollback = flip the flag (env +
+    // `php artisan config:cache` + recreate), no code revert needed. See 'shadow'.
+    'flow' => [
+        // The brief ALSO emits `az_reading` (a second, independent one-line reading of
+        // what the item is) and `synonyms` (4-6 alt-names / analogous goods / category
+        // terms a customs catalog might use). Same brief call, separate cache namespace
+        // (version suffix). Feeds vector_multi_query + the ensemble resolver.
+        'enrich_brief' => (bool) env('CLASSIFY_FLOW_ENRICH_BRIEF', false),
+
+        // Vector retrieves from a FUSED multi-query set [identity, az_reading,
+        // ...synonyms, raw] via CatalogRetriever::candidates(), instead of the pure
+        // FT-embedder single-raw-query vector_first path. Lifted the shortlist ceiling
+        // on the leak-free conflict set 78.6% → ~88% @K12 offline. Needs enrich_brief.
+        'vector_multi_query' => (bool) env('CLASSIFY_FLOW_VECTOR_MULTI_QUERY', false),
+
+        // Conflict tier: before the paid web search, run the grounded chooser 3× over 3
+        // paraphrases (raw / identity / az_reading) against the vector shortlist and
+        // vote. Agreement (unanimous/majority) commits the voted heading; a SPLIT vote
+        // is a self-consistency abstain that falls through to the existing web resolver.
+        // Offline cascade 65.4% vs web-only 58.8% on the conflict set. Needs enrich_brief.
+        'ensemble_resolver' => (bool) env('CLASSIFY_FLOW_ENSEMBLE_RESOLVER', false),
+
+        // SHADOW: compute + RECORD the new path but SERVE THE OLD ANSWER, so live
+        // traffic is untouched while the new flow's quality/volume is measured. The
+        // safe first rollout state — turn a lever ON, keep shadow ON, compare, then
+        // drop shadow to actually serve it.
+        'shadow' => (bool) env('CLASSIFY_FLOW_SHADOW', true),
+
+        'ensemble' => [
+            // Chooser model — search-free and cheap; the web is reserved for the
+            // split-vote fallback only.
+            'model' => (string) env('CLASSIFY_FLOW_ENSEMBLE_MODEL', 'deepseek/deepseek-v4-flash'),
+            'timeout' => (int) env('CLASSIFY_FLOW_ENSEMBLE_TIMEOUT', 60),
+            // Top headings from the vector shortlist offered to the chooser.
+            'shortlist_k' => (int) env('CLASSIFY_FLOW_ENSEMBLE_K', 12),
+            // Confidence stamped on a committed vote by agreement strength — must clear
+            // search_resolver.min_confidence to auto-resolve the item.
+            'confidence_unanimous' => (float) env('CLASSIFY_FLOW_ENSEMBLE_CONF_UNANIMOUS', 0.9),
+            'confidence_majority' => (float) env('CLASSIFY_FLOW_ENSEMBLE_CONF_MAJORITY', 0.8),
+        ],
+    ],
+
     // Third, INDEPENDENT mechanism (App\Services\Classify\Mechanisms\DirectLlmMechanism):
     // a reasoning model that IDENTIFIES the item from its own knowledge, then codes it.
     // A different METHOD from retrieval/descent, so its vote is a genuinely independent

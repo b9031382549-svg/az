@@ -44,6 +44,12 @@ class ProductBriefService
         $sourceHash = ItemTranslation::hashFor($text);
         $version = (string) config('classify.broker.brief_prompt_version', 'b1');
 
+        // Flow v2: the enriched brief (identity + az_reading + synonyms) lives in its
+        // OWN cache namespace so it never masks or is masked by the base briefs.
+        if (config('classify.flow.enrich_brief')) {
+            $version .= '-syn';
+        }
+
         // Catalog glossary grounding — the '-gloss' cache suffix keeps glossary briefs
         // in their own cache namespace, so they never mask or pollute the base briefs.
         $glossaryOn = (bool) config('classify.broker.brief_glossary', false);
@@ -125,6 +131,15 @@ class ProductBriefService
                     .'garbled/transliterated head-noun correctly; they are evidence about the '
                     ."WORD, not a code to copy:\n".implode("\n", $lines)];
             }
+            if (config('classify.flow.enrich_brief')) {
+                $messages[] = ['role' => 'system', 'content' => 'ALSO include TWO extra keys in the JSON. '
+                    .'"az_reading": a SECOND, independent one-line reading of what the item physically IS — '
+                    .'phrased differently from identity, resolving Azerbaijani/Russian transliteration, and '
+                    .'read as an ordinary imported commodity (NEVER a brand, game, app, company or media). '
+                    .'"synonyms": an array of 4-6 alternative names, closely analogous goods, or broader '
+                    .'category terms that a customs commodity catalog might use for this item — the words that '
+                    .'would help a catalog search find it. Keep all the other keys exactly as instructed.'];
+            }
             $messages[] = ['role' => 'user', 'content' => "ITEM: {$text}"];
 
             $response = $this->llm->jsonWithUsage($messages, ['model' => $model]);
@@ -152,7 +167,7 @@ class ProductBriefService
         // the row (defence-in-depth on top of the text() column).
         $value = mb_substr(trim((string) ($material['value'] ?? '')), 0, 200);
 
-        return [
+        $brief = [
             'identity' => trim((string) ($d['identity'] ?? '')),
             'purpose' => trim((string) ($d['purpose'] ?? '')),
             'function_class' => $this->oneOf($d['function_class'] ?? null, [
@@ -167,6 +182,23 @@ class ProductBriefService
             'decisive_axis' => $this->oneOf($d['decisive_axis'] ?? null, ['function', 'origin', 'material', 'identity'], 'identity'),
             'confidence' => round((float) ($d['confidence'] ?? 0), 3),
         ];
+
+        // Flow v2: extra retrieval-steering signals. Gated so the OFF brief shape is
+        // byte-for-byte unchanged. az_reading = second independent understanding;
+        // synonyms = catalog-vocabulary alt-names (capped, deduped, short).
+        if (config('classify.flow.enrich_brief')) {
+            $syns = [];
+            foreach ((array) ($d['synonyms'] ?? []) as $s) {
+                $s = mb_substr(trim((string) $s), 0, 80);
+                if ($s !== '' && ! in_array($s, $syns, true)) {
+                    $syns[] = $s;
+                }
+            }
+            $brief['az_reading'] = mb_substr(trim((string) ($d['az_reading'] ?? '')), 0, 200);
+            $brief['synonyms'] = array_slice($syns, 0, 6);
+        }
+
+        return $brief;
     }
 
     /** @param array<int, string> $allowed */
