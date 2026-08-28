@@ -25,7 +25,7 @@ class SearchResolverService
         private readonly OpenRouterClient $llm,
         private readonly SearchCache $cache,
         private readonly AnswerCacheService $memory,
-        private readonly ProductBriefService $briefs,
+        private readonly CatalogRetriever $retriever,
     ) {}
 
     /**
@@ -132,27 +132,51 @@ class SearchResolverService
      */
     private function ensemble(ClassificationItem $item, string $text): ?array
     {
-        $vector = $item->results()->where('mechanism', 'vector')->first();
-        $k = max(1, (int) config('classify.flow.ensemble.shortlist_k', 12));
-        $shortlist = $vector !== null ? $vector->topHeadings($k) : [];
-        if ($shortlist === []) {
-            return null; // nothing to choose from
+        // 1) WEB-grounded understanding — the search-free upstream brief hallucinates terse
+        //    AZ tokens ("çelik dübel" → "steel needle"), so the resolver does its own
+        //    web-backed identification here. This is the crux; without it the rest is noise.
+        $u = $this->understand($text);
+        if ($u === null) {
+            return null; // could not understand → leave it to the web resolver below
         }
 
-        $brief = $this->briefs->brief($text);
-        $identity = is_array($brief) ? trim((string) ($brief['identity'] ?? '')) : '';
-        $azReading = is_array($brief) ? trim((string) ($brief['az_reading'] ?? '')) : '';
+        // 2) Build a FRESH shortlist from that understanding (identity + synonyms + raw),
+        //    fused via CatalogRetriever — so the candidates reflect what the item ACTUALLY is,
+        //    not the noisy raw tokens.
+        $k = max(1, (int) config('classify.flow.ensemble.shortlist_k', 12));
+        $queries = array_values(array_filter(array_merge([$u['identity']], $u['synonyms'], [$text])));
+        $shortlist = [];
+        $seen = [];
+        try {
+            foreach ($this->retriever->candidates($queries, max($k, 24)) as $row) {
+                $h = mb_substr((string) $row->code, 0, 4);
+                if ($h === '' || isset($seen[$h])) {
+                    continue;
+                }
+                $seen[$h] = true;
+                $shortlist[] = $h;
+                if (count($shortlist) >= $k) {
+                    break;
+                }
+            }
+        } catch (Throwable) {
+            return null; // retrieval unavailable → fall through to the web resolver
+        }
+        if ($shortlist === []) {
+            return null;
+        }
 
-        // Distinct "what it is" framings; dedupe so identical groundings do not fake agreement.
+        // 3) Three distinct "what it is" framings for the self-consistency vote; dedupe so
+        //    identical groundings cannot fake agreement.
         $groundings = [];
-        foreach ([$text, $identity, $azReading] as $g) {
+        foreach ([$text, $u['identity'], $u['az_reading']] as $g) {
             $g = trim($g);
             if ($g !== '' && ! in_array($g, $groundings, true)) {
                 $groundings[] = $g;
             }
         }
         if (count($groundings) < 2) {
-            return null; // no diversity → the self-consistency signal is meaningless
+            return null;
         }
 
         $list = '';
@@ -174,7 +198,61 @@ class SearchResolverService
             'picks' => $picks,
             'groundings' => $groundings,
             'shortlist' => $shortlist,
+            'understanding' => $u,
         ];
+    }
+
+    /**
+     * Web-grounded identification of a terse Azerbaijani customs line: returns
+     * {identity, az_reading, synonyms[]}, or null when it cannot be identified. Uses a
+     * `:online` model with an AZ-customs prompt (transliterate first, prefer the physical
+     * good over any brand collision) — the understanding that made the offline gains real.
+     *
+     * @return array{identity: string, az_reading: string, synonyms: array<int, string>}|null
+     */
+    private function understand(string $text): ?array
+    {
+        $sys = 'You identify ONE line item from an AZERBAIJANI CUSTOMS IMPORT declaration. Every item is an ordinary physical tradable GOOD imported into Azerbaijan by a commercial company — NEVER a video game, movie, book, song, mobile app, software, company or web service. The text is a terse invoice line: transliterated Azerbaijani or Russian, with abbreviations, units and typos.
+RULES:
+- Read tokens as Azerbaijani/Russian COMMERCIAL/COMMODITY words; transliterate FIRST. Examples: "kislord"=oxygen gas; "tut"=mulberry; "med"/"bal"=honey; "celik dubel"=steel wall plug/anchor; "zewa"=paper-hygiene brand (toilet paper/napkins); "kondes"=air conditioner.
+- If a token collides with a brand, game, company, drug or media title, PREFER the physical-goods reading.
+- When you look it up, treat it as an Azerbaijani import commodity (mentally append "Azerbaijan idxal gomruk"); do NOT accept a foreign game/app/company result.
+- Use units and packaging as evidence: kg/l/m/qr/ed/rulon mean a physical good; note material.
+- If you truly cannot tell, prefix identity with "uncertain:".
+Output strict JSON only: {"identity":"<head-noun/type + material/function>","az_reading":"<a second, differently-phrased one-line reading>","synonyms":["<4-6 alt-names / analogous goods / category terms an HS catalog would use>"]}';
+
+        try {
+            $resp = $this->llm->complete(
+                [['role' => 'system', 'content' => $sys], ['role' => 'user', 'content' => "ITEM: {$text}"]],
+                [
+                    'model' => (string) config('classify.flow.ensemble.understand_model', 'deepseek/deepseek-v4-flash:online'),
+                    'timeout' => (int) config('classify.flow.ensemble.understand_timeout', 120),
+                ],
+            );
+            $j = json_decode((string) preg_replace('/^```json|```$/m', '', trim((string) ($resp['content'] ?? ''))), true);
+            if (! is_array($j)) {
+                return null;
+            }
+            $identity = trim((string) ($j['identity'] ?? ''));
+            if ($identity === '') {
+                return null;
+            }
+            $syns = [];
+            foreach ((array) ($j['synonyms'] ?? []) as $s) {
+                $s = trim((string) $s);
+                if ($s !== '' && ! in_array($s, $syns, true)) {
+                    $syns[] = $s;
+                }
+            }
+
+            return [
+                'identity' => $identity,
+                'az_reading' => trim((string) ($j['az_reading'] ?? '')),
+                'synonyms' => array_slice($syns, 0, 6),
+            ];
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -286,7 +364,8 @@ class SearchResolverService
                 'status' => $committed ? ($shadow ? 'shadow' : 'auto_confirmed') : 'needs_review',
                 'confidence' => $conf,
                 'candidates' => [],
-                'explanation' => 'Ensemble ('.$ens['agreement'].'): '.implode(' / ', $ens['picks'])
+                'explanation' => 'Understood as "'.($ens['understanding']['identity'] ?? '?').'". Ensemble ('
+                    .$ens['agreement'].'): '.implode(' / ', $ens['picks'])
                     .($shadow && $committed ? ' [shadow — web answer served]' : ''),
                 'model' => (string) config('classify.flow.ensemble.model', 'deepseek/deepseek-v4-flash'),
                 'trace' => [
@@ -294,6 +373,7 @@ class SearchResolverService
                     'answer' => $ens['answer'],
                     'picks' => $ens['picks'],
                     'shortlist' => $ens['shortlist'],
+                    'understanding' => $ens['understanding'] ?? null,
                     'shadow' => $shadow,
                     'committed' => $committed,
                 ],

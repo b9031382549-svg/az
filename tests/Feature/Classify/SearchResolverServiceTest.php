@@ -7,7 +7,7 @@ use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\TestDataset;
 use App\Models\TestRun;
-use App\Services\Classify\ProductBriefService;
+use App\Services\Classify\CatalogRetriever;
 use App\Services\Classify\SearchResolverService;
 use App\Services\Llm\OpenRouterClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -156,36 +156,36 @@ class SearchResolverServiceTest extends TestCase
 
     // --- Flow v2: self-consistency ensemble resolver -------------------------------------
 
-    private function mockBrief(): void
+    /** The web understanding step's JSON (identity + az_reading + synonyms). */
+    private const UNDERSTANDING = '{"identity":"laptop computer","az_reading":"portable notebook PC","synonyms":["notebook","portable computer"]}';
+
+    /** Mock the retriever so the fresh shortlist is the given 4-digit headings' codes. */
+    private function mockRetriever(array $codes): void
     {
-        $briefs = Mockery::mock(ProductBriefService::class);
-        $briefs->shouldReceive('brief')->andReturn([
-            'identity' => 'laptop computer',
-            'az_reading' => 'portable notebook PC',
-            'synonyms' => ['notebook', 'portable computer'],
-        ]);
-        $this->instance(ProductBriefService::class, $briefs);
+        $rows = array_map(fn ($c) => (object) ['code' => $c], $codes);
+        $ret = Mockery::mock(CatalogRetriever::class);
+        $ret->shouldReceive('candidates')->andReturn($rows);
+        $this->instance(CatalogRetriever::class, $ret);
     }
 
-    /** A vector trace whose top-K headings are the ensemble's shortlist. */
-    private function seedVectorShortlist(ClassificationItem $item, array $codes): void
+    /** Mock complete() to return the given contents in sequence (understand, choosers, web). */
+    private function mockLlmSeq(array $contents): void
     {
-        $item->results()->create([
-            'mechanism' => 'vector', 'matched_code' => $codes[0], 'kind' => 'good',
-            'status' => 'needs_review', 'candidates' => array_map(fn ($c) => ['code' => $c], $codes),
-        ]);
+        $returns = array_map(fn ($c) => ['content' => $c, 'usage' => [], 'model' => 'deepseek/deepseek-v4-flash:online', 'annotations' => []], $contents);
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('complete')->andReturn(...$returns);
+        $this->instance(OpenRouterClient::class, $llm);
     }
 
     public function test_ensemble_agreement_resolves_locally_and_skips_the_web(): void
     {
         config()->set('classify.flow.ensemble_resolver', true);
         config()->set('classify.flow.shadow', false);
-        $this->mockBrief();
 
         $item = $this->conflictItem();
-        $this->seedVectorShortlist($item, ['8471300000']);
-        // Every grounded-chooser call agrees on 8471 → unanimous → commit, no web.
-        $this->mockLlm('{"heading":"8471"}');
+        $this->mockRetriever(['8471300000']); // shortlist = ['8471']
+        // understand, then 3 groundings all agree on 8471 → unanimous → commit, no web.
+        $this->mockLlmSeq([self::UNDERSTANDING, '{"heading":"8471"}', '{"heading":"8471"}', '{"heading":"8471"}']);
 
         app(SearchResolverService::class)->resolve($item);
 
@@ -195,6 +195,7 @@ class SearchResolverServiceTest extends TestCase
         $ens = $item->results()->where('mechanism', 'ensemble')->first();
         $this->assertSame('unanimous', $ens->trace['agreement']);
         $this->assertSame('auto_confirmed', $ens->status);
+        $this->assertSame('laptop computer', $ens->trace['understanding']['identity']);
         // The paid web resolver was skipped entirely — no 'search' trace row.
         $this->assertNull($item->results()->where('mechanism', 'search')->first());
     }
@@ -203,19 +204,15 @@ class SearchResolverServiceTest extends TestCase
     {
         config()->set('classify.flow.ensemble_resolver', true);
         config()->set('classify.flow.shadow', false);
-        $this->mockBrief();
 
         $item = $this->conflictItem();
-        $this->seedVectorShortlist($item, ['8471300000', '8528720000', '8517120000']);
-        // 3 groundings → 3 different valid headings → split; then the web call resolves.
-        $llm = Mockery::mock(OpenRouterClient::class);
-        $llm->shouldReceive('complete')->andReturn(
-            ['content' => '{"heading":"8471"}', 'usage' => [], 'model' => 'm', 'annotations' => []],
-            ['content' => '{"heading":"8528"}', 'usage' => [], 'model' => 'm', 'annotations' => []],
-            ['content' => '{"heading":"8517"}', 'usage' => [], 'model' => 'm', 'annotations' => []],
-            ['content' => '{"heading":"8471","confidence":0.95,"reason":"laptop"}', 'usage' => [], 'model' => 'deepseek/deepseek-v4-flash:online', 'annotations' => []],
-        );
-        $this->instance(OpenRouterClient::class, $llm);
+        $this->mockRetriever(['8471300000', '8528720000', '8517120000']); // 3 distinct headings
+        // understand, then 3 different valid picks → split; then the web call resolves.
+        $this->mockLlmSeq([
+            self::UNDERSTANDING,
+            '{"heading":"8471"}', '{"heading":"8528"}', '{"heading":"8517"}',
+            '{"heading":"8471","confidence":0.95,"reason":"laptop"}',
+        ]);
 
         app(SearchResolverService::class)->resolve($item);
 
@@ -231,13 +228,16 @@ class SearchResolverServiceTest extends TestCase
     {
         config()->set('classify.flow.ensemble_resolver', true);
         config()->set('classify.flow.shadow', true); // shadow: compute + log, serve old
-        $this->mockBrief();
 
         $item = $this->conflictItem();
-        $this->seedVectorShortlist($item, ['8471300000']);
+        $this->mockRetriever(['8471300000']);
         // Ensemble unanimously agrees AND the web is confident — but shadow means the WEB
-        // answer is the one served, and the ensemble is only recorded.
-        $this->mockLlm('{"heading":"8471","confidence":0.95,"reason":"laptop"}');
+        // answer is served and the ensemble is only recorded.
+        $this->mockLlmSeq([
+            self::UNDERSTANDING,
+            '{"heading":"8471"}', '{"heading":"8471"}', '{"heading":"8471"}',
+            '{"heading":"8471","confidence":0.95,"reason":"laptop"}',
+        ]);
 
         app(SearchResolverService::class)->resolve($item);
 
