@@ -1,7 +1,11 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
     // Everything resolves at the 4-digit HS heading now — one view, no full/heading toggle.
-    $tabs = ['open' => __('Needs attention'), 'found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
+    // The 'Searching…' tab only appears while conflicts are still under the web-search
+    // resolver — no permanent zero-count tab in the common case.
+    $tabs = ['open' => __('Needs attention')];
+    if (($counts['resolving'] ?? 0) > 0) { $tabs['resolving'] = __('Searching…'); }
+    $tabs += ['found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
     $tabCount = fn ($key) => $key === 'all' ? $counts->sum() : ($key === 'open' ? $openCount : ($counts[$key] ?? 0));
   @endphp
 
@@ -46,6 +50,7 @@
             @php
               $wc = $u->total ? $u->resolved / $u->total * 100 : 0;
               $wr = $u->total ? $u->review / $u->total * 100 : 0;
+              $ws = $u->total ? ($u->resolving ?? 0) / $u->total * 100 : 0;
               $wk = $u->total ? $u->conflict / $u->total * 100 : 0;
             @endphp
             <tr wire:click="selectBatch('{{ $u->key }}')" wire:key="up-{{ $u->key }}"
@@ -64,6 +69,7 @@
                   <span class="w-24 h-2 rounded-full bg-line/40 overflow-hidden flex shrink-0">
                     <span class="bg-ledger block h-full" style="width:{{ $wc }}%"></span>
                     <span class="bg-amber block h-full" style="width:{{ $wr }}%"></span>
+                    <span class="bg-amber/50 block h-full animate-pulse" style="width:{{ $ws }}%" title="{{ __('searching…') }}"></span>
                     <span class="bg-stamp block h-full" style="width:{{ $wk }}%"></span>
                   </span>
                   <span class="text-faint tnum text-xs whitespace-nowrap">{{ $u->done }}% {{ __('resolved') }}</span>

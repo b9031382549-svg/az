@@ -37,10 +37,13 @@ class TestIsolationTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
 
-        ClassificationItem::create([
+        // Terminal conflict (search resolver ran, couldn't settle) so it sits under the
+        // 'open' / needs-attention filter rather than the in-flight 'resolving' bucket.
+        $prod = ClassificationItem::create([
             'batch' => 'b', 'source_text' => 'prodwidget',
-            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict',
+            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict', 'search_resolved_at' => now(),
         ]);
+        $prod->results()->create(['mechanism' => 'search', 'matched_code' => null, 'status' => 'needs_review']);
         $run = $this->makeRun();
         $this->makeItem($run, 'conflict', 'testwidget');
 

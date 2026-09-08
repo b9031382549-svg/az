@@ -119,18 +119,37 @@ class ClassificationDecisionTest extends TestCase
             ->assertDontSee('Human');     // auto-found (agreed) → human stage omitted
     }
 
-    public function test_a_conflict_item_shows_the_human_stage(): void
+    public function test_a_terminal_conflict_shows_the_human_stage(): void
     {
-        // An unresolved item (no confident answer) DOES need a human → the stage shows.
-        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'garbled xyz', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict']);
+        // A conflict the web-search resolver ALREADY ran on (a 'search' trace exists) but
+        // could not settle DOES need a human → the stage shows.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'garbled xyz', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
         $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'needs_review', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '2106909200', 'status' => 'needs_review', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'search', 'matched_code' => null, 'status' => 'needs_review', 'explanation' => 'Search could not confidently identify the item.']);
 
         Livewire::actingAs(User::factory()->create())
             ->test(ClassificationDecision::class, ['item' => $item])
             ->assertOk()
             ->assertSee('Human')
             ->assertSee('waiting for a human decision');
+    }
+
+    public function test_a_conflict_still_being_resolved_shows_searching_not_the_human_stage(): void
+    {
+        // A conflict whose web-search resolver hasn't finished (no 'search' trace yet) is
+        // still IN FLIGHT — the decision page shows "searching…", not a final conflict, and
+        // the Human stage stays hidden until the resolver gives up. (Resolver enabled in the
+        // test env via CLASSIFY_SEARCH_RESOLVER_ENABLED.)
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'garbled xyz', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'needs_review', 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'broker', 'matched_code' => '2106909200', 'status' => 'needs_review', 'kind' => 'good']);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('searching…')
+            ->assertDontSee('waiting for a human decision');
     }
 
     public function test_full_flow_shows_cache_miss_ai_and_web_stages(): void

@@ -159,7 +159,10 @@ class ReviewQueueTest extends TestCase
     public function test_uploads_table_lists_batches_and_selecting_one_filters_the_items(): void
     {
         ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
-        ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha 2', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+        // A TERMINAL conflict (the web-search resolver ran — a 'search' trace exists — and
+        // couldn't settle it), so it counts as 'conflict', not the in-flight 'resolving'.
+        $conflict = ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha 2', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
+        $conflict->results()->create(['mechanism' => 'search', 'matched_code' => null, 'status' => 'needs_review']);
         ClassificationItem::create(['batch' => 'up-beta', 'source_text' => 'beta item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'confirmed', 'final_code' => '1104']);
 
         $c = $this->actingComponent()->call('setFilter', 'all')->assertOk()
@@ -171,6 +174,7 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(2, $alpha->total);
         $this->assertSame(1, $alpha->resolved);
         $this->assertSame(1, $alpha->conflict);
+        $this->assertSame(0, $alpha->resolving);
         $this->assertSame(50, $alpha->done);
 
         // Selecting an upload scopes the item list to that batch.
@@ -247,5 +251,30 @@ class ReviewQueueTest extends TestCase
 
         $c->call('setFilter', 'found');
         $this->assertSame(2, $c->viewData('items')->total());          // the Found filter returns both
+    }
+
+    public function test_in_flight_conflicts_are_counted_as_resolving_not_needs_attention(): void
+    {
+        // In flight: conflict, resolver still running (no 'search' trace yet).
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'still searching', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
+        // Terminal: conflict the resolver already ran on and could not settle.
+        $terminal = ClassificationItem::create(['batch' => 'b', 'source_text' => 'gave up', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
+        $terminal->results()->create(['mechanism' => 'search', 'matched_code' => null, 'status' => 'needs_review']);
+
+        $c = $this->actingComponent();
+        $counts = $c->viewData('counts');
+
+        // Only the terminal conflict is "needs attention"; the in-flight one is 'resolving'.
+        $this->assertSame(1, $c->viewData('openCount'));
+        $this->assertSame(1, (int) ($counts['resolving'] ?? 0));
+        $this->assertSame(1, (int) ($counts['conflict'] ?? 0));
+
+        // The 'open' filter list excludes the in-flight conflict…
+        $c->call('setFilter', 'open');
+        $this->assertSame(1, $c->viewData('items')->total());
+        // …and the 'resolving' filter surfaces exactly it.
+        $c->call('setFilter', 'resolving');
+        $this->assertSame(1, $c->viewData('items')->total());
+        $this->assertSame('still searching', $c->viewData('items')->first()->source_text);
     }
 }

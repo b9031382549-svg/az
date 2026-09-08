@@ -35,6 +35,7 @@ class ReviewQueue extends Component
         // answer, via consensus or the web-search resolver).
         'found' => ['label' => 'Found', 'color' => '#3f6b4f'],
         'confirmed' => ['label' => 'Confirmed', 'color' => '#5b8568'],
+        'resolving' => ['label' => 'Searching…', 'color' => '#c98a2b'],
         'conflict' => ['label' => 'Conflict', 'color' => '#B5462E'],
         'blocked_on_fact' => ['label' => 'Blocked (fact)', 'color' => '#7c5cbf'],
         'no_match' => ['label' => 'No match', 'color' => '#9a9183'],
@@ -160,7 +161,10 @@ class ReviewQueue extends Component
         $q = $scoped()->with(['finalCode', 'translation', 'results']);
         match ($this->filter) {
             'found' => $q->whereIn('resolution', ['agreed', 'ai_resolved']),
-            'open' => $q->whereIn('resolution', self::OPEN),
+            // "Needs attention" excludes conflicts the web-search resolver is still working
+            // on — those live under the 'resolving' filter, not the human queue.
+            'open' => $q->whereIn('resolution', self::OPEN)->whereNot(fn ($w) => $w->resolving()),
+            'resolving' => $q->resolving(),
             'all' => $q,
             default => $q->where('resolution', $this->filter),
         };
@@ -171,6 +175,14 @@ class ReviewQueue extends Component
         // Collapse agreed + ai_resolved into one "Found" bucket for the tabs/donut.
         $counts = collect($rawCounts);
         $counts['found'] = (int) ($rawCounts['agreed'] ?? 0) + (int) ($rawCounts['ai_resolved'] ?? 0);
+
+        // Split conflicts the resolver hasn't finished out of 'conflict' into their own
+        // 'resolving' bucket, so they never inflate "needs attention" (openCount) — a
+        // conflict still under web search is in-flight, not a human's job yet.
+        $resolvingCount = $scoped()->resolving()->count();
+        $counts['resolving'] = $resolvingCount;
+        $counts['conflict'] = max(0, (int) ($counts['conflict'] ?? 0) - $resolvingCount);
+
         $counts = $counts->reject(fn ($v, $k) => in_array($k, ['agreed', 'ai_resolved'], true))
             ->filter(fn ($v) => $v !== 0);
 
@@ -206,7 +218,9 @@ class ReviewQueue extends Component
             'uploadTotal' => $uploadTotal,
             'uploadStart' => ($this->uploadPage - 1) * 5,
             'report' => $this->report($scoped, $counts),
-            'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($rawCounts[$r] ?? 0)),
+            // Bulk confirm/reject targets — minus the conflicts still under web search
+            // (they aren't a settled outcome a human should sweep yet).
+            'actionableCount' => collect(self::ACTIONABLE)->sum(fn ($r) => (int) ($rawCounts[$r] ?? 0)) - $resolvingCount,
             'headingNames' => $headingNames,
         ]);
     }
@@ -244,12 +258,22 @@ class ReviewQueue extends Component
             ->get()
             ->groupBy('batch');
 
-        return $rows->map(function ($r) use ($labels, $break) {
+        // Conflicts still under the web-search resolver, per batch — shown as "searching",
+        // not "conflict", so an upload mid-processing doesn't read as all-conflicts.
+        $resolvingByBatch = ClassificationItem::query()
+            ->whereIn('batch', $rows->pluck('batch'))
+            ->resolving()
+            ->selectRaw('batch, count(*) as c')
+            ->groupBy('batch')
+            ->pluck('c', 'batch');
+
+        return $rows->map(function ($r) use ($labels, $break, $resolvingByBatch) {
             $b = $break->get($r->batch, collect());
             $cnt = fn ($res) => (int) ($b->firstWhere('resolution', $res)->c ?? 0);
             $resolved = $cnt('agreed') + $cnt('ai_resolved') + $cnt('confirmed');
             $review = $cnt('review');
-            $conflict = $cnt('conflict') + $cnt('blocked_on_fact');
+            $resolving = (int) ($resolvingByBatch[$r->batch] ?? 0);
+            $conflict = max(0, $cnt('conflict') + $cnt('blocked_on_fact') - $resolving);
             $total = (int) $r->total;
 
             return (object) [
@@ -259,6 +283,7 @@ class ReviewQueue extends Component
                 'last_at' => $r->last_at,
                 'resolved' => $resolved,
                 'review' => $review,
+                'resolving' => $resolving,
                 'conflict' => $conflict,
                 'done' => $total > 0 ? (int) round($resolved / $total * 100) : 0,
             ];
