@@ -43,6 +43,16 @@
     $searchRan = $search !== null;
     $searchResolved = $searchRan && $search->status === 'auto_confirmed';
     $humanDecided = in_array($item->resolution, ['confirmed', 'rejected'], true);
+
+    // The divergence resolver (flow v2): the self-consistency ENSEMBLE runs first and, on
+    // agreement, settles the item locally; a split falls through to the web SEARCH. Show
+    // one "Resolver" stage covering whichever ran — an ensemble-settled item has no 'search'
+    // row, so keying only on that hid the step that actually produced the answer.
+    $ensembleRan = $ensemble !== null;
+    $ensembleCommitted = $ensembleRan && $ensemble->status === 'auto_confirmed'
+        && (string) $ensemble->matched_code === (string) $item->final_code;
+    $resolverRan = $ensembleRan || $searchRan;
+    $resolverSettled = $item->resolution === 'ai_resolved';
   @endphp
 
   <div class="mb-6">
@@ -62,7 +72,7 @@
           $tier = $item->confidenceTier();
           // Evidence strength behind the answer (measured vs the benchmark): unanimous
           // ~92-97%, majority ~55%, web-resolved ~63%. Only unanimous is Memory-eligible.
-          $tierLabel = ['verified' => __('verified'), 'unanimous' => __('unanimous'), 'majority' => __('majority'), 'resolved' => __('web-resolved'), 'weak' => __('weak')][$tier] ?? $tier;
+          $tierLabel = ['verified' => __('verified'), 'unanimous' => __('unanimous'), 'majority' => __('majority'), 'resolved' => __('AI-resolved'), 'weak' => __('weak')][$tier] ?? $tier;
           $tierTone = in_array($tier, ['verified', 'unanimous'], true) ? 'good' : ($tier === 'weak' ? 'muted' : 'warn');
         @endphp
         <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($tierTone) }}" title="{{ __('Confidence tier — the strength of evidence behind the answer') }}">{{ $tierLabel }}</span>
@@ -169,7 +179,7 @@
               <p class="text-ledger text-xs mt-0.5">{{ __('direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
             @else
               <p class="text-muted">{{ __('the mechanisms did not agree on a heading') }}</p>
-              <p class="text-amber text-xs mt-0.5">{{ $searchRan ? __('conflict → web search') : ($item->isResolving() ? __('conflict → web search (in progress)') : __('conflict → a human')) }}</p>
+              <p class="text-amber text-xs mt-0.5">{{ ($resolverRan || $resolverSettled) ? __('diverged → the resolver') : ($item->isResolving() ? __('diverged → the resolver (in progress)') : __('diverged → a human')) }}</p>
             @endif
           </div>
         </div>
@@ -225,16 +235,18 @@
       </li>
     @endif
 
-    {{-- ③ WEB SEARCH resolver — only when the mechanisms diverged and it ran --}}
-    @if($searchRan)
+    {{-- ③ RESOLVER — the divergence handoff. Two sub-steps: a self-consistency ENSEMBLE
+         vote (settles locally on agreement) and, only if it split, a paid WEB SEARCH. Shown
+         whenever either produced a trace, so the step that actually decided is never hidden. --}}
+    @if($resolverRan)
       <li class="card p-5">
         <div class="flex items-center justify-between gap-3 mb-3">
           <div class="flex items-center gap-2.5">
             <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">3</span>
-            <span class="font-medium">{{ __('Web search') }}</span>
-            <span class="text-faint text-xs">{{ __('a thinking model looks it up online') }}</span>
+            <span class="font-medium">{{ __('Resolver') }}</span>
+            <span class="text-faint text-xs">{{ __('self-consistency vote, then a web lookup if it cannot agree') }}</span>
           </div>
-          <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($searchResolved ? 'good' : 'warn') }}">{{ $searchResolved ? __('resolved') : __('to a human') }}</span>
+          <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($resolverSettled ? 'good' : 'warn') }}">{{ $resolverSettled ? __('resolved') : __('to a human') }}</span>
         </div>
         <div class="flex flex-col sm:flex-row gap-2 text-sm">
           <div class="flex-1 rounded-lg border hair p-3 min-w-0">
@@ -245,25 +257,72 @@
           <div class="flex items-center justify-center text-faint">→</div>
           <div class="flex-1 rounded-lg border hair p-3 min-w-0">
             <p class="kicker mb-1">{{ __('Output') }}</p>
-            @if($search->matched_code)
-              <p><span class="font-mono">{{ $search->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($search->matched_code) ?: data_get($search->trace, 'heading_name'), 55) }}</span></p>
-              <p class="text-xs mt-0.5 {{ $searchResolved ? 'text-ledger' : 'text-amber' }}">{{ __('confidence') }} {{ $pct($search->confidence) }} · {{ $searchResolved ? __('confident → taken as the answer') : __('not confident enough → a human decides') }}</p>
+            @if($item->final_code && $resolverSettled)
+              <p><span class="font-mono">{{ $item->final_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($finalName, 55) }}</span></p>
+              <p class="text-ledger text-xs mt-0.5">{{ $ensembleCommitted ? __('settled by the ensemble — no web search needed') : __('settled by the web search') }}</p>
             @else
               <p class="text-muted">{{ __('could not confidently identify the item') }}</p>
               <p class="text-amber text-xs mt-0.5">{{ __('→ a human decides') }}</p>
             @endif
           </div>
         </div>
-        @if($search->explanation)
-          <details class="mt-3 group">
-            <summary class="cursor-pointer text-xs text-muted hover:text-ink select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1">
-              <span class="transition-transform group-open:rotate-90">▸</span> {{ __('What the search found') }}
-            </summary>
-            <div class="mt-2 text-sm text-muted">
-              <p>{{ $search->explanation }}</p>
-              @if($search->model)<p class="text-faint text-xs mt-1">{{ $search->model }}</p>@endif
+
+        {{-- Sub-step A — the ensemble self-consistency vote. --}}
+        @if($ensembleRan)
+          @php
+            $ensAgreement = (string) data_get($ensemble->trace, 'agreement', '');
+            $ensPicks = collect(data_get($ensemble->trace, 'picks', []))->filter()->values();
+            $ensIdentity = data_get($ensemble->trace, 'understanding.identity');
+            $ensAgreeLabel = ['unanimous' => __('unanimous'), 'majority' => __('majority'), 'split' => __('split vote')][$ensAgreement] ?? $ensAgreement;
+          @endphp
+          <div class="mt-3 rounded-lg border hair p-3 text-xs {{ $ensembleCommitted ? 'ring-1 ring-ledger/30' : '' }}">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="kicker">{{ __('Ensemble vote') }}</span>
+              <span class="px-1.5 py-0.5 rounded {{ $ensembleCommitted ? 'bg-ledger/12 text-ledger' : 'bg-amber/15 text-amber' }}">{{ $ensAgreeLabel }}</span>
             </div>
-          </details>
+            @if($ensIdentity)<p class="text-muted mb-1">{{ __('Understood as') }}: <span class="text-ink">“{{ \Illuminate\Support\Str::limit($ensIdentity, 90) }}”</span></p>@endif
+            @if($ensPicks->isNotEmpty())
+              <p class="text-muted">{{ __('Votes') }}: <span class="font-mono text-ink">{{ $ensPicks->implode(' · ') }}</span></p>
+            @endif
+            <p class="mt-1 {{ $ensembleCommitted ? 'text-ledger' : 'text-amber' }}">
+              @if($ensemble->matched_code)<span class="font-mono">{{ $ensemble->matched_code }}</span> · {{ __('confidence') }} {{ $pct($ensemble->confidence) }} · @endif{{ $ensembleCommitted ? __('agreed → taken as the answer') : __('no agreement → fell through to the web search') }}
+            </p>
+            @if($ensemble->explanation)
+              <details class="mt-2 group">
+                <summary class="cursor-pointer text-muted hover:text-ink select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1">
+                  <span class="transition-transform group-open:rotate-90">▸</span> {{ __('Details') }}
+                </summary>
+                <p class="mt-1.5 text-muted">{{ $ensemble->explanation }}</p>
+                @if($ensemble->model)<p class="text-faint mt-1">{{ $ensemble->model }}</p>@endif
+              </details>
+            @endif
+          </div>
+        @endif
+
+        {{-- Sub-step B — the paid web search (only when the ensemble split or in shadow). --}}
+        @if($searchRan)
+          <div class="mt-3 rounded-lg border hair p-3 text-xs {{ $searchResolved ? 'ring-1 ring-ledger/30' : '' }}">
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="kicker">{{ __('Web search') }}</span>
+              <span class="text-faint">{{ __('a thinking model looks it up online') }}</span>
+            </div>
+            @if($search->matched_code)
+              <p><span class="font-mono">{{ $search->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($search->matched_code) ?: data_get($search->trace, 'heading_name'), 55) }}</span></p>
+              <p class="mt-1 {{ $searchResolved ? 'text-ledger' : 'text-amber' }}">{{ __('confidence') }} {{ $pct($search->confidence) }} · {{ $searchResolved ? __('confident → taken as the answer') : __('not confident enough → a human decides') }}</p>
+            @else
+              <p class="text-muted">{{ __('could not confidently identify the item') }}</p>
+              <p class="text-amber mt-0.5">{{ __('→ a human decides') }}</p>
+            @endif
+            @if($search->explanation)
+              <details class="mt-2 group">
+                <summary class="cursor-pointer text-muted hover:text-ink select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1">
+                  <span class="transition-transform group-open:rotate-90">▸</span> {{ __('What the search found') }}
+                </summary>
+                <p class="mt-1.5 text-muted">{{ $search->explanation }}</p>
+                @if($search->model)<p class="text-faint mt-1">{{ $search->model }}</p>@endif
+              </details>
+            @endif
+          </div>
         @endif
       </li>
     @elseif($adj)
@@ -304,7 +363,7 @@
           <p class="kicker mb-1">{{ __('Input') }}</p>
           @if($item->final_code)
             <p><span class="font-mono">{{ $item->final_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($finalName, 55) }}</span></p>
-            <p class="text-muted text-xs mt-0.5">{{ $isCacheHit ? __('the cached answer') : ($searchResolved ? __('the web-search answer') : __('the consensus answer')) }}</p>
+            <p class="text-muted text-xs mt-0.5">{{ $isCacheHit ? __('the cached answer') : ($ensembleCommitted ? __('the ensemble answer') : ($searchResolved ? __('the web-search answer') : __('the consensus answer'))) }}</p>
           @else
             <p class="text-muted">{{ __('a conflict with no confident answer') }}</p>
           @endif

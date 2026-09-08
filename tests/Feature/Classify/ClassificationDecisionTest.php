@@ -174,6 +174,32 @@ class ClassificationDecisionTest extends TestCase
             ->assertDontSee('Human');                      // auto-found (ai_resolved) → no human stage
     }
 
+    public function test_ensemble_settled_item_shows_the_resolver_stage_not_a_dead_end(): void
+    {
+        // The flow-v2 case (like prod item 48872): the mechanisms diverged, the ENSEMBLE
+        // self-consistency vote settled it locally (mechanism='ensemble', no 'search' row),
+        // and the item is ai_resolved. The page must show the Resolver stage crediting the
+        // ensemble — NOT the old "diverged → a human" dead end, and NO Human stage.
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Xilasedici dron', 'source_hash' => bin2hex(random_bytes(32)), 'kind' => 'good', 'resolution' => 'ai_resolved', 'final_code' => '8802', 'search_resolved_at' => now()]);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => null, 'status' => 'no_match']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8802110000', 'status' => 'needs_review', 'confidence' => 0.44, 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'ensemble', 'matched_code' => '8802', 'status' => 'auto_confirmed', 'confidence' => 0.9, 'kind' => 'good',
+            'explanation' => 'Understood as "rescue drone". Ensemble (unanimous): 8802 / 8802 / 8802',
+            'trace' => ['agreement' => 'unanimous', 'answer' => '8802', 'picks' => ['8802', '8802', '8802'], 'understanding' => ['identity' => 'rescue drone']]]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('Resolver')                                   // the unified resolver stage renders
+            ->assertSee('Ensemble vote')                              // with the ensemble sub-step
+            ->assertSee('rescue drone')                               // and what it understood the item as
+            ->assertSee('settled by the ensemble — no web search needed')
+            ->assertSee('8802')
+            ->assertDontSee('diverged → a human')                     // NOT the misleading dead end
+            ->assertDontSee('Web search')                             // the web sub-step never ran
+            ->assertDontSee('Human');                                 // ai_resolved → no human stage
+    }
+
     public function test_confirm_on_the_decision_page(): void
     {
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'ai_resolved', 'final_code' => '9018', 'kind' => 'good']);

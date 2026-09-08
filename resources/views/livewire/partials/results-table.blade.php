@@ -25,6 +25,8 @@
       if ($final === '') return null; // not resolved yet
       if (optional($item->results->firstWhere('mechanism', 'cache'))->matched_code === $final) return 'memory';
       if (optional($item->results->firstWhere('mechanism', 'search'))->matched_code === $final) return 'web research';
+      // Flow-v2 resolver: the ensemble self-consistency vote settled it locally (no web).
+      if (optional($item->results->firstWhere('mechanism', 'ensemble'))->matched_code === $final) return 'ensemble';
       return 'local ai';
   };
   $codeName = fn ($item) => $item->finalCode?->localizedName() ?: ($headingNames[(string) $item->final_code] ?? '');
