@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -122,6 +123,53 @@ class ClassificationItem extends Model
         }
 
         return 'weak';
+    }
+
+    /**
+     * Is this item still being settled by the async web-search resolver? A divergent
+     * item is written as 'conflict' and only THEN is SearchResolveJob dispatched, so
+     * between that write and the job finishing the row reads 'conflict' while the resolver
+     * is still working — showing a final "conflict" (reads as "no code will be found")
+     * misleads. The resolver ALWAYS leaves a mechanism='search' trace when it finishes
+     * (the same signal the reaper trusts), so a 'conflict' without that trace, while the
+     * resolver is enabled, is still in flight. Requires `results` to be loaded.
+     */
+    public function isResolving(): bool
+    {
+        if ($this->resolution !== 'conflict' || ! (bool) config('classify.search_resolver.enabled', false)) {
+            return false;
+        }
+
+        return $this->results->firstWhere('mechanism', 'search') === null;
+    }
+
+    /**
+     * The query-side twin of isResolving(): 'conflict' rows still in flight with the async
+     * web-search resolver (no mechanism='search' trace yet). Only matches while the resolver
+     * is enabled — disabled, a conflict is terminal, so the scope matches nothing. Used by
+     * the review queue to keep in-flight conflicts out of the "needs attention" counts.
+     *
+     * @param  Builder<ClassificationItem>  $query
+     * @return Builder<ClassificationItem>
+     */
+    public function scopeResolving(Builder $query): Builder
+    {
+        if (! (bool) config('classify.search_resolver.enabled', false)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('resolution', 'conflict')
+            ->whereDoesntHave('results', fn ($r) => $r->where('mechanism', 'search'));
+    }
+
+    /**
+     * The resolution to SHOW: 'resolving' while the web-search resolver is still in flight
+     * (see isResolving), otherwise the stored resolution. Display-only — the DB row keeps
+     * 'conflict' as the resolver's work-ticket (dispatch trigger, single-fire claim, reaper).
+     */
+    public function displayResolution(): string
+    {
+        return $this->isResolving() ? 'resolving' : (string) $this->resolution;
     }
 
     /** Cached display translation of this item's name, keyed by source_hash. */

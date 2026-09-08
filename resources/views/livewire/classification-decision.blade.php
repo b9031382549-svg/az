@@ -1,4 +1,4 @@
-<section class="p-5 sm:p-8 max-w-[1000px]">
+<section class="p-5 sm:p-8 max-w-[1000px]" @if($item->isResolving()) wire:poll.3s @endif>
   @php
     $nm = fn ($c) => $names[(string) $c] ?? '';
     // Localized rubricator title by code, falling back to the title stored in the trace.
@@ -12,6 +12,7 @@
     $statusLabel = fn ($r) => match ($r) {
         'agreed' => __('agreed'),
         'conflict' => __('conflict'),
+        'resolving' => __('searching…'), // display-only: web-search resolver still running (see ClassificationItem::displayResolution)
         'ai_resolved' => __('resolved by AI'),
         'no_match' => __('no match'),
         'confirmed' => __('confirmed'),
@@ -52,7 +53,7 @@
     {{-- The overall outcome — what came out of the whole flow. --}}
     <div class="card-flat p-3 mt-3 flex items-center gap-2 flex-wrap text-sm">
       <span class="kicker">{{ __('Final answer') }}</span>
-      <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($humanDecided ? ($item->resolution === 'rejected' ? 'bad' : 'good') : ($item->resolution === 'conflict' ? 'warn' : ($item->final_code ? 'good' : 'muted'))) }}">{{ $statusLabel($item->resolution) }}</span>
+      <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($humanDecided ? ($item->resolution === 'rejected' ? 'bad' : 'good') : ($item->resolution === 'conflict' ? 'warn' : ($item->final_code ? 'good' : 'muted'))) }}">{{ $statusLabel($item->displayResolution()) }}</span>
       @if($item->final_code)
         <span class="font-mono text-sm">{{ $item->final_code }}</span>
         <span class="text-muted">{{ \Illuminate\Support\Str::limit($finalName, 90) }}</span>
@@ -168,7 +169,7 @@
               <p class="text-ledger text-xs mt-0.5">{{ __('direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
             @else
               <p class="text-muted">{{ __('the mechanisms did not agree on a heading') }}</p>
-              <p class="text-amber text-xs mt-0.5">{{ $searchRan ? __('conflict → web search') : __('conflict → a human') }}</p>
+              <p class="text-amber text-xs mt-0.5">{{ $searchRan ? __('conflict → web search') : ($item->isResolving() ? __('conflict → web search (in progress)') : __('conflict → a human')) }}</p>
             @endif
           </div>
         </div>
@@ -288,7 +289,7 @@
          still open (conflict / no_match / blocked) or a human already confirmed/rejected
          it. An auto-found item (agreed / ai_resolved) is settled, so this stage is
          omitted — the decision is already made and the goods are found. --}}
-    @if(! in_array($item->resolution, ['agreed', 'ai_resolved'], true))
+    @if(! in_array($item->resolution, ['agreed', 'ai_resolved'], true) && ! $item->isResolving())
     <li class="card p-5">
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-2.5">

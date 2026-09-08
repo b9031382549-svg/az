@@ -236,7 +236,23 @@ class Classify extends Component
 
         if ($this->queued) {
             $batch = $this->queued['batch'];
-            $done = ClassificationItem::where('batch', $batch)->where('resolution', '!=', 'pending')->count();
+
+            // "Done" is every non-pending row — EXCEPT a raw 'conflict' that the web-search
+            // resolver hasn't finished yet. Consensus sets 'conflict' and only *then*
+            // dispatches SearchResolveJob, so a just-diverged item is non-pending while its
+            // resolver job is still queued/running. Counting it as done let the bar hit 100%
+            // and stop polling (blade: wire:poll only while !complete) before the resolver
+            // flipped those rows to 'ai_resolved' — "finished" on screen, still working in
+            // fact. A completed resolve *always* leaves a mechanism='search' trace row (the
+            // same signal the reaper trusts), so its presence is the real "resolver done"
+            // marker; search_resolved_at is only the dispatch claim, not completion.
+            $resolverEnabled = (bool) config('classify.search_resolver.enabled', false);
+            $done = ClassificationItem::where('batch', $batch)
+                ->where('resolution', '!=', 'pending')
+                ->when($resolverEnabled, fn ($q) => $q->where(fn ($w) => $w
+                    ->where('resolution', '!=', 'conflict')
+                    ->orWhereHas('results', fn ($r) => $r->where('mechanism', 'search'))))
+                ->count();
 
             $rows = ClassificationItem::where('batch', $batch)
                 ->with(['finalCode', 'translation', 'results'])

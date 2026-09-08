@@ -9,9 +9,13 @@
       'agreed', 'confirmed' => 'bg-ledger/12 text-ledger',
       'ai_resolved' => 'bg-ink/10 text-ink',
       'blocked_on_fact' => 'bg-amber/15 text-amber',
+      'resolving' => 'bg-amber/15 text-amber animate-pulse', // web-search resolver still running — NOT a final conflict
       'conflict' => 'bg-stamp/12 text-stamp',
       default => 'bg-line/40 text-muted', // no_match, rejected, pending
   };
+  // 'resolving' is display-only (ClassificationItem::displayResolution): a conflict whose
+  // web-search resolver hasn't finished. Show "searching…", not the scary final "conflict".
+  $statusLabel = fn ($s) => $s === 'resolving' ? __('searching…') : __(str_replace('_', ' ', (string) $s));
   // Who produced the answer that stuck: memory (cache) / web research (search) / local ai
   // (2-of-3 consensus). Credit a source only when ITS own code is still the final one —
   // otherwise a human correction (which leaves the old cache/search row in place) would be
@@ -57,7 +61,8 @@
                 <span class="text-faint">—</span>
               @endif
             </td>
-            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($r->resolution) }}">{{ __(str_replace('_', ' ', (string) $r->resolution)) }}</span></td>
+            @php $ds = $r->displayResolution(); @endphp
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($ds) }}">{{ $statusLabel($ds) }}</span></td>
           </tr>
         @empty
           <tr><td colspan="6" class="px-4 py-10 text-center text-muted">{{ __('Nothing here. Classify some items first.') }}</td></tr>
