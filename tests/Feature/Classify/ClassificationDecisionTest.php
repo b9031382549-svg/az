@@ -139,8 +139,10 @@ class ClassificationDecisionTest extends TestCase
     {
         // A conflict whose web-search resolver hasn't finished (no 'search' trace yet) is
         // still IN FLIGHT — the decision page shows "searching…", not a final conflict, and
-        // the Human stage stays hidden until the resolver gives up. (Resolver enabled in the
-        // test env via CLASSIFY_SEARCH_RESOLVER_ENABLED.)
+        // the Human stage stays hidden until the resolver gives up. Pin the resolver on so
+        // the test is deterministic regardless of the ambient env (CI defaults it off).
+        config()->set('classify.search_resolver.enabled', true);
+
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'garbled xyz', 'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
         $item->results()->create(['mechanism' => 'vector', 'matched_code' => '8471300000', 'status' => 'needs_review', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '2106909200', 'status' => 'needs_review', 'kind' => 'good']);

@@ -255,6 +255,9 @@ class ReviewQueueTest extends TestCase
 
     public function test_in_flight_conflicts_are_counted_as_resolving_not_needs_attention(): void
     {
+        // Pin the resolver on — deterministic regardless of the ambient env (CI defaults off).
+        config()->set('classify.search_resolver.enabled', true);
+
         // In flight: conflict, resolver still running (no 'search' trace yet).
         ClassificationItem::create(['batch' => 'b', 'source_text' => 'still searching', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
         // Terminal: conflict the resolver already ran on and could not settle.
