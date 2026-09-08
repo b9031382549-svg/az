@@ -93,6 +93,12 @@ class ClassificationDecision extends Component
         $mechResults = $results->whereIn('mechanism', ['vector', 'broker', 'direct'])
             ->sortBy(fn ($r) => $order[$r->mechanism] ?? 9)->values();
         $cache = $results->firstWhere('mechanism', 'cache');
+        // The divergence resolver is two-step (flow v2): a self-consistency ENSEMBLE vote
+        // runs first and, when it agrees, settles the item locally (mechanism='ensemble');
+        // only a split/shadow falls through to the paid web SEARCH (mechanism='search').
+        // The decision page shows whichever ran — an ensemble-settled item has no 'search'
+        // row, so keying the resolver stage on 'search' alone hid the step that decided it.
+        $ensemble = $results->firstWhere('mechanism', 'ensemble');
         $search = $results->firstWhere('mechanism', 'search');
         $adj = $this->item->adjudications->sortByDesc('id')->first();
 
@@ -116,6 +122,7 @@ class ClassificationDecision extends Component
             'gold' => $gold,
             'mechResults' => $mechResults,
             'cache' => $cache,
+            'ensemble' => $ensemble,
             'search' => $search,
             'adj' => $adj,
             'consensus' => $consensus,
