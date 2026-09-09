@@ -8,6 +8,7 @@ use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
 use App\Models\RubricatorNode;
 use App\Services\Classify\Consensus;
+use App\Services\Classify\HeadingMatch;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -116,6 +117,25 @@ class ClassificationDecision extends Component
             'total' => $ag['total'],
         ];
 
+        // The vector shortlist the consensus rule actually tests against: DIRECT resolves
+        // only when its heading is in the vector's top-K candidates. Surfacing those K
+        // headings (with the one Direct matched flagged) makes "agreed" self-evident — e.g.
+        // Vector's #1 pick can differ from Direct's answer yet still corroborate it because
+        // the answer sits deeper in the same shortlist. Mirrors Consensus::vectorContains.
+        $vectorRow = $mechResults->firstWhere('mechanism', 'vector');
+        $directRow = $mechResults->firstWhere('mechanism', 'direct');
+        $membershipK = max(1, (int) config('classify.vector.membership_k', 3));
+        $vectorShortlist = collect($vectorRow?->candidates ?? [])
+            ->take($membershipK)
+            ->map(fn ($c) => [
+                'code' => (string) ($c['code'] ?? ''),
+                'heading' => mb_substr((string) ($c['code'] ?? ''), 0, 4),
+                'matched' => $directRow?->matched_code
+                    && HeadingMatch::same($directRow->matched_code, $directRow->kind, $c['code'] ?? null, $c['kind'] ?? null),
+            ])
+            ->filter(fn ($c) => $c['code'] !== '')
+            ->values();
+
         return view('livewire.classification-decision', [
             'names' => $names,
             'rubricTitles' => $rubricTitles,
@@ -126,6 +146,8 @@ class ClassificationDecision extends Component
             'search' => $search,
             'adj' => $adj,
             'consensus' => $consensus,
+            'vectorShortlist' => $vectorShortlist,
+            'membershipK' => $membershipK,
         ]);
     }
 }

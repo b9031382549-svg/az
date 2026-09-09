@@ -190,14 +190,38 @@ class ClassificationDecisionTest extends TestCase
         Livewire::actingAs(User::factory()->create())
             ->test(ClassificationDecision::class, ['item' => $item])
             ->assertOk()
-            ->assertSee('Resolver')                                   // the unified resolver stage renders
-            ->assertSee('Ensemble vote')                              // with the ensemble sub-step
-            ->assertSee('rescue drone')                               // and what it understood the item as
-            ->assertSee('settled by the ensemble — no web search needed')
+            ->assertSee('Ensemble')                                   // the ensemble stage renders
+            ->assertSee('rescue drone')                               // what it understood the item as
+            ->assertSee('agreed → taken as the answer')               // and that it committed the heading
             ->assertSee('8802')
             ->assertDontSee('diverged → a human')                     // NOT the misleading dead end
-            ->assertDontSee('Web search')                             // the web sub-step never ran
+            ->assertDontSee('Web search')                             // the web stage never ran
             ->assertDontSee('Human');                                 // ai_resolved → no human stage
+    }
+
+    public function test_agreed_via_membership_shows_the_vector_shortlist_direct_is_checked_against(): void
+    {
+        // The #48912 shape: Direct picks 7411; Vector's #1 is 7407 but its shortlist carries
+        // 7411 deeper (top-K membership), so the item is 'agreed'. The page must surface the
+        // vector shortlist with the entry Direct matched flagged — otherwise "agreed" reads
+        // like an error (7411 ≠ Vector's visible 7407).
+        config()->set('classify.vector.membership_k', 3);
+        $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Latun perexod', 'source_hash' => bin2hex(random_bytes(32)), 'kind' => 'good', 'resolution' => 'agreed', 'final_code' => '7411']);
+        $item->results()->create(['mechanism' => 'direct', 'matched_code' => '7411', 'status' => 'auto_confirmed', 'confidence' => 0.8, 'kind' => 'good']);
+        $item->results()->create(['mechanism' => 'vector', 'matched_code' => '7407219000', 'status' => 'auto_confirmed', 'confidence' => 0.68, 'kind' => 'good',
+            'candidates' => [
+                ['code' => '7407219000', 'kind' => 'good'],
+                ['code' => '7412209000', 'kind' => 'good'],
+                ['code' => '7411100000', 'kind' => 'good'],
+            ]]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('the shortlist Direct is checked against')   // the shortlist block header
+            ->assertSee('7407')->assertSee('7412')->assertSee('7411') // all top-3 headings shown
+            ->assertSee('matches Direct')                            // the matched entry is flagged
+            ->assertSee('Direct is in the shortlist → agreed');      // and the rule is spelled out
     }
 
     public function test_confirm_on_the_decision_page(): void
