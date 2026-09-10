@@ -48,5 +48,10 @@ class SearchResolveJob implements ShouldQueue
         }
 
         $resolver->resolve($item);
+
+        // The resolver has given its verdict (resolved, or left it 'conflict' for a human) —
+        // the automatic pipeline is now finished for this item. Set-once (whereNull), so a
+        // reaper re-dispatch never moves the timestamp.
+        ClassificationItem::markAnswered($this->itemId);
     }
 }

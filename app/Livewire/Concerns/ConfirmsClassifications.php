@@ -40,6 +40,7 @@ trait ConfirmsClassifications
             Audit::log(((string) $was !== $code) ? 'classification.corrected' : 'classification.confirm',
                 ['id' => $item->id, 'code' => $code, 'was' => $was], $item);
             app(AnswerCacheService::class)->promoteConfirmed($item);
+            ClassificationItem::markAnswered($item->id);
 
             return true;
         }
@@ -71,6 +72,7 @@ trait ConfirmsClassifications
     protected function applyReject(ClassificationItem $item): void
     {
         $item->update(['resolution' => 'rejected']);
+        ClassificationItem::markAnswered($item->id);
         Audit::log('classification.reject', ['id' => $item->id]);
     }
 }

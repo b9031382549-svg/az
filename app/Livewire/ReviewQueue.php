@@ -6,6 +6,7 @@ use App\Livewire\Concerns\ConfirmsClassifications;
 use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\RubricatorNode;
+use App\Services\Classify\BatchStats;
 use App\Support\Audit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -207,9 +208,13 @@ class ReviewQueue extends Component
         $this->uploadPage = min(max(1, $this->uploadPage), $uploadPages);
         $uploads = $allUploads->forPage($this->uploadPage, 5)->values();
 
+        // Per-batch funnel + recognition time — only for a single selected upload.
+        $batchStats = $this->batch !== 'all' ? app(BatchStats::class)->for($this->batch) : null;
+
         return view('livewire.review-queue', [
             'items' => $items,
             'counts' => $counts,
+            'batchStats' => $batchStats,
             'openCount' => $openCount,
             'batches' => $allUploads,
             'uploads' => $uploads,

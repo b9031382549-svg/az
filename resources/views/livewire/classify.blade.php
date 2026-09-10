@@ -102,5 +102,13 @@
         <p class="text-muted text-sm mt-4">{{ __('Waiting for the first results…') }}</p>
       @endif
     </div>
+
+    {{-- The per-batch funnel: which step resolved how many, and the recognition time.
+         Re-rendered on the progress poll above, so it fills in live. --}}
+    @if($batchStats)
+      <div class="mt-6">
+        @include('livewire.partials.batch-stats', ['stats' => $batchStats])
+      </div>
+    @endif
   @endif
 </section>

@@ -113,6 +113,11 @@
     $gs = $report['good'] + $report['service'];
     $maxCh = max(1, optional($report['chapters']->first())->c ?? 1);
   @endphp
+  @if($batchStats)
+    <div class="mb-5">
+      @include('livewire.partials.batch-stats', ['stats' => $batchStats])
+    </div>
+  @endif
   <div x-data="{open:true}" class="card p-5 mb-5">
     <button @click="open=!open" class="w-full flex items-center justify-end">
       <span class="text-faint text-sm" x-text="open ? '▾ hide' : '▸ show'"></span>

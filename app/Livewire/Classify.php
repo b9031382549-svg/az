@@ -11,6 +11,7 @@ use App\Models\ItemTranslation;
 use App\Models\LlmUsage;
 use App\Models\RubricatorNode;
 use App\Services\Classify\AnswerCacheService;
+use App\Services\Classify\BatchStats;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
 use Illuminate\Support\Facades\Queue;
@@ -233,6 +234,7 @@ class Classify extends Component
     {
         $progress = null;
         $headingNames = collect();
+        $batchStats = null;
 
         if ($this->queued) {
             $batch = $this->queued['batch'];
@@ -273,12 +275,15 @@ class Classify extends Component
                 'complete' => $done >= (int) $this->queued['count'],
                 'rows' => $rows,
             ];
+
+            $batchStats = app(BatchStats::class)->for($batch);
         }
 
         $baselineSource = (string) config('classify.cache.baseline_source', 'gold');
 
         return view('livewire.classify', [
             'progress' => $progress,
+            'batchStats' => $batchStats,
             'headingNames' => $headingNames,
             'manualLimit' => self::MANUAL_LIMIT,
             'fileLimit' => self::FILE_LIMIT,

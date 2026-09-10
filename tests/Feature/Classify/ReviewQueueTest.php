@@ -253,6 +253,24 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(2, $c->viewData('items')->total());          // the Found filter returns both
     }
 
+    public function test_selecting_a_batch_renders_the_funnel_statistics_block(): void
+    {
+        ClassificationItem::create(['batch' => 'up-x', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471', 'answered_at' => now()]);
+
+        Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class)
+            ->set('batch', 'up-x')
+            ->assertOk()
+            ->assertSee('Batch statistics')
+            ->assertSee('Recognition time')
+            ->assertSee('Sent to memory & training');
+
+        // The all-uploads view has no single batch → no per-batch stats block.
+        Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class)
+            ->set('batch', 'all')
+            ->assertOk()
+            ->assertDontSee('Batch statistics');
+    }
+
     public function test_in_flight_conflicts_are_counted_as_resolving_not_needs_attention(): void
     {
         // Pin the resolver on — deterministic regardless of the ambient env (CI defaults off).
