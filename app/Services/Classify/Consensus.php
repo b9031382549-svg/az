@@ -85,10 +85,21 @@ class Consensus
             return; // stay 'pending' until every authoritative mechanism reports
         }
 
-        $item->update($this->resolve($authResults));
+        $resolved = $this->resolve($authResults);
+        $item->update($resolved);
 
         $this->maybePromote($item);
         $this->maybeSearchResolve($item);
+
+        // Stamp answered_at for items whose automatic pipeline is done here: 'agreed'/'no_match'
+        // are terminal, and a 'conflict' is terminal too UNLESS the search resolver is enabled
+        // (then SearchResolveJob stamps it when it returns its verdict). Set-once, so this never
+        // moves on a reaper re-run or a later human decision.
+        $resolverWillRun = ($resolved['resolution'] ?? null) === 'conflict'
+            && (bool) config('classify.search_resolver.enabled', false);
+        if (! $resolverWillRun) {
+            ClassificationItem::markAnswered($item->id);
+        }
     }
 
     /**

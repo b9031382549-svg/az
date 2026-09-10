@@ -81,6 +81,9 @@ class AnswerCacheService
             'kind' => $kind,
         ]);
 
+        // A cache hit is answered the instant it resolves — no mechanism pipeline runs.
+        ClassificationItem::markAnswered($item->id);
+
         return true;
     }
 
@@ -183,6 +186,8 @@ class AnswerCacheService
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            // Record that this item's answer went to memory (feeds the batch stats + training).
+            ClassificationItem::markMemoryPromoted($item->id);
         } catch (Throwable) {
             // A write-back failure must never affect the (already settled) classification.
         }
@@ -220,6 +225,7 @@ class AnswerCacheService
                     'meta' => json_encode(['item_id' => $item->id], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
                 ],
             );
+            ClassificationItem::markMemoryPromoted($item->id);
         } catch (Throwable) {
             // A write-back failure must never affect the (already applied) confirmation.
         }
@@ -315,6 +321,7 @@ class AnswerCacheService
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            ClassificationItem::markMemoryPromoted($item->id);
         } catch (Throwable) {
             // A write-back failure must never affect the (already applied) resolution.
         }

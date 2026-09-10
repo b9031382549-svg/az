@@ -19,7 +19,29 @@ class ClassificationItem extends Model
         return [
             'confirmed_at' => 'datetime',
             'search_resolved_at' => 'datetime',
+            'answered_at' => 'datetime',
+            'memory_promoted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Stamp the moment this item's AUTOMATIC pipeline finished — set once, never moved by a
+     * later human decision or a reaper re-run (so the batch's recognition time stays honest).
+     * Called wherever an item reaches an auto-terminal state: a cache hit, an agreed/no_match
+     * consensus, a conflict with no resolver to run, or the resolver's verdict.
+     */
+    public static function markAnswered(int $id): void
+    {
+        static::whereKey($id)->whereNull('answered_at')->update(['answered_at' => now()]);
+    }
+
+    /**
+     * Stamp the moment this item's answer was actually written back to the answer_cache
+     * (memory & training). Set once, at the real write sites in AnswerCacheService.
+     */
+    public static function markMemoryPromoted(int $id): void
+    {
+        static::whereKey($id)->whereNull('memory_promoted_at')->update(['memory_promoted_at' => now()]);
     }
 
     /** @return HasMany<ClassificationResult, $this> */
