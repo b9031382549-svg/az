@@ -26,10 +26,10 @@ class Classify extends Component
     use WithFileUploads;
 
     /** Max items accepted from one manual (textarea) submission — same cap as a file. */
-    private const MANUAL_LIMIT = 10000;
+    private const MANUAL_LIMIT = 100000;
 
     /** Max items queued from a single file upload. */
-    private const FILE_LIMIT = 10000;
+    private const FILE_LIMIT = 100000;
 
     /** Jobs pushed to the queue per bulk insert. */
     private const DISPATCH_CHUNK = 500;
