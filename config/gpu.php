@@ -53,7 +53,7 @@ return [
 
     // "Forgot" safety only (meaningful for rented Nebius, retired with owned servers):
     // destroy a serving slot after this idle gap, or ANY slot past the hard ceiling.
-    'autostop_idle_minutes' => (int) env('GPU_AUTOSTOP_IDLE_MINUTES', 120),
+    'autostop_idle_minutes' => (int) env('GPU_AUTOSTOP_IDLE_MINUTES', 180),
     'hard_ceiling_hours' => (int) env('GPU_HARD_CEILING_HOURS', 24),
 
     // Eval-gate: the held-out dataset a freshly-trained adapter is scored on (a TestRun),
