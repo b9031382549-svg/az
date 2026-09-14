@@ -104,18 +104,19 @@ class ClassificationDecision extends Component
         $search = $results->firstWhere('mechanism', 'search');
         $adj = $this->item->adjudications->sortByDesc('id')->first();
 
-        // Was THIS search-resolved answer written back to Memory? The grounded write-back
-        // stamps the item (memory_promoted_at) AND leaves an 'ai_resolved_grounded'
-        // answer_cache row; confirming that row exists attributes the "saved to memory"
-        // fact to the web-search step specifically (a later human confirm is a different
-        // source and must not light up this badge).
-        $searchInMemory = false;
-        if ($search !== null && $this->item->memory_promoted_at !== null) {
-            $groundedSource = (string) config('classify.memory_promotion.grounded_search.source', 'ai_resolved_grounded');
-            $searchInMemory = AnswerCache::where('name_key', AnswerCache::keyFor((string) $this->item->source_text))
-                ->where('source', $groundedSource)
-                ->exists();
-        }
+        // Item-level Memory write-back. memory_promoted_at is the authoritative per-item
+        // stamp that this item's answer was written to the answer_cache; the row's `source`
+        // names WHICH path wrote it (unanimous consensus / grounded web-search / human
+        // confirm) for the badge's descriptive note.
+        $inMemory = $this->item->memory_promoted_at !== null;
+        $memorySource = $inMemory
+            ? AnswerCache::where('name_key', AnswerCache::keyFor((string) $this->item->source_text))
+                ->orderByDesc('id')->value('source')
+            : null;
+        // The web-search step's own detail badge lights up only when THIS answer reached
+        // memory via the grounded search path (not consensus / human confirm).
+        $groundedSource = (string) config('classify.memory_promotion.grounded_search.source', 'ai_resolved_grounded');
+        $searchInMemory = $search !== null && $memorySource === $groundedSource;
 
         // Reproduce the item's ACTUAL decision (broker == direct + vector top-K membership)
         // via the same Consensus::resolve() the pipeline ran, so this AI-stage preview can
@@ -158,6 +159,8 @@ class ClassificationDecision extends Component
             'cache' => $cache,
             'ensemble' => $ensemble,
             'search' => $search,
+            'inMemory' => $inMemory,
+            'memorySource' => $memorySource,
             'searchInMemory' => $searchInMemory,
             'adj' => $adj,
             'consensus' => $consensus,
