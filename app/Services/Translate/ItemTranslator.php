@@ -53,7 +53,9 @@ class ItemTranslator
             // Leave en/ru null — display falls back to the original text and a
             // later backfill/retry can fill it. Never break the caller.
             LlmLog::record(
-                'translate_item', (string) config('services.openrouter.model'),
+                // Log the model this stage actually targets (classify.translate_model),
+                // not the client's default — otherwise a failed translate is mislabelled.
+                'translate_item', (string) config('classify.translate_model'),
                 ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0],
                 0, 'error', null, [], null, $e->getMessage(),
                 ['item' => mb_substr($text, 0, 120)],
