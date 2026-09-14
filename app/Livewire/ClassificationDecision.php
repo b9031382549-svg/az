@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Livewire\Concerns\ConfirmsClassifications;
+use App\Models\AnswerCache;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
@@ -103,6 +104,19 @@ class ClassificationDecision extends Component
         $search = $results->firstWhere('mechanism', 'search');
         $adj = $this->item->adjudications->sortByDesc('id')->first();
 
+        // Was THIS search-resolved answer written back to Memory? The grounded write-back
+        // stamps the item (memory_promoted_at) AND leaves an 'ai_resolved_grounded'
+        // answer_cache row; confirming that row exists attributes the "saved to memory"
+        // fact to the web-search step specifically (a later human confirm is a different
+        // source and must not light up this badge).
+        $searchInMemory = false;
+        if ($search !== null && $this->item->memory_promoted_at !== null) {
+            $groundedSource = (string) config('classify.memory_promotion.grounded_search.source', 'ai_resolved_grounded');
+            $searchInMemory = AnswerCache::where('name_key', AnswerCache::keyFor((string) $this->item->source_text))
+                ->where('source', $groundedSource)
+                ->exists();
+        }
+
         // Reproduce the item's ACTUAL decision (broker == direct + vector top-K membership)
         // via the same Consensus::resolve() the pipeline ran, so this AI-stage preview can
         // never drift from the item's real resolution. agreementOf is kept only for the
@@ -144,6 +158,7 @@ class ClassificationDecision extends Component
             'cache' => $cache,
             'ensemble' => $ensemble,
             'search' => $search,
+            'searchInMemory' => $searchInMemory,
             'adj' => $adj,
             'consensus' => $consensus,
             'vectorShortlist' => $vectorShortlist,
