@@ -329,7 +329,19 @@
             <span class="font-medium">{{ __('Web search') }}</span>
             <span class="text-faint text-xs">{{ __('a thinking model looks it up online') }}</span>
           </div>
-          <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($searchResolved ? 'good' : 'warn') }}">{{ $searchResolved ? __('resolved') : __('to a human') }}</span>
+          <div class="flex items-center gap-2 flex-wrap justify-end">
+            {{-- The model's self-reported confidence, surfaced at a glance — it is what the
+                 grounded gate below tests against. --}}
+            @if($search->confidence !== null)
+              <span class="px-2 py-0.5 rounded-md text-xs font-medium tnum {{ $pill($searchResolved ? 'good' : 'warn') }}" title="{{ __('The model’s self-reported confidence — it must clear the threshold to be taken as the answer.') }}">{{ __('confidence') }} {{ $pct($search->confidence) }}</span>
+            @endif
+            {{-- Grounded + high-confidence answers are written back to Memory, so a future
+                 identical item is answered from the cache without another paid search. --}}
+            @if($searchInMemory)
+              <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill('good') }}" title="{{ __('This answer was written back to Memory (answer cache) — grounded and above the memory-write confidence threshold.') }}">✓ {{ __('saved to memory') }}</span>
+            @endif
+            <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($searchResolved ? 'good' : 'warn') }}">{{ $searchResolved ? __('resolved') : __('to a human') }}</span>
+          </div>
         </div>
         <div class="flex flex-col sm:flex-row gap-2 text-sm">
           <div class="flex-1 rounded-lg border hair p-3 min-w-0">
@@ -343,6 +355,9 @@
             @if($search->matched_code)
               <p><span class="font-mono">{{ $search->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($search->matched_code) ?: data_get($search->trace, 'heading_name'), 55) }}</span></p>
               <p class="text-xs mt-0.5 {{ $searchResolved ? 'text-ledger' : 'text-amber' }}">{{ __('confidence') }} {{ $pct($search->confidence) }} · {{ $searchResolved ? __('confident → taken as the answer') : __('not confident enough → a human decides') }}</p>
+              @if($searchInMemory)
+                <p class="text-ledger text-xs mt-0.5">✓ {{ __('saved to memory — a future identical item is answered from the cache') }}</p>
+              @endif
             @else
               <p class="text-muted">{{ __('could not confidently identify the item') }}</p>
               <p class="text-amber text-xs mt-0.5">{{ __('→ a human decides') }}</p>
