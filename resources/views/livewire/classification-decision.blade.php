@@ -76,6 +76,21 @@
           $tierTone = in_array($tier, ['verified', 'unanimous'], true) ? 'good' : ($tier === 'weak' ? 'muted' : 'warn');
         @endphp
         <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($tierTone) }}" title="{{ __('Confidence tier — the strength of evidence behind the answer') }}">{{ $tierLabel }}</span>
+        {{-- Item-level Memory fact: this answer was written back to the cache, so a future
+             identical item is answered from Memory without re-running the pipeline. The
+             note says by which path it was written. --}}
+        @if($inMemory)
+          @php
+            $memoryVia = match(true) {
+                $memorySource === 'ai_resolved_grounded' => __('grounded web search'),
+                is_string($memorySource) && str_starts_with($memorySource, 'auto:consensus') => __('unanimous consensus'),
+                $memorySource === 'confirmed' => __('a human confirmation'),
+                default => null,
+            };
+          @endphp
+          <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill('good') }}" title="{{ __('This answer was written to Memory (answer cache) — a future identical item is answered from the cache.') }}">✓ {{ __('saved to memory') }}</span>
+          @if($memoryVia)<span class="text-faint text-xs">{{ __('via') }} {{ $memoryVia }}</span>@endif
+        @endif
       @else
         <span class="text-muted">{{ __('awaiting a human decision') }}</span>
       @endif
