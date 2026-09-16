@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 use App\Jobs\ClassifyMechanismJob;
 use App\Jobs\TranslateItemJob;
-use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\ItemTranslation;
@@ -50,9 +49,6 @@ class Classify extends Component
         'Anilin və onun duzları',
         'Taxılın topdansatışı üzrə xidmətlər',
     ];
-
-    /** Number of rows the last "Reset memory" click removed, or null before it's used. */
-    public ?int $memoryResetCount = null;
 
     public function useExample(string $text): void
     {
@@ -218,17 +214,6 @@ class Classify extends Component
         $this->reset('queued', 'input', 'file');
     }
 
-    /**
-     * Reset the production answer_cache (scope 0) back to just the baseline reference —
-     * everything added since (fedor / auto-promoted / confirmed / ...) is deleted. Never
-     * touches test-dataset memory (see AnswerCacheService::resetToBaseline()).
-     */
-    public function resetMemory(AnswerCacheService $cache): void
-    {
-        $this->memoryResetCount = $cache->resetToBaseline();
-        Audit::log('classify.memory_reset', ['deleted' => $this->memoryResetCount]);
-    }
-
     public function render()
     {
         $progress = null;
@@ -278,17 +263,12 @@ class Classify extends Component
             $batchStats = app(BatchStats::class)->for($batch);
         }
 
-        $baselineSource = (string) config('classify.cache.baseline_source', 'gold');
-
         return view('livewire.classify', [
             'progress' => $progress,
             'batchStats' => $batchStats,
             'headingNames' => $headingNames,
             'manualLimit' => self::MANUAL_LIMIT,
             'fileLimit' => self::FILE_LIMIT,
-            'baselineSource' => $baselineSource,
-            // How many production memory rows a "Reset memory" click would remove right now.
-            'resettableCacheCount' => AnswerCache::where('test_dataset_id', 0)->where('source', '!=', $baselineSource)->count(),
         ]);
     }
 }

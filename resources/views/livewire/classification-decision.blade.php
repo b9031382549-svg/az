@@ -61,7 +61,7 @@
       // per-run page arrive in later phases; unknown/absent origins fall back to the review list.
       [$backUrl, $backLabel] = match (request('from')) {
           'classify' => [route('classify'), __('Back to Classify')],
-          default => [route('review', ['batch' => $item->batch, 'filter' => 'all']), __('Back to review')],
+          default => [route('review.batch', ['batch' => $item->batch, 'filter' => 'all']), __('Back to review')],
       };
     @endphp
     <a href="{{ $backUrl }}" class="text-sm text-muted hover:text-ink">← {{ $backLabel }}</a>

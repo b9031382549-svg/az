@@ -1,26 +1,20 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
-  @php
-    // Everything resolves at the 4-digit HS heading now — one view, no full/heading toggle.
-    // The 'Searching…' tab only appears while conflicts are still under the web-search
-    // resolver — no permanent zero-count tab in the common case.
-    $tabs = ['open' => __('Needs attention')];
-    if (($counts['resolving'] ?? 0) > 0) { $tabs['resolving'] = __('Searching…'); }
-    $tabs += ['found' => __('Found'), 'confirmed' => __('Confirmed'), 'rejected' => __('Rejected'), 'no_match' => __('No match'), 'all' => __('All')];
-    $tabCount = fn ($key) => $key === 'all' ? $counts->sum() : ($key === 'open' ? $openCount : ($counts[$key] ?? 0));
-  @endphp
-
   <div class="mb-6 flex items-end justify-between flex-wrap gap-3">
     <div>
       <h1 class="font-display text-4xl">{{ __('Review queue') }}</h1>
+      <p class="text-muted text-sm mt-1">{{ __('Pick an upload to see its report and items.') }}</p>
     </div>
-    <div class="flex items-center gap-3 flex-wrap">
-      <a href="{{ route('review.export', ['batch' => $batch, 'filter' => $filter]) }}"
-         class="btn btn-ghost btn-sm" title="{{ __('Export the current view (upload + status filter) to Excel') }}">⬇ {{ __('Export Excel') }}</a>
+    <div class="flex items-center gap-2 text-sm">
+      <span class="text-faint">{{ __('Rows') }}</span>
+      <select wire:model.live="perPage" class="h-9 px-2.5 rounded-lg border hair bg-surface outline-none hover:border-ink transition cursor-pointer tnum">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+      </select>
     </div>
   </div>
 
-  {{-- Uploads — pick which import to review (replaces the old dropdown). --}}
-  <div class="card mb-5 overflow-hidden">
+  <div class="card overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
@@ -28,42 +22,47 @@
             <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Upload') }}</th>
             <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Date') }}</th>
             <th class="kicker font-medium text-right px-5 py-2.5">{{ __('Items') }}</th>
+            <th class="kicker font-medium text-right px-5 py-2.5"><span class="hint-head" data-hint="column:memory">{{ __('To Memory') }}</span></th>
             <th class="kicker font-medium text-left px-5 py-2.5"><span class="hint-head" data-hint="column:result">{{ __('Result') }}</span></th>
           </tr>
         </thead>
         <tbody>
-          {{-- All uploads --}}
-          <tr wire:click="selectBatch('all')" class="cursor-pointer border-b hair transition {{ $batch === 'all' ? 'bg-paper/70' : 'hover:bg-paper/40' }}">
+          {{-- All uploads — pinned, exact sums across every upload. --}}
+          <tr wire:key="up-all" class="border-b hair bg-paper/40">
             <td class="px-5 py-3">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="text-faint shrink-0">🗂</span>
-                <span class="{{ $batch === 'all' ? 'font-semibold' : 'font-medium' }}">{{ __('All uploads') }}</span>
-                @if($batch === 'all')<span class="text-[10px] px-1.5 py-0.5 rounded bg-ink text-paper shrink-0">{{ __('viewing') }}</span>@endif
-              </div>
+              <a href="{{ route('review.batch', ['batch' => 'all']) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-semibold link-under">
+                <span class="text-faint shrink-0">🗂</span>{{ __('All uploads') }}
+              </a>
             </td>
             <td class="px-5 py-3 text-muted">—</td>
-            <td class="px-5 py-3 text-right tnum">{{ $batches->sum('total') }}</td>
+            <td class="px-5 py-3 text-right tnum">{{ number_format($allRow->total) }}</td>
+            <td class="px-5 py-3 text-right tnum">
+              {{ number_format($allRow->memory) }}
+              @if($allRow->total > 0)<span class="text-faint text-xs">· {{ (int) round($allRow->memory / $allRow->total * 100) }}%</span>@endif
+            </td>
             <td class="px-5 py-3 text-faint text-xs">{{ __('everything') }}</td>
           </tr>
           {{-- One row per upload --}}
-          @foreach($uploads as $u)
+          @forelse($uploads as $u)
             @php
               $wc = $u->total ? $u->resolved / $u->total * 100 : 0;
               $wr = $u->total ? $u->review / $u->total * 100 : 0;
               $ws = $u->total ? ($u->resolving ?? 0) / $u->total * 100 : 0;
               $wk = $u->total ? $u->conflict / $u->total * 100 : 0;
             @endphp
-            <tr wire:click="selectBatch('{{ $u->key }}')" wire:key="up-{{ $u->key }}"
-                class="cursor-pointer border-b hair last:border-0 transition {{ $batch === (string) $u->key ? 'bg-paper/70' : 'hover:bg-paper/40' }}">
+            <tr wire:key="up-{{ $u->key }}" class="border-b hair last:border-0 hover:bg-paper/40 transition">
               <td class="px-5 py-3">
-                <div class="flex items-center gap-2 min-w-0">
+                <a href="{{ route('review.batch', ['batch' => $u->key]) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-medium link-under">
                   <span class="text-faint shrink-0">📄</span>
-                  <span class="truncate {{ $batch === (string) $u->key ? 'font-semibold' : 'font-medium' }}">{{ \Illuminate\Support\Str::limit($u->label, 42) }}</span>
-                  @if($batch === (string) $u->key)<span class="text-[10px] px-1.5 py-0.5 rounded bg-ink text-paper shrink-0">{{ __('viewing') }}</span>@endif
-                </div>
+                  <span class="truncate">{{ \Illuminate\Support\Str::limit($u->label, 42) }}</span>
+                </a>
               </td>
               <td class="px-5 py-3 text-muted tnum whitespace-nowrap">{{ $u->last_at ? \Illuminate\Support\Carbon::parse($u->last_at)->format('Y-m-d') : '—' }}</td>
-              <td class="px-5 py-3 text-right tnum">{{ $u->total }}</td>
+              <td class="px-5 py-3 text-right tnum">{{ number_format($u->total) }}</td>
+              <td class="px-5 py-3 text-right tnum">
+                {{ number_format($u->memory) }}
+                @if($u->total > 0 && $u->memory > 0)<span class="text-faint text-xs">· {{ (int) round($u->memory / $u->total * 100) }}%</span>@endif
+              </td>
               <td class="px-5 py-3">
                 <div class="flex items-center gap-2.5">
                   <span class="w-24 h-2 rounded-full bg-line/40 overflow-hidden flex shrink-0 cursor-help"
@@ -72,20 +71,22 @@
                         data-hint-meta="{{ __(':done% of :total resolved.', ['done' => $u->done, 'total' => $u->total]) }}">
                     <span class="bg-ledger block h-full" style="width:{{ $wc }}%"></span>
                     <span class="bg-amber block h-full" style="width:{{ $wr }}%"></span>
-                    <span class="bg-amber/50 block h-full animate-pulse" style="width:{{ $ws }}%" title="{{ __('searching…') }}"></span>
+                    <span class="bg-amber/50 block h-full animate-pulse" style="width:{{ $ws }}%"></span>
                     <span class="bg-stamp block h-full" style="width:{{ $wk }}%"></span>
                   </span>
                   <span class="text-faint tnum text-xs whitespace-nowrap">{{ $u->done }}% {{ __('resolved') }}</span>
                 </div>
               </td>
             </tr>
-          @endforeach
+          @empty
+            <tr><td colspan="5" class="px-5 py-10 text-center text-muted">{{ __('No uploads yet. Classify some items first.') }}</td></tr>
+          @endforelse
         </tbody>
       </table>
     </div>
     @if($uploadPages > 1)
       <div class="flex items-center justify-between px-5 py-3 border-t hair">
-        <span class="text-xs text-faint tnum">{{ $uploadStart + 1 }}–{{ min($uploadStart + 5, $uploadTotal) }} {{ __('of') }} {{ $uploadTotal }}</span>
+        <span class="text-xs text-faint tnum">{{ $uploadStart + 1 }}–{{ min($uploadStart + $perPage, $uploadTotal) }} {{ __('of') }} {{ $uploadTotal }}</span>
         <div class="flex items-center gap-1 text-sm">
           <button wire:click="setUploadPage({{ max(1, $uploadPage - 1) }})"
                   class="px-2.5 py-1 rounded-lg border hair bg-surface {{ $uploadPage === 1 ? 'text-faint opacity-50 pointer-events-none' : 'hover:border-ink' }}">‹</button>
@@ -99,99 +100,4 @@
       </div>
     @endif
   </div>
-
-  {{-- Distribution report --}}
-  @php
-    $cs = $report['consensus']; $csTotal = max(1, $report['total']);
-    $gs = $report['good'] + $report['service'];
-  @endphp
-  @if($batchStats)
-    <div class="mb-5">
-      @include('livewire.partials.batch-stats', ['stats' => $batchStats])
-    </div>
-  @endif
-  <div x-data="{open:true}" class="card p-5 mb-5">
-    <button @click="open=!open" class="w-full flex items-center justify-end">
-      <span class="text-faint text-sm" x-text="open ? '▾ hide' : '▸ show'"></span>
-    </button>
-
-    <div x-show="open" class="mt-4 grid lg:grid-cols-2 gap-7">
-      {{-- Resolution donut --}}
-      <div class="flex items-center gap-4">
-        <div class="relative shrink-0" style="width:120px;height:120px">
-          <svg viewBox="0 0 120 120" width="120" height="120">
-            <circle cx="60" cy="60" r="{{ $report['donut']['r'] }}" fill="none" stroke="#ece6d9" stroke-width="12"/>
-            @foreach($report['donut']['segments'] as $s)
-              <circle cx="60" cy="60" r="{{ $report['donut']['r'] }}" fill="none"
-                      stroke="{{ $s['color'] }}" stroke-width="12" stroke-linecap="butt"
-                      stroke-dasharray="{{ $s['len'] }} {{ $s['gap'] }}"
-                      stroke-dashoffset="{{ $s['offset'] }}"
-                      transform="rotate(-90 60 60)"/>
-            @endforeach
-          </svg>
-          <div class="absolute inset-0 grid place-items-center text-center">
-            <div>
-              <div class="font-display text-2xl leading-none tnum">{{ number_format($report['total']) }}</div>
-              <div class="text-faint text-[11px]">{{ __('items') }}</div>
-            </div>
-          </div>
-        </div>
-        <div class="space-y-1.5 text-sm min-w-0 flex-1">
-          @forelse($report['donut']['segments'] as $s)
-            <button type="button" wire:click="setFilter('{{ $s['key'] }}')"
-                    class="w-full flex items-center gap-2 text-left rounded px-1 -mx-1 hover:bg-paper/60 transition {{ $filter === $s['key'] ? 'font-medium' : '' }}">
-              <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:{{ $s['color'] }}"></span>
-              <span class="truncate">{{ __($s['label']) }}</span>
-              <span class="text-faint tnum ml-auto whitespace-nowrap">{{ $s['count'] }} · {{ $s['pct'] }}%</span>
-            </button>
-          @empty
-            <p class="text-muted">{{ __('No items yet.') }}</p>
-          @endforelse
-        </div>
-      </div>
-
-      {{-- Good/service + consensus --}}
-      <div class="space-y-4">
-        <div>
-          <p class="kicker mb-2">{{ __('Good vs service') }}</p>
-          <div class="flex h-3 rounded-full overflow-hidden bg-line/40">
-            <div class="bg-ledger h-full" style="width:{{ $gs ? $report['good']/$gs*100 : 0 }}%"></div>
-            <div class="bg-amber h-full" style="width:{{ $gs ? $report['service']/$gs*100 : 0 }}%"></div>
-          </div>
-          <div class="flex justify-between text-sm mt-1.5">
-            <span class="text-ledger">● {{ __('Goods') }} <span class="tnum">{{ $report['good'] }}</span></span>
-            <span class="text-amber"><span class="tnum">{{ $report['service'] }}</span> {{ __('Services') }} ●</span>
-          </div>
-        </div>
-        <div>
-          <p class="kicker mb-2">{{ __('Mechanism consensus') }}</p>
-          <div class="space-y-1.5">
-            @foreach([[__('Found'),$cs['found'] ?? 0,'bg-ledger'],[__('Review'),$cs['review'],'bg-amber'],[__('Conflict'),$cs['conflict'],'bg-stamp']] as [$lbl,$val,$bar])
-              <div class="flex items-center gap-2 text-sm">
-                <span class="w-28 shrink-0 text-muted">{{ $lbl }}</span>
-                <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="{{ $bar }} block h-full" style="width:{{ $val/$csTotal*100 }}%"></span></span>
-                <span class="tnum text-faint w-8 text-right">{{ $val }}</span>
-              </div>
-            @endforeach
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="flex flex-wrap gap-2 mb-3">
-    @foreach($tabs as $key => $label)
-      <button wire:click="setFilter('{{ $key }}')"
-              class="px-3 py-1.5 rounded-lg text-sm border hair transition {{ $filter === $key ? 'bg-ink text-paper border-ink' : 'bg-surface hover:border-ink' }}">
-        {{ $label }}
-        <span class="opacity-60">{{ $tabCount($key) }}</span>
-      </button>
-    @endforeach
-  </div>
-
-  {{-- Results table (shared with the Classify page). Confirm/reject moved to the
-       decision page — the item name links there. --}}
-  @include('livewire.partials.results-table', ['rows' => $items, 'headingNames' => $headingNames])
-
-  <div class="mt-5">{{ $items->onEachSide(1)->links() }}</div>
 </section>

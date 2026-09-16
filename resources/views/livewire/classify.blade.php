@@ -4,17 +4,6 @@
       <p class="kicker mb-1.5">{{ __('XİF MN · goods & services') }}</p>
       <h1 class="font-display text-4xl">{{ __('Classify') }}</h1>
     </div>
-    <div class="flex items-center gap-2">
-      @if($memoryResetCount !== null)
-        <p class="text-muted text-sm">{{ __(':n rows removed.', ['n' => number_format($memoryResetCount)]) }}</p>
-      @endif
-      <button wire:click="resetMemory" wire:loading.attr="disabled" wire:target="resetMemory"
-              @disabled($resettableCacheCount === 0)
-              wire:confirm="{{ __('Delete :n cached answers and reset memory to only the :source baseline? This cannot be undone.', ['n' => number_format($resettableCacheCount), 'source' => $baselineSource]) }}"
-              class="btn btn-ghost btn-sm text-stamp" title="{{ __('Deletes every production cache row except :source (test data is never touched).', ['source' => $baselineSource]) }}">
-        {{ __('Reset memory') }}
-      </button>
-    </div>
   </div>
 
   <div class="card p-6">
@@ -73,7 +62,7 @@
           @endif
         </div>
         <div class="flex gap-2">
-          <a href="{{ route('review', ['batch' => $queued['batch'], 'filter' => 'all']) }}" class="btn btn-ghost btn-sm">{{ __('Open in review →') }}</a>
+          <a href="{{ route('review.batch', ['batch' => $queued['batch'], 'filter' => 'all']) }}" class="btn btn-ghost btn-sm">{{ __('Open in review →') }}</a>
           <button wire:click="startOver" class="btn btn-ink btn-sm">{{ __('Classify more') }}</button>
         </div>
       </div>
@@ -87,7 +76,7 @@
 
       @if($progress['rows']->isNotEmpty())
         <div class="mt-4">
-          @include('livewire.partials.results-table', ['rows' => $progress['rows'], 'headingNames' => $headingNames])
+          @include('livewire.partials.results-table', ['rows' => $progress['rows'], 'headingNames' => $headingNames, 'from' => 'classify'])
         </div>
         @if($progress['done'] > $progress['rows']->count())
           <p class="text-faint text-xs mt-2">{{ __('Showing the latest :shown of :total.', ['shown' => $progress['rows']->count(), 'total' => number_format($progress['done'])]) }}</p>

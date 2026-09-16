@@ -42,6 +42,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/review', ReviewQueue::class)->name('review');
     Route::get('/review/export', ReviewExportController::class)->name('review.export');
     Route::get('/review/decision/{item}', ClassificationDecision::class)->name('review.decision');
+    // One run's report + item table. Declared AFTER the static /review/* routes above so
+    // they win; {batch} accepts a UUID, a non-UUID seed key ("gold-ivan"), or "all".
+    Route::get('/review/{batch}', ReviewQueue::class)->name('review.batch');
     Route::get('/benchmark', Benchmark::class)->name('benchmark');
     Route::get('/catalog', Catalog::class)->name('catalog');
 

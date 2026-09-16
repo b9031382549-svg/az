@@ -50,7 +50,7 @@
           @php $src = $sourceOf($r); @endphp
           <tr wire:key="row-{{ $r->id }}" class="border-b hair last:border-0 align-top">
             <td class="px-4 py-3 max-w-[260px]">
-              <a href="{{ route('review.decision', $r->id) }}" target="_blank"
+              <a href="{{ route('review.decision', ['item' => $r->id] + (($from ?? null) ? ['from' => $from] : [])) }}" target="_blank"
                  class="text-ink hover:text-stamp underline decoration-dotted decoration-faint underline-offset-2 break-words">{{ $r->localizedSourceText() }}</a>
             </td>
             <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($r->kind) }}">{{ $r->kind ?? '—' }}</span></td>

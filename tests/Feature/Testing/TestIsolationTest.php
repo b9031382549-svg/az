@@ -47,7 +47,8 @@ class TestIsolationTest extends TestCase
         $run = $this->makeRun();
         $this->makeItem($run, 'conflict', 'testwidget');
 
-        Livewire::test(ReviewQueue::class)
+        // The run detail ('all' aggregates every upload) lists items; test rows must not leak.
+        Livewire::test(ReviewQueue::class, ['batch' => 'all'])
             ->set('filter', 'open')
             ->assertSee('prodwidget')
             ->assertDontSee('testwidget');
