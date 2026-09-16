@@ -90,6 +90,17 @@ class HumanReviewTest extends TestCase
         $this->assertSame($b->id, $c->get('selected'));
     }
 
+    public function test_confirming_an_invalid_code_surfaces_an_error_and_changes_nothing(): void
+    {
+        $item = $this->open('no_match', 'mystery item');
+
+        $this->acting()->call('selectItem', $item->id)
+            ->call('confirm', '9999')          // not 99, not an active catalog position
+            ->assertHasErrors('confirm');
+
+        $this->assertSame('no_match', $item->fresh()->resolution);
+    }
+
     public function test_reject_marks_the_item_rejected(): void
     {
         $item = $this->open('conflict', 'nope');

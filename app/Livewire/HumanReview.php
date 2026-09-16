@@ -46,6 +46,7 @@ class HumanReview extends Component
     {
         $this->selected = $id;
         $this->manualCode = '';
+        $this->resetErrorBag('confirm');
     }
 
     public function confirm(string $code): void
@@ -58,7 +59,13 @@ class HumanReview extends Component
         if ($this->applyConfirm($item, $code)) {
             $this->selected = $next ?? $this->queueQuery()->value('id');
             $this->manualCode = '';
+
+            return;
         }
+
+        // applyConfirm rejects a code that is neither "99" nor an active catalog position —
+        // tell the reviewer instead of silently doing nothing.
+        $this->addError('confirm', __('That code can\'t be confirmed — it isn\'t an active 4-digit heading (or 99 for a service).'));
     }
 
     public function confirmManual(): void
