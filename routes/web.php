@@ -11,6 +11,7 @@ use App\Livewire\Catalog;
 use App\Livewire\ClassificationDecision;
 use App\Livewire\Classify;
 use App\Livewire\GpuServers;
+use App\Livewire\HumanReview;
 use App\Livewire\Invoices;
 use App\Livewire\Logs;
 use App\Livewire\ReviewQueue;
@@ -45,6 +46,7 @@ Route::middleware('auth')->group(function () {
     // One run's report + item table. Declared AFTER the static /review/* routes above so
     // they win; {batch} accepts a UUID, a non-UUID seed key ("gold-ivan"), or "all".
     Route::get('/review/{batch}', ReviewQueue::class)->name('review.batch');
+    Route::get('/human-review', HumanReview::class)->name('human-review');
     Route::get('/benchmark', Benchmark::class)->name('benchmark');
     Route::get('/catalog', Catalog::class)->name('catalog');
 

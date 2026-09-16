@@ -96,7 +96,8 @@
     </div>
   </div>
 
-  <div class="flex flex-wrap gap-2 mb-3">
+  @php $needsHuman = (int) ($counts['conflict'] ?? 0) + (int) ($counts['no_match'] ?? 0) + (int) ($counts['blocked_on_fact'] ?? 0); @endphp
+  <div class="flex flex-wrap items-center gap-2 mb-3">
     @foreach($tabs as $key => $label)
       <button wire:click="setFilter('{{ $key }}')"
               class="px-3 py-1.5 rounded-lg text-sm border hair transition {{ $filter === $key ? 'bg-ink text-paper border-ink' : 'bg-surface hover:border-ink' }}">
@@ -104,6 +105,10 @@
         <span class="opacity-60">{{ $tabCount($key) }}</span>
       </button>
     @endforeach
+    @if($needsHuman > 0)
+      <a href="{{ route('human-review', $batch !== 'all' ? ['batch' => $batch] : []) }}" wire:navigate
+         class="ml-auto text-sm text-stamp hover:underline">{{ __('Needs attention') }} ({{ $needsHuman }}) →</a>
+    @endif
   </div>
 
   {{-- Results table (shared with the Classify page). Confirm/reject moved to the

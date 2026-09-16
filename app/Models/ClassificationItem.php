@@ -185,6 +185,25 @@ class ClassificationItem extends Model
     }
 
     /**
+     * Items that genuinely need a HUMAN to decide — the Human review queue. A distinct set
+     * from the Review-queue "open" bucket: no code produced (no_match), a fact the descent
+     * needed but the line didn't carry (blocked_on_fact), or a divergence the web search
+     * couldn't settle (a TERMINAL conflict — in-flight 'resolving' conflicts are excluded,
+     * the machine is still working on those). Production only (never test-run rows).
+     *
+     * @param  Builder<ClassificationItem>  $query
+     * @return Builder<ClassificationItem>
+     */
+    public function scopeHumanQueue(Builder $query): Builder
+    {
+        return $query->whereNull('test_run_id')
+            ->where(function (Builder $w) {
+                $w->whereIn('resolution', ['no_match', 'blocked_on_fact'])
+                    ->orWhere(fn (Builder $c) => $c->where('resolution', 'conflict')->whereNot(fn (Builder $r) => $r->resolving()));
+            });
+    }
+
+    /**
      * The resolution to SHOW: 'resolving' while the web-search resolver is still in flight
      * (see isResolving), otherwise the stored resolution. Display-only — the DB row keeps
      * 'conflict' as the resolver's work-ticket (dispatch trigger, single-fire claim, reaper).
