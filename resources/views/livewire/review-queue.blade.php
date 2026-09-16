@@ -28,7 +28,7 @@
             <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Upload') }}</th>
             <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Date') }}</th>
             <th class="kicker font-medium text-right px-5 py-2.5">{{ __('Items') }}</th>
-            <th class="kicker font-medium text-left px-5 py-2.5">{{ __('Result') }}</th>
+            <th class="kicker font-medium text-left px-5 py-2.5"><span class="hint-head" data-hint="column:result">{{ __('Result') }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -66,7 +66,10 @@
               <td class="px-5 py-3 text-right tnum">{{ $u->total }}</td>
               <td class="px-5 py-3">
                 <div class="flex items-center gap-2.5">
-                  <span class="w-24 h-2 rounded-full bg-line/40 overflow-hidden flex shrink-0">
+                  <span class="w-24 h-2 rounded-full bg-line/40 overflow-hidden flex shrink-0 cursor-help"
+                        data-hint-title="{{ __('Result') }}"
+                        data-hint-body="{{ __(':resolved resolved · :searching searching · :review needs attention · :conflict conflict', ['resolved' => $u->resolved, 'searching' => $u->resolving ?? 0, 'review' => $u->review, 'conflict' => $u->conflict]) }}"
+                        data-hint-meta="{{ __(':done% of :total resolved.', ['done' => $u->done, 'total' => $u->total]) }}">
                     <span class="bg-ledger block h-full" style="width:{{ $wc }}%"></span>
                     <span class="bg-amber block h-full" style="width:{{ $wr }}%"></span>
                     <span class="bg-amber/50 block h-full animate-pulse" style="width:{{ $ws }}%" title="{{ __('searching…') }}"></span>
@@ -99,19 +102,8 @@
 
   {{-- Distribution report --}}
   @php
-    $chName = [
-      '03'=>'Fish','04'=>'Dairy','07'=>'Vegetables','08'=>'Fruit','09'=>'Coffee/tea','11'=>'Milling',
-      '15'=>'Fats/oils','16'=>'Meat/fish prep','17'=>'Sugar/sweets','18'=>'Cocoa','19'=>'Bakery',
-      '20'=>'Veg/fruit prep','21'=>'Food prep','22'=>'Beverages','25'=>'Salt/stone','28'=>'Inorg. chem',
-      '30'=>'Pharma','32'=>'Dyes/paint','33'=>'Cosmetics','34'=>'Soap/cleaning','38'=>'Chemicals',
-      '39'=>'Plastics','40'=>'Rubber','42'=>'Leather goods','48'=>'Paper','49'=>'Printed','61'=>'Knit apparel',
-      '62'=>'Apparel','63'=>'Textiles','64'=>'Footwear','69'=>'Ceramics','70'=>'Glass','73'=>'Steel articles',
-      '76'=>'Aluminium','82'=>'Tools','84'=>'Machinery','85'=>'Electrical','90'=>'Medical/optical',
-      '94'=>'Furniture/lamps','95'=>'Toys','96'=>'Misc. mfg','99'=>'Services',
-    ];
     $cs = $report['consensus']; $csTotal = max(1, $report['total']);
     $gs = $report['good'] + $report['service'];
-    $maxCh = max(1, optional($report['chapters']->first())->c ?? 1);
   @endphp
   @if($batchStats)
     <div class="mb-5">
@@ -123,7 +115,7 @@
       <span class="text-faint text-sm" x-text="open ? '▾ hide' : '▸ show'"></span>
     </button>
 
-    <div x-show="open" class="mt-4 grid lg:grid-cols-3 gap-7">
+    <div x-show="open" class="mt-4 grid lg:grid-cols-2 gap-7">
       {{-- Resolution donut --}}
       <div class="flex items-center gap-4">
         <div class="relative shrink-0" style="width:120px;height:120px">
@@ -183,20 +175,6 @@
             @endforeach
           </div>
         </div>
-      </div>
-
-      {{-- Top HS chapters --}}
-      <div>
-        <p class="kicker mb-2">{{ __('Top categories (HS chapter)') }}</p>
-        @forelse($report['chapters'] as $ch)
-          <div class="flex items-center gap-2 text-sm mb-1.5">
-            <span class="w-28 shrink-0 truncate">{{ $chName[$ch->chapter] ?? ('Ch '.$ch->chapter) }}</span>
-            <span class="flex-1 h-2 rounded-full bg-line/40 overflow-hidden"><span class="bg-ink/70 block h-full" style="width:{{ $ch->c/$maxCh*100 }}%"></span></span>
-            <span class="tnum text-faint w-8 text-right">{{ $ch->c }}</span>
-          </div>
-        @empty
-          <p class="text-muted text-sm">{{ __('No classified codes yet.') }}</p>
-        @endforelse
       </div>
     </div>
   </div>

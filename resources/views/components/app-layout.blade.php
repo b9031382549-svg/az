@@ -22,12 +22,13 @@
       <span class="font-display text-lg tracking-tight">Invoice<span class="text-stamp">·</span>Intel</span>
     </div>
     <nav class="flex-1 py-4">
+      <div class="px-5 pt-1 pb-1.5"><p class="kicker">{{ __('Invoices Chat') }}</p></div>
       <a href="{{ route('overview') }}" class="{{ $nav('overview') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="6" height="6" rx="1.2"/><rect x="11.5" y="2.5" width="6" height="6" rx="1.2"/><rect x="2.5" y="11.5" width="6" height="6" rx="1.2"/><rect x="11.5" y="11.5" width="6" height="6" rx="1.2"/></svg>{{ __('Overview') }}</a>
-      <a href="{{ route('invoices') }}" class="{{ $nav('invoices') }}">
-        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><path d="M5 2.5h7l3 3v12H5z" stroke-linejoin="round"/><path d="M12 2.5v3.5h3M7.5 9.5h5M7.5 12.5h5"/></svg>{{ __('Invoices') }}</a>
       <a href="{{ route('upload') }}" class="{{ $nav('upload') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M3.5 13.5v2a1 1 0 001 1h11a1 1 0 001-1v-2"/></svg>{{ __('Upload') }}</a>
+      <a href="{{ route('invoices') }}" class="{{ $nav('invoices') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><path d="M5 2.5h7l3 3v12H5z" stroke-linejoin="round"/><path d="M12 2.5v3.5h3M7.5 9.5h5M7.5 12.5h5"/></svg>{{ __('Invoices') }}</a>
       <a href="{{ route('ask') }}" class="{{ $nav('ask') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linejoin="round"><path d="M3 4.5h14v9H8l-4 3v-3H3z"/></svg>{{ __('AI Chat') }}</a>
 
@@ -36,16 +37,17 @@
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l4 4 10-10"/><path d="M3 16h7"/></svg>{{ __('Classify') }}</a>
       <a href="{{ route('review') }}" class="{{ $nav('review') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.5 2"/></svg>{{ __('Review queue') }}</a>
+      <a href="{{ route('catalog') }}" class="{{ $nav('catalog') }}">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17"/></svg>{{ __('Catalog (memory)') }}</a>
+
+      <div class="px-5 pt-4 pb-1.5"><p class="kicker">{{ __('Testing') }}</p></div>
       {{-- Benchmark hidden from the menu (route still exists, just not linked). --}}
       <a href="{{ route('testing') }}" class="{{ $nav('testing*') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v5L4 15a1.5 1.5 0 001.3 2.3h9.4A1.5 1.5 0 0016 15l-4-7.5v-5"/><path d="M6.5 2.5h7M7 12h6"/></svg>{{ __('Testing') }}</a>
-      <a href="{{ route('catalog') }}" class="{{ $nav('catalog') }}">
-        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17"/></svg>{{ __('Catalog') }}</a>
       <a href="{{ route('gpu-servers') }}" class="{{ $nav('gpu-servers*') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="15" height="5" rx="1.2"/><rect x="2.5" y="11" width="15" height="5" rx="1.2"/><path d="M5 6.5h.01M5 13.5h.01"/></svg>{{ __('GPU servers') }}</a>
 
-      <div class="mx-5 my-3 border-t hair"></div>
-      <a href="{{ route('settings') }}" class="{{ $nav('settings') }}">
+      <a href="{{ route('settings') }}" class="{{ $nav('settings') }} mt-2">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.5v2M10 16.5v2M3.5 3.5l1.4 1.4M15.1 15.1l1.4 1.4M1.5 10h2M16.5 10h2M3.5 16.5l1.4-1.4M15.1 4.9l1.4-1.4"/></svg>{{ __('Settings') }}</a>
     </nav>
     <div class="p-4 border-t hair">
@@ -96,6 +98,7 @@
     <livewire:report-problem />
   </div>
 </div>
+@include('partials.hints')
 @livewireScripts
 </body>
 </html>

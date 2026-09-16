@@ -8,7 +8,6 @@ use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\ItemTranslation;
-use App\Models\LlmUsage;
 use App\Models\RubricatorNode;
 use App\Services\Classify\AnswerCacheService;
 use App\Services\Classify\BatchStats;
@@ -290,16 +289,6 @@ class Classify extends Component
             'baselineSource' => $baselineSource,
             // How many production memory rows a "Reset memory" click would remove right now.
             'resettableCacheCount' => AnswerCache::where('test_dataset_id', 0)->where('source', '!=', $baselineSource)->count(),
-            'stats' => [
-                // Global counts exclude dataset test rows (test_run_id set) — those live
-                // only in the Testing tab, never in the production classifier stats.
-                'total' => ClassificationItem::whereNull('test_run_id')->count(),
-                // "Found" = the classifier produced an answer: consensus/cache (agreed) +
-                // the web-search resolver (ai_resolved).
-                'auto' => ClassificationItem::whereNull('test_run_id')->whereIn('resolution', ['agreed', 'ai_resolved'])->count(),
-                'review' => ClassificationItem::whereNull('test_run_id')->whereIn('resolution', ['conflict', 'blocked_on_fact'])->count(),
-                'tokensAll' => (int) LlmUsage::sum('total_tokens'),
-            ],
         ]);
     }
 }

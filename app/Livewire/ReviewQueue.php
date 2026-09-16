@@ -297,7 +297,7 @@ class ReviewQueue extends Component
 
     /**
      * Distribution report for the current scope: resolution donut, good/service
-     * split, consensus breakdown and the top HS chapters.
+     * split and consensus breakdown.
      *
      * @param  callable():Builder  $scoped
      * @param  Collection<string, int>  $counts
@@ -332,14 +332,6 @@ class ReviewQueue extends Component
 
         $kind = $scoped()->selectRaw('kind, count(*) as c')->groupBy('kind')->pluck('c', 'kind');
 
-        $chapters = $scoped()
-            ->whereNotNull('final_code')
-            ->selectRaw('substr(final_code, 1, 2) as chapter, count(*) as c')
-            ->groupBy('chapter')
-            ->orderByDesc('c')
-            ->limit(8)
-            ->get();
-
         return [
             'total' => $total,
             'donut' => ['r' => $r, 'circ' => $circ, 'segments' => $segments],
@@ -353,7 +345,6 @@ class ReviewQueue extends Component
                 'review' => (int) ($counts['review'] ?? 0),
                 'conflict' => (int) ($counts['conflict'] ?? 0),
             ],
-            'chapters' => $chapters,
         ];
     }
 }

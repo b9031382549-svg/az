@@ -17,12 +17,6 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    @foreach([[__('Classified'),$stats['total']],[__('Found'),$stats['auto']],[__('Needs attention'),$stats['review']],[__('Tokens used'),number_format($stats['tokensAll'],0,'.',' ')]] as [$l,$v])
-      <div class="card-flat p-4"><p class="kicker mb-1.5">{{ $l }}</p><p class="font-display text-2xl tnum">{{ $v }}</p></div>
-    @endforeach
-  </div>
-
   <div class="card p-6">
     <label class="field-label">{{ __('Items — one per line (max :n)', ['n' => number_format($manualLimit)]) }}</label>
     <textarea wire:model="input" rows="4" placeholder="{{ __('e.g. Şpris 5ml 23G rezin porşenli') }}"
