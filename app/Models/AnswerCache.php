@@ -21,6 +21,8 @@ class AnswerCache extends Model
         return [
             'is_service' => 'boolean',
             'meta' => 'array',
+            'hits' => 'integer',
+            'last_hit_at' => 'datetime',
         ];
     }
 

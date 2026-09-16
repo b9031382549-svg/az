@@ -7,6 +7,7 @@ use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
 use App\Models\TestRun;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -83,6 +84,15 @@ class AnswerCacheService
 
         // A cache hit is answered the instant it resolves — no mechanism pipeline runs.
         ClassificationItem::markAnswered($item->id);
+
+        // Count the hit on the production memory row (atomic — jobs run in parallel under
+        // Horizon). Test-dataset lookups never touch the production counter.
+        if (($datasetId ?? 0) === 0) {
+            AnswerCache::whereKey($hit->id)->update([
+                'hits' => DB::raw('hits + 1'),
+                'last_hit_at' => now(),
+            ]);
+        }
 
         return true;
     }

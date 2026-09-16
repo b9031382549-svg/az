@@ -14,6 +14,7 @@ use App\Livewire\GpuServers;
 use App\Livewire\HumanReview;
 use App\Livewire\Invoices;
 use App\Livewire\Logs;
+use App\Livewire\MemoryItem;
 use App\Livewire\ReviewQueue;
 use App\Livewire\Testing;
 use App\Livewire\TestingCompare;
@@ -49,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/human-review', HumanReview::class)->name('human-review');
     Route::get('/benchmark', Benchmark::class)->name('benchmark');
     Route::get('/catalog', Catalog::class)->name('catalog');
+    Route::get('/catalog/{cache}', MemoryItem::class)->name('catalog.item');
 
     // Testing — dataset-based accuracy measurement + before/after comparison
     Route::get('/testing', Testing::class)->name('testing');
