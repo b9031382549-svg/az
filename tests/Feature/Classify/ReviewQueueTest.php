@@ -193,6 +193,14 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $this->detailComponent('up-beta')->viewData('items')->total());
     }
 
+    public function test_perpage_is_clamped_to_the_allowed_set(): void
+    {
+        ClassificationItem::create(['batch' => 'up-a', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+
+        // A crafted ?perPage=0 must not divide-by-zero the list; it clamps back to 10.
+        $this->actingComponent()->set('perPage', 0)->assertOk()->assertSet('perPage', 10);
+    }
+
     public function test_all_uploads_row_sums_every_upload(): void
     {
         ClassificationItem::create(['batch' => 'up-a', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471', 'memory_promoted_at' => now()]);
