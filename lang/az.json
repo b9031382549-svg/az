@@ -251,6 +251,7 @@
     "No items are waiting for a human right now.": "Hazırda insanı gözləyən mövqe yoxdur.",
     "Nothing waiting. The queue is clear. 🎉": "Gözləyən yoxdur. Növbə boşdur. 🎉",
     "Reject this item? It keeps no final code.": "Bu mövqe rədd edilsin? Yekun kod saxlanmayacaq.",
+    "That code can't be confirmed — it isn't an active 4-digit heading (or 99 for a service).": "Bu kod təsdiqlənə bilməz — aktiv 4 rəqəmli başlıq (və ya xidmət üçün 99) deyil.",
     "Mechanisms diverged": "Mexanizmlər ziddiyyət təşkil etdi",
     "No code proposed": "Kod təklif edilmədi",
     "Missing a fact": "Fakt çatışmır",

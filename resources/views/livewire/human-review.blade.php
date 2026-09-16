@@ -136,6 +136,7 @@
                     class="btn btn-ghost btn-sm text-stamp">{{ __('Reject') }}</button>
           </div>
         </div>
+        @error('confirm') <p class="text-sm text-stamp mt-2">{{ $message }}</p> @enderror
 
         <div class="mt-4 pt-4 border-t hair">
           <a href="{{ route('review.decision', ['item' => $item->id, 'from' => 'human']) }}" target="_blank"
