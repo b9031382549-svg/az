@@ -166,6 +166,12 @@ class ReviewQueue extends Component
     /** The list of uploads — /review. */
     private function renderList()
     {
+        // perPage is a public #[Url] int — a crafted ?perPage=0 would divide by zero below,
+        // and any other value bypasses the 10/25/50 selector. Clamp to the allowed set.
+        if (! in_array($this->perPage, [10, 25, 50], true)) {
+            $this->perPage = 10;
+        }
+
         $allUploads = $this->batchOptions();
         $uploadTotal = $allUploads->count();
         $uploadPages = max(1, (int) ceil($uploadTotal / $this->perPage));
