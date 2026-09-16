@@ -69,6 +69,20 @@ class CatalogMemoryTest extends TestCase
         $this->assertTrue(collect($c->viewData('leavesByPosition')['1104'])->contains(fn ($l) => $l->id === $leaf->id));
     }
 
+    public function test_a_service_with_a_heading_is_not_double_counted_in_a_chapter(): void
+    {
+        $this->seedRubricator();
+        $this->memory('Oat flakes 1kg', '1104');                       // a good in chapter 11
+        AnswerCache::create([                                          // a service that kept a heading
+            'test_dataset_id' => 0, 'source' => 'confirmed', 'name' => 'Milling service',
+            'name_key' => AnswerCache::keyFor('Milling service'), 'heading' => '1104', 'is_service' => true,
+        ]);
+
+        $c = Livewire::actingAs(User::factory()->create())->test(Catalog::class);
+        $ch11 = $c->viewData('chapters')->firstWhere('code', '11');
+        $this->assertSame(1, $ch11->count);   // only the good — the service is not double-counted
+    }
+
     public function test_search_returns_matching_memory_entries(): void
     {
         $this->memory('Zeytun yağı 1L', '1509');

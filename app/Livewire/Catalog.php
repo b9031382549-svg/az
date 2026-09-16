@@ -68,8 +68,10 @@ class Catalog extends Component
             return view('livewire.catalog', ['search' => $results, 'term' => $term]);
         }
 
-        // Chapter counts: memory entries grouped by the heading's first two digits.
-        $byChapter = $scope()->whereNotNull('heading')
+        // Chapter counts: GOODS memory entries grouped by the heading's first two digits.
+        // Services are counted separately (and shown in their own root), so a service that
+        // happens to carry a heading is never double-counted here.
+        $byChapter = $scope()->where('is_service', false)->whereNotNull('heading')
             ->selectRaw('substr(heading, 1, 2) as ch, count(*) as c')
             ->groupBy('ch')->pluck('c', 'ch');
         $serviceCount = (int) $scope()->where('is_service', true)->count();
@@ -88,7 +90,7 @@ class Catalog extends Component
 
         // Positions (4-digit) for the expanded chapters, with per-position counts.
         $goodsOpen = array_values(array_filter($this->openChapters, fn ($c) => $c !== self::SERVICES));
-        $posCounts = empty($goodsOpen) ? collect() : $scope()->whereNotNull('heading')
+        $posCounts = empty($goodsOpen) ? collect() : $scope()->where('is_service', false)->whereNotNull('heading')
             ->whereIn(DB::raw('substr(heading, 1, 2)'), $goodsOpen)
             ->selectRaw('heading, count(*) as c')->groupBy('heading')->pluck('c', 'heading');
         $positionsByChapter = collect($goodsOpen)->mapWithKeys(function ($ch) use ($posCounts) {
@@ -103,13 +105,22 @@ class Catalog extends Component
             ])->sortBy('code')->values()];
         });
 
-        // Leaves (the actual answers) for the expanded positions + services if expanded.
+        // Leaves (the actual answers) for the expanded GOODS positions.
         $leavesByPosition = empty($this->openPositions) ? collect() : $scope()
+            ->where('is_service', false)
             ->whereIn('heading', $this->openPositions)
             ->orderBy('name')->get(['id', 'name', 'heading'])->groupBy('heading');
-        $serviceLeaves = in_array(self::SERVICES, $this->openChapters, true)
-            ? $scope()->where('is_service', true)->orderBy('name')->limit(500)->get(['id', 'name', 'heading'])
-            : collect();
+
+        // Services leaves — capped, but surface the cap rather than silently truncating.
+        $serviceCap = 500;
+        $serviceLeaves = collect();
+        $serviceTruncated = false;
+        if (in_array(self::SERVICES, $this->openChapters, true)) {
+            $serviceLeaves = $scope()->where('is_service', true)->orderBy('name')
+                ->limit($serviceCap + 1)->get(['id', 'name', 'heading']);
+            $serviceTruncated = $serviceLeaves->count() > $serviceCap;
+            $serviceLeaves = $serviceLeaves->take($serviceCap);
+        }
 
         return view('livewire.catalog', [
             'search' => null,
@@ -117,6 +128,8 @@ class Catalog extends Component
             'positionsByChapter' => $positionsByChapter,
             'leavesByPosition' => $leavesByPosition,
             'serviceLeaves' => $serviceLeaves,
+            'serviceTruncated' => $serviceTruncated,
+            'serviceCap' => $serviceCap,
             'servicesCode' => self::SERVICES,
             'total' => (int) $scope()->count(),
         ]);

@@ -74,6 +74,9 @@
                     <span class="font-mono text-xs text-faint">99</span>
                   </a>
                 @endforeach
+                @if($serviceTruncated)
+                  <p class="pl-14 pr-5 py-2 text-faint text-xs">{{ __('Showing the first :n — refine with search.', ['n' => $serviceCap]) }}</p>
+                @endif
               @else
                 @foreach(($positionsByChapter[$ch->code] ?? []) as $pos)
                   @php $posOpen = in_array($pos->code, $openPositions, true); @endphp
