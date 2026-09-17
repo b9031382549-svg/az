@@ -2,7 +2,9 @@
 
 namespace App\Livewire;
 
+use App\Models\AnswerCache;
 use App\Models\TestDataset;
+use App\Services\Classify\AnswerCacheService;
 use App\Services\Testing\DatasetImporter;
 use App\Support\Audit;
 use Livewire\Attributes\Layout;
@@ -30,6 +32,20 @@ class Testing extends Component
     public bool $useMemory = false;
 
     public bool $useSearch = true;
+
+    /** Rows removed by the last "Reset memory" click (null until used). */
+    public ?int $memoryResetCount = null;
+
+    /**
+     * Reset the production answer_cache (scope 0) back to just the baseline reference —
+     * everything added since (fedor / auto-promoted / confirmed / ...) is deleted. Never
+     * touches test-dataset memory (see AnswerCacheService::resetToBaseline()).
+     */
+    public function resetMemory(AnswerCacheService $cache): void
+    {
+        $this->memoryResetCount = $cache->resetToBaseline();
+        Audit::log('classify.memory_reset', ['deleted' => $this->memoryResetCount]);
+    }
 
     public function createDataset(DatasetImporter $importer): void
     {
@@ -87,8 +103,13 @@ class Testing extends Component
 
     public function render()
     {
+        $baselineSource = (string) config('classify.cache.baseline_source', 'gold');
+
         return view('livewire.testing', [
             'datasets' => TestDataset::withCount(['rows', 'runs'])->latest()->get(),
+            'baselineSource' => $baselineSource,
+            // How many production memory rows a "Reset memory" click would remove right now.
+            'resettableCacheCount' => AnswerCache::where('test_dataset_id', 0)->where('source', '!=', $baselineSource)->count(),
         ]);
     }
 }

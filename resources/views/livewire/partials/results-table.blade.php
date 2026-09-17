@@ -42,7 +42,7 @@
           <th class="font-medium px-4 py-3">{{ __('Code') }}</th>
           <th class="font-medium px-4 py-3">{{ __('Matched name') }}</th>
           <th class="font-medium px-4 py-3">{{ __('Found by') }}</th>
-          <th class="font-medium px-4 py-3">{{ __('Status') }}</th>
+          <th class="font-medium px-4 py-3"><span class="hint-head" data-hint="column:status">{{ __('Status') }}</span></th>
         </tr>
       </thead>
       <tbody>
@@ -50,12 +50,19 @@
           @php $src = $sourceOf($r); @endphp
           <tr wire:key="row-{{ $r->id }}" class="border-b hair last:border-0 align-top">
             <td class="px-4 py-3 max-w-[260px]">
-              <a href="{{ route('review.decision', $r->id) }}" target="_blank"
+              <a href="{{ route('review.decision', ['item' => $r->id] + (($from ?? null) ? ['from' => $from] : [])) }}" target="_blank"
                  class="text-ink hover:text-stamp underline decoration-dotted decoration-faint underline-offset-2 break-words">{{ $r->localizedSourceText() }}</a>
             </td>
             <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $kindBadge($r->kind) }}">{{ $r->kind ?? '—' }}</span></td>
             <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $r->final_code ?? '—' }}</td>
-            <td class="px-4 py-3 text-muted max-w-[300px]">{{ \Illuminate\Support\Str::limit($codeName($r), 80) ?: '—' }}</td>
+            <td class="px-4 py-3 text-muted max-w-[300px]">
+              @php $cn = $codeName($r); @endphp
+              @if($cn)
+                <span class="hint-head" data-hint-title="{{ $r->final_code }}" data-hint-body="{{ $cn }}" data-hint-meta="{{ __('Full rubricator title for this heading.') }}">{{ \Illuminate\Support\Str::limit($cn, 58) }}</span>
+              @else
+                —
+              @endif
+            </td>
             <td class="px-4 py-3 whitespace-nowrap">
               @if($src)
                 <span class="text-ledger">✓</span> <span class="text-muted">{{ __($src) }}</span>
@@ -63,8 +70,13 @@
                 <span class="text-faint">—</span>
               @endif
             </td>
-            @php $ds = $r->displayResolution(); @endphp
-            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($ds) }}">{{ $statusLabel($ds) }}</span></td>
+            @php
+              $ds = $r->displayResolution();
+              // Cache hits share the 'agreed' resolution but took a different path — give
+              // them their own hint so "no AI calls, no tokens" is explained.
+              $hintKey = ($ds === 'agreed' && $src === 'memory') ? 'agreed:cache' : $ds;
+            @endphp
+            <td class="px-4 py-3"><span class="hint-head px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $statusBadge($ds) }}" data-hint="{{ $hintKey }}">{{ $statusLabel($ds) }}</span></td>
           </tr>
         @empty
           <tr><td colspan="6" class="px-4 py-10 text-center text-muted">{{ __('Nothing here. Classify some items first.') }}</td></tr>

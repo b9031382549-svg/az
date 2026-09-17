@@ -5,6 +5,7 @@ namespace Tests\Feature\Classify;
 use App\Jobs\ClassifyMechanismJob;
 use App\Jobs\TranslateItemJob;
 use App\Livewire\Classify;
+use App\Livewire\Testing;
 use App\Models\AnswerCache;
 use App\Models\ClassificationItem;
 use App\Models\TestDataset;
@@ -71,8 +72,9 @@ class ClassifyDispatchTest extends TestCase
         $dataset = TestDataset::create(['name' => 'ds', 'mechanisms' => ['enabled' => ['vector']]]);
         AnswerCache::create(['test_dataset_id' => $dataset->id, 'source' => 'dataset-labels', 'name' => 'Test Item', 'name_key' => AnswerCache::keyFor('Test Item'), 'heading' => '1104', 'is_service' => false]);
 
+        // Reset memory lives on the Testing page now (it wipes production cache back to baseline).
         Livewire::actingAs(User::factory()->create())
-            ->test(Classify::class)
+            ->test(Testing::class)
             ->call('resetMemory')
             ->assertSet('memoryResetCount', 1);
 

@@ -56,26 +56,36 @@
   @endphp
 
   <div class="mb-6">
-    <a href="{{ route('review', ['batch' => $item->batch, 'filter' => 'all']) }}" class="text-sm text-muted hover:text-ink">← {{ __('Back to review') }}</a>
+    @php
+      // The back link remembers where the reviewer came from (?from=). Human review and the
+      // per-run page arrive in later phases; unknown/absent origins fall back to the review list.
+      [$backUrl, $backLabel] = match (request('from')) {
+          'classify' => [route('classify'), __('Back to Classify')],
+          default => [route('review.batch', ['batch' => $item->batch, 'filter' => 'all']), __('Back to review')],
+      };
+    @endphp
+    <a href="{{ $backUrl }}" class="text-sm text-muted hover:text-ink">← {{ $backLabel }}</a>
     <p class="kicker mt-3 mb-1">{{ __('Decision flow') }}</p>
     <h1 class="font-display text-3xl">{{ $item->localizedSourceText() }}</h1>
 
     {{-- The overall outcome — what came out of the whole flow. --}}
     <div class="card-flat p-3 mt-3 flex items-center gap-2 flex-wrap text-sm">
       <span class="kicker">{{ __('Final answer') }}</span>
-      <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($humanDecided ? ($item->resolution === 'rejected' ? 'bad' : 'good') : ($item->resolution === 'conflict' ? 'warn' : ($item->final_code ? 'good' : 'muted'))) }}">{{ $statusLabel($item->displayResolution()) }}</span>
+      <span class="hint-head px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($humanDecided ? ($item->resolution === 'rejected' ? 'bad' : 'good') : ($item->resolution === 'conflict' ? 'warn' : ($item->final_code ? 'good' : 'muted'))) }}" data-hint="{{ $item->displayResolution() }}">{{ $statusLabel($item->displayResolution()) }}</span>
       @if($item->final_code)
         <span class="font-mono text-sm">{{ $item->final_code }}</span>
         <span class="text-muted">{{ \Illuminate\Support\Str::limit($finalName, 90) }}</span>
-        @if($isHeading)<span class="px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted">{{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span>@endif
+        @if($isHeading)<span class="hint-head px-1.5 py-0.5 rounded text-[10px] bg-line/40 text-muted" data-hint="{{ (string) $item->final_code === '99' ? 'code:service' : 'code:heading' }}">{{ (string) $item->final_code === '99' ? __('service level') : __('heading only') }}</span>@endif
         @php
           $tier = $item->confidenceTier();
           // Evidence strength behind the answer (measured vs the benchmark): unanimous
           // ~92-97%, majority ~55%, web-resolved ~63%. Only unanimous is Memory-eligible.
           $tierLabel = ['verified' => __('verified'), 'unanimous' => __('unanimous'), 'majority' => __('majority'), 'resolved' => __('AI-resolved'), 'weak' => __('weak')][$tier] ?? $tier;
           $tierTone = in_array($tier, ['verified', 'unanimous'], true) ? 'good' : ($tier === 'weak' ? 'muted' : 'warn');
+          // 'majority' has no dedicated hint entry — fall back to the plain title tooltip.
+          $tierHint = in_array($tier, ['verified', 'unanimous', 'resolved', 'weak'], true) ? 'tier:'.$tier : null;
         @endphp
-        <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($tierTone) }}" title="{{ __('Confidence tier — the strength of evidence behind the answer') }}">{{ $tierLabel }}</span>
+        <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($tierTone) }} @if($tierHint) hint-head @endif" @if($tierHint) data-hint="{{ $tierHint }}" @else title="{{ __('Confidence tier — the strength of evidence behind the answer') }}" @endif>{{ $tierLabel }}</span>
         {{-- Item-level Memory fact: this answer was written back to the cache, so a future
              identical item is answered from Memory without re-running the pipeline. The
              note says by which path it was written. --}}

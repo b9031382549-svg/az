@@ -41,9 +41,16 @@ class ReviewQueueTest extends TestCase
         return $item;
     }
 
+    /** The uploads list (/review). */
     private function actingComponent()
     {
         return Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class);
+    }
+
+    /** One run's detail (/review/{batch}); 'all' aggregates every upload. */
+    private function detailComponent(string $batch = 'all')
+    {
+        return Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class, ['batch' => $batch]);
     }
 
     public function test_confirm_sets_final_and_confirmed_by(): void
@@ -156,7 +163,7 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(2, ClassificationItem::where('batch', 'up')->where('resolution', 'confirmed')->count());
     }
 
-    public function test_uploads_table_lists_batches_and_selecting_one_filters_the_items(): void
+    public function test_uploads_table_lists_batches_and_selecting_one_opens_its_run(): void
     {
         ClassificationItem::create(['batch' => 'up-alpha', 'source_text' => 'alpha item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
         // A TERMINAL conflict (the web-search resolver ran — a 'search' trace exists — and
@@ -165,8 +172,9 @@ class ReviewQueueTest extends TestCase
         $conflict->results()->create(['mechanism' => 'search', 'matched_code' => null, 'status' => 'needs_review']);
         ClassificationItem::create(['batch' => 'up-beta', 'source_text' => 'beta item', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'confirmed', 'final_code' => '1104']);
 
-        $c = $this->actingComponent()->call('setFilter', 'all')->assertOk()
-            ->assertSee('up-alpha')->assertSee('up-beta')  // both uploads listed in the table
+        // The list page shows every upload (the batch key appears in each row's run link).
+        $c = $this->actingComponent()->assertOk()
+            ->assertSee('up-alpha')->assertSee('up-beta')
             ->assertSee('resolved');                        // the result bar label
 
         // A batch carries its resolution breakdown for the result bar.
@@ -177,10 +185,31 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(0, $alpha->resolving);
         $this->assertSame(50, $alpha->done);
 
-        // Selecting an upload scopes the item list to that batch.
-        $c->call('selectBatch', 'up-beta');
-        $this->assertSame('up-beta', $c->get('batch'));
-        $this->assertSame(1, $c->viewData('items')->total());
+        // Clicking an upload navigates to its run page.
+        $this->actingComponent()->call('selectBatch', 'up-beta')
+            ->assertRedirect(route('review.batch', ['batch' => 'up-beta']));
+
+        // …which scopes the item list to that batch.
+        $this->assertSame(1, $this->detailComponent('up-beta')->viewData('items')->total());
+    }
+
+    public function test_perpage_is_clamped_to_the_allowed_set(): void
+    {
+        ClassificationItem::create(['batch' => 'up-a', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+
+        // A crafted ?perPage=0 must not divide-by-zero the list; it clamps back to 10.
+        $this->actingComponent()->set('perPage', 0)->assertOk()->assertSet('perPage', 10);
+    }
+
+    public function test_all_uploads_row_sums_every_upload(): void
+    {
+        ClassificationItem::create(['batch' => 'up-a', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471', 'memory_promoted_at' => now()]);
+        ClassificationItem::create(['batch' => 'up-b', 'source_text' => 'b', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'confirmed', 'final_code' => '1104', 'memory_promoted_at' => now()]);
+        ClassificationItem::create(['batch' => 'up-b', 'source_text' => 'c', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict']);
+
+        $all = $this->actingComponent()->viewData('allRow');
+        $this->assertSame(3, $all->total);       // every item across both uploads
+        $this->assertSame(2, $all->memory);      // two promoted into memory
     }
 
     public function test_table_shows_the_deciding_source(): void
@@ -191,7 +220,7 @@ class ReviewQueueTest extends TestCase
         $item->results()->create(['mechanism' => 'broker', 'matched_code' => '8471300000', 'status' => 'auto_confirmed', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'search', 'matched_code' => '8528', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
-        $this->actingComponent()->call('setFilter', 'all')
+        $this->detailComponent()->call('setFilter', 'all')
             ->assertSee('Found by')
             ->assertSee('web research')  // the deciding source
             ->assertSee('ai resolved')   // status
@@ -203,7 +232,7 @@ class ReviewQueueTest extends TestCase
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'c', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '1104']);
         $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
-        $this->actingComponent()->call('setFilter', 'all')
+        $this->detailComponent()->call('setFilter', 'all')
             ->assertSee('memory')
             ->assertDontSee('local ai')
             ->assertDontSee('web research');
@@ -217,7 +246,7 @@ class ReviewQueueTest extends TestCase
         $item = ClassificationItem::create(['batch' => 'b', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'confirmed', 'final_code' => '8471', 'kind' => 'good']);
         $item->results()->create(['mechanism' => 'cache', 'matched_code' => '1104', 'status' => 'auto_confirmed', 'kind' => 'good']);
 
-        $this->actingComponent()->call('setFilter', 'all')
+        $this->detailComponent()->call('setFilter', 'all')
             ->assertSee('8471')          // the human's corrected code is shown
             ->assertDontSee('memory');   // ...but NOT credited to the cache
     }
@@ -242,7 +271,7 @@ class ReviewQueueTest extends TestCase
         $this->agreedItem(); // resolution = agreed
         ClassificationItem::create(['batch' => 'b', 'source_text' => 'x1', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'ai_resolved', 'final_code' => '8471', 'kind' => 'good']);
 
-        $c = $this->actingComponent();
+        $c = $this->detailComponent();
         $counts = $c->viewData('counts');
 
         $this->assertSame(2, (int) ($counts['found'] ?? 0));           // agreed + ai_resolved merged
@@ -282,7 +311,7 @@ class ReviewQueueTest extends TestCase
         $terminal = ClassificationItem::create(['batch' => 'b', 'source_text' => 'gave up', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'conflict', 'search_resolved_at' => now()]);
         $terminal->results()->create(['mechanism' => 'search', 'matched_code' => null, 'status' => 'needs_review']);
 
-        $c = $this->actingComponent();
+        $c = $this->detailComponent();
         $counts = $c->viewData('counts');
 
         // Only the terminal conflict is "needs attention"; the in-flight one is 'resolving'.

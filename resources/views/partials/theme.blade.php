@@ -114,4 +114,22 @@ tailwind.config = {
   .dropzone.drag{ background:#FCFBF6; border-color:#BE3A22; }
   .link-under{ text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
   .row-hover:hover{ background:#FAF8F1; }
+
+  /* ---- hint popover (ported from the design mockup) ----
+     A single fixed popover, driven by [data-hint] / [data-hint-title] anywhere in the
+     page (see partials/hints). Delegated on document, so it survives Livewire DOM morphs. */
+  .hint-head{ cursor:help; border-bottom:1px dotted #9A9384; }
+  #hintPop{
+    position:fixed; z-index:70; max-width:330px; pointer-events:none;
+    background:#1C1A14; color:#F2EEE3; border-radius:12px; padding:10px 13px;
+    box-shadow:0 12px 32px rgba(23,21,15,.28);
+    opacity:0; transform:translateY(-4px); transition:opacity .12s, transform .12s;
+  }
+  #hintPop.show{ opacity:1; transform:none; }
+  #hintPop .hint-title{ font-family:"Spline Sans Mono",monospace; font-size:11px;
+    letter-spacing:.14em; text-transform:uppercase; color:#BEB6A2; margin-bottom:5px; }
+  #hintPop .hint-body{ font-size:12.5px; line-height:1.5; }
+  #hintPop .hint-body b{ font-weight:600; }
+  #hintPop .hint-meta{ font-size:11px; line-height:1.45; color:#BEB6A2; margin-top:6px;
+    padding-top:6px; border-top:1px solid rgba(242,238,227,.14); }
 </style>

@@ -16,6 +16,11 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+// Two views, one component, chosen by the URL:
+//   /review          → the list of uploads (batch === null)
+//   /review/{batch}  → one run's report + item table ('all' = every upload aggregated)
+// Keeping a single class means every query and action below is shared verbatim
+// between the two — the layout differs, the data does not.
 #[Layout('components.app-layout', ['title' => 'Review queue'])]
 class ReviewQueue extends Component
 {
@@ -43,15 +48,22 @@ class ReviewQueue extends Component
         'rejected' => ['label' => 'Rejected', 'color' => '#8a8175'],
     ];
 
-    #[Url]
-    public string $filter = 'open';
+    /** Selected upload (batch key) or "all" for the run view; null on the list. */
+    public ?string $batch = null;
 
-    /** Selected upload (batch key), or "all". */
     #[Url]
-    public string $batch = 'all';
+    public string $filter = 'all';
 
-    /** Page of the uploads table (5 per page). */
+    /** Uploads-list page size (10 / 25 / 50) and current page. */
+    #[Url]
+    public int $perPage = 10;
+
     public int $uploadPage = 1;
+
+    public function mount(?string $batch = null): void
+    {
+        $this->batch = $batch;
+    }
 
     public function setFilter(string $filter): void
     {
@@ -59,16 +71,15 @@ class ReviewQueue extends Component
         $this->resetPage();
     }
 
-    public function updatedBatch(): void
+    public function updatedPerPage(): void
     {
-        $this->resetPage();
+        $this->uploadPage = 1;
     }
 
-    /** Pick an upload to review (a batch key, or "all") from the uploads table. */
-    public function selectBatch(string $key): void
+    /** Open one upload's run page (the row links do this; kept for programmatic callers). */
+    public function selectBatch(string $key): mixed
     {
-        $this->batch = $key;
-        $this->resetPage();
+        return $this->redirect(route('review.batch', ['batch' => $key]), navigate: true);
     }
 
     public function setUploadPage(int $page): void
@@ -100,7 +111,7 @@ class ReviewQueue extends Component
     /** Confirm every item in the selected upload that already has an agreed code. */
     public function confirmAll(): void
     {
-        if ($this->batch === 'all') {
+        if ($this->batch === null || $this->batch === 'all') {
             return;
         }
 
@@ -119,7 +130,7 @@ class ReviewQueue extends Component
     /** Reject every still-actionable item in the selected upload. */
     public function rejectAll(): void
     {
-        if ($this->batch === 'all') {
+        if ($this->batch === null || $this->batch === 'all') {
             return;
         }
 
@@ -132,10 +143,10 @@ class ReviewQueue extends Component
     }
 
     /** Delete the selected upload entirely (its items + results + batch record). */
-    public function deleteBatch(): void
+    public function deleteBatch(): mixed
     {
-        if ($this->batch === 'all') {
-            return;
+        if ($this->batch === null || $this->batch === 'all') {
+            return null;
         }
 
         $deleted = ClassificationItem::where('batch', $this->batch)->count();
@@ -143,16 +154,51 @@ class ReviewQueue extends Component
         ImportBatch::where('key', $this->batch)->delete();
         Audit::log('batch.delete', ['batch' => $this->batch, 'deleted' => $deleted]);
 
-        $this->batch = 'all';
-        $this->resetPage();
+        // The upload is gone — back to the list.
+        return $this->redirect(route('review'), navigate: true);
     }
 
     public function render()
     {
-        // Everything now resolves at the 4-digit HS heading — there is no full-code /
-        // heading toggle any more, and no async judge. "Found" = auto-resolved (cache /
-        // 2-of-3 consensus / web-search); "Needs attention" = a genuine conflict/review
-        // a human must decide.
+        return $this->batch === null ? $this->renderList() : $this->renderBatch();
+    }
+
+    /** The list of uploads — /review. */
+    private function renderList()
+    {
+        // perPage is a public #[Url] int — a crafted ?perPage=0 would divide by zero below,
+        // and any other value bypasses the 10/25/50 selector. Clamp to the allowed set.
+        if (! in_array($this->perPage, [10, 25, 50], true)) {
+            $this->perPage = 10;
+        }
+
+        $allUploads = $this->batchOptions();
+        $uploadTotal = $allUploads->count();
+        $uploadPages = max(1, (int) ceil($uploadTotal / $this->perPage));
+        $this->uploadPage = min(max(1, $this->uploadPage), $uploadPages);
+        $uploads = $allUploads->forPage($this->uploadPage, $this->perPage)->values();
+
+        // The pinned "All uploads" row — exact sums across every upload in scope.
+        $allRow = (object) [
+            'total' => (int) $allUploads->sum('total'),
+            'resolved' => (int) $allUploads->sum('resolved'),
+            'memory' => (int) $allUploads->sum('memory'),
+        ];
+
+        return view('livewire.review-queue', [
+            'uploads' => $uploads,
+            'batches' => $allUploads,
+            'allRow' => $allRow,
+            'uploadPage' => $this->uploadPage,
+            'uploadPages' => $uploadPages,
+            'uploadTotal' => $uploadTotal,
+            'uploadStart' => ($this->uploadPage - 1) * $this->perPage,
+        ]);
+    }
+
+    /** One run's report + item table — /review/{batch} ('all' aggregates every upload). */
+    private function renderBatch()
+    {
         // whereNull('test_run_id'): dataset test rows live only in the Testing tab and
         // must never surface in the human review queue, counts, donut or report.
         $scoped = fn () => ClassificationItem::query()
@@ -201,27 +247,15 @@ class ReviewQueue extends Component
 
         $openCount = collect(self::OPEN)->sum(fn ($r) => (int) ($counts[$r] ?? 0));
 
-        // Uploads table — the recent imports, paginated 5 per page (client picks one).
-        $allUploads = $this->batchOptions();
-        $uploadTotal = $allUploads->count();
-        $uploadPages = max(1, (int) ceil($uploadTotal / 5));
-        $this->uploadPage = min(max(1, $this->uploadPage), $uploadPages);
-        $uploads = $allUploads->forPage($this->uploadPage, 5)->values();
-
         // Per-batch funnel + recognition time — only for a single selected upload.
         $batchStats = $this->batch !== 'all' ? app(BatchStats::class)->for($this->batch) : null;
 
-        return view('livewire.review-queue', [
+        return view('livewire.review-batch', [
             'items' => $items,
             'counts' => $counts,
             'batchStats' => $batchStats,
             'openCount' => $openCount,
-            'batches' => $allUploads,
-            'uploads' => $uploads,
-            'uploadPage' => $this->uploadPage,
-            'uploadPages' => $uploadPages,
-            'uploadTotal' => $uploadTotal,
-            'uploadStart' => ($this->uploadPage - 1) * 5,
+            'batchLabel' => $this->batchLabel(),
             'report' => $this->report($scoped, $counts),
             // Bulk confirm/reject targets — minus the conflicts still under web search
             // (they aren't a settled outcome a human should sweep yet).
@@ -230,9 +264,21 @@ class ReviewQueue extends Component
         ]);
     }
 
+    /** Human-readable name for the selected run. */
+    private function batchLabel(): string
+    {
+        if ($this->batch === 'all') {
+            return __('All uploads');
+        }
+
+        return Str::isUuid((string) $this->batch)
+            ? (string) (ImportBatch::where('key', $this->batch)->value('label') ?? __('Earlier import'))
+            : (string) $this->batch;
+    }
+
     /**
-     * Recent uploads for the filter dropdown — derived from the items themselves
-     * (so pre-existing batches still appear), labelled from import_batches.
+     * Recent uploads for the list — derived from the items themselves (so pre-existing
+     * batches still appear), labelled from import_batches.
      *
      * @return Collection<int, object>
      */
@@ -272,7 +318,17 @@ class ReviewQueue extends Component
             ->groupBy('batch')
             ->pluck('c', 'batch');
 
-        return $rows->map(function ($r) use ($labels, $break, $resolvingByBatch) {
+        // Answers this upload promoted into Memory — the authoritative per-item stamp
+        // (set by every promotion path). This is the honest "To Memory" number, not the
+        // agreed+ai_resolved bucket (which counts answers that were never written back).
+        $memoryByBatch = ClassificationItem::query()
+            ->whereIn('batch', $rows->pluck('batch'))
+            ->whereNotNull('memory_promoted_at')
+            ->selectRaw('batch, count(*) as c')
+            ->groupBy('batch')
+            ->pluck('c', 'batch');
+
+        return $rows->map(function ($r) use ($labels, $break, $resolvingByBatch, $memoryByBatch) {
             $b = $break->get($r->batch, collect());
             $cnt = fn ($res) => (int) ($b->firstWhere('resolution', $res)->c ?? 0);
             $resolved = $cnt('agreed') + $cnt('ai_resolved') + $cnt('confirmed');
@@ -290,6 +346,7 @@ class ReviewQueue extends Component
                 'review' => $review,
                 'resolving' => $resolving,
                 'conflict' => $conflict,
+                'memory' => (int) ($memoryByBatch[$r->batch] ?? 0),
                 'done' => $total > 0 ? (int) round($resolved / $total * 100) : 0,
             ];
         });
@@ -297,7 +354,7 @@ class ReviewQueue extends Component
 
     /**
      * Distribution report for the current scope: resolution donut, good/service
-     * split, consensus breakdown and the top HS chapters.
+     * split and consensus breakdown.
      *
      * @param  callable():Builder  $scoped
      * @param  Collection<string, int>  $counts
@@ -332,14 +389,6 @@ class ReviewQueue extends Component
 
         $kind = $scoped()->selectRaw('kind, count(*) as c')->groupBy('kind')->pluck('c', 'kind');
 
-        $chapters = $scoped()
-            ->whereNotNull('final_code')
-            ->selectRaw('substr(final_code, 1, 2) as chapter, count(*) as c')
-            ->groupBy('chapter')
-            ->orderByDesc('c')
-            ->limit(8)
-            ->get();
-
         return [
             'total' => $total,
             'donut' => ['r' => $r, 'circ' => $circ, 'segments' => $segments],
@@ -353,7 +402,6 @@ class ReviewQueue extends Component
                 'review' => (int) ($counts['review'] ?? 0),
                 'conflict' => (int) ($counts['conflict'] ?? 0),
             ],
-            'chapters' => $chapters,
         ];
     }
 }
