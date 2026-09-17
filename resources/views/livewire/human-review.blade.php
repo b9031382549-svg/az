@@ -46,7 +46,7 @@
     <div class="card-flat p-4"><p class="kicker mb-1.5">{{ __('Processed today') }}</p><p class="font-display text-2xl tnum">{{ number_format($processedToday) }}</p></div>
   </div>
 
-  <div class="grid lg:grid-cols-[minmax(0,360px)_1fr] gap-5">
+  <div class="grid lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-5">
     {{-- LEFT: the queue --}}
     <div class="card overflow-hidden self-start">
       <div class="px-4 py-3 border-b hair flex items-center justify-between">
@@ -72,13 +72,13 @@
     </div>
 
     {{-- RIGHT: the decision panel --}}
-    <div class="card p-6 self-start">
+    <div class="card p-6 self-start min-w-0">
       @if($item)
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div class="min-w-0">
             <h2 class="font-display text-2xl break-words">{{ $item->localizedSourceText() }}</h2>
             @if($item->source_text !== $item->localizedSourceText())
-              <p class="text-muted text-sm mt-1">{{ $item->source_text }}</p>
+              <p class="text-muted text-sm mt-1 break-words">{{ $item->source_text }}</p>
             @endif
           </div>
           <span class="hint-head px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap {{ $reasonBadge($item->displayResolution()) }}"
@@ -111,8 +111,8 @@
               @foreach($candidates as $code)
                 <button type="button" wire:click="confirm('{{ $code }}')"
                         class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-lg border hair hover:border-ink bg-surface transition">
-                  <span class="font-mono text-sm">{{ $code }}</span>
-                  <span class="text-muted text-sm truncate">{{ $headingNames[$code] ?? '—' }}</span>
+                  <span class="font-mono text-sm shrink-0">{{ $code }}</span>
+                  <span class="text-muted text-sm truncate min-w-0">{{ $headingNames[$code] ?? '—' }}</span>
                   <span class="ml-auto text-ledger text-sm shrink-0">✓ {{ __('Confirm') }}</span>
                 </button>
               @endforeach
