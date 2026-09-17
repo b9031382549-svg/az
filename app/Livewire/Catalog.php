@@ -57,15 +57,22 @@ class Catalog extends Component
         if ($term !== '') {
             // ILIKE (case-insensitive, trgm-indexed) on Postgres; LIKE on sqlite (tests).
             $likeOp = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $searchCap = 200;
             $results = $scope()
                 ->when(preg_match('/^\d+$/', $term),
                     fn ($w) => $w->where('heading', 'like', $term.'%'),
                     fn ($w) => $w->where('name', $likeOp, '%'.$term.'%'))
                 ->orderBy('name')
-                ->limit(200)
+                ->limit($searchCap + 1)
                 ->get(['id', 'name', 'heading', 'is_service']);
+            $searchTruncated = $results->count() > $searchCap;
 
-            return view('livewire.catalog', ['search' => $results, 'term' => $term]);
+            return view('livewire.catalog', [
+                'search' => $results->take($searchCap),
+                'term' => $term,
+                'searchTruncated' => $searchTruncated,
+                'searchCap' => $searchCap,
+            ]);
         }
 
         // Chapter counts: GOODS memory entries grouped by the heading's first two digits.
@@ -105,11 +112,13 @@ class Catalog extends Component
             ])->sortBy('code')->values()];
         });
 
-        // Leaves (the actual answers) for the expanded GOODS positions.
-        $leavesByPosition = empty($this->openPositions) ? collect() : $scope()
-            ->where('is_service', false)
-            ->whereIn('heading', $this->openPositions)
-            ->orderBy('name')->get(['id', 'name', 'heading'])->groupBy('heading');
+        // Leaves (the actual answers) for the expanded GOODS positions — capped PER position
+        // (a single heading could hold thousands of names). Query each open position with
+        // leafCap+1 so the view can show the cap instead of loading everything at once.
+        $leafCap = 500;
+        $leavesByPosition = collect($this->openPositions)->mapWithKeys(fn ($h) => [$h => $scope()
+            ->where('is_service', false)->where('heading', $h)
+            ->orderBy('name')->limit($leafCap + 1)->get(['id', 'name', 'heading'])]);
 
         // Services leaves — capped, but surface the cap rather than silently truncating.
         $serviceCap = 500;
@@ -130,6 +139,7 @@ class Catalog extends Component
             'serviceLeaves' => $serviceLeaves,
             'serviceTruncated' => $serviceTruncated,
             'serviceCap' => $serviceCap,
+            'leafCap' => $leafCap,
             'servicesCode' => self::SERVICES,
             'total' => (int) $scope()->count(),
         ]);
