@@ -9,7 +9,7 @@
 </head>
 <body class="font-sans">
 @php
-    $nav = fn (string $route) => request()->routeIs($route) ? 'nav-item active' : 'nav-item';
+    $nav = fn (string ...$routes) => request()->routeIs(...$routes) ? 'nav-item active' : 'nav-item';
     $initial = mb_strtoupper(mb_substr(auth()->user()->name ?? 'A', 0, 1));
     // Live count of items waiting on a human — cached briefly so it isn't recomputed on
     // every page render (the layout is on every page).
@@ -41,7 +41,7 @@
       <div class="px-5 pt-4 pb-1.5"><p class="kicker">{{ __('Classifier') }}</p></div>
       <a href="{{ route('classify') }}" class="{{ $nav('classify') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l4 4 10-10"/><path d="M3 16h7"/></svg>{{ __('Classify') }}</a>
-      <a href="{{ route('review') }}" class="{{ $nav('review') }}">
+      <a href="{{ route('review') }}" class="{{ $nav('review', 'review.batch', 'review.decision') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.5 2"/></svg>{{ __('Review queue') }}</a>
       <a href="{{ route('catalog') }}" class="{{ $nav('catalog') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M13.5 13.5L17 17"/></svg>{{ __('Catalog (memory)') }}</a>
