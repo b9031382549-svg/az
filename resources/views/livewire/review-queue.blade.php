@@ -30,7 +30,7 @@
           {{-- All uploads — pinned, exact sums across every upload. --}}
           <tr wire:key="up-all" class="border-b hair bg-paper/40">
             <td class="px-5 py-3">
-              <a href="{{ route('review.batch', ['batch' => 'all']) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-semibold link-under">
+              <a href="{{ route('review.batch', ['batch' => 'all']) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-semibold hover:text-stamp transition">
                 <span class="text-faint shrink-0">🗂</span>{{ __('All uploads') }}
               </a>
             </td>
@@ -52,7 +52,7 @@
             @endphp
             <tr wire:key="up-{{ $u->key }}" class="border-b hair last:border-0 hover:bg-paper/40 transition">
               <td class="px-5 py-3">
-                <a href="{{ route('review.batch', ['batch' => $u->key]) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-medium link-under">
+                <a href="{{ route('review.batch', ['batch' => $u->key]) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-medium hover:text-stamp transition">
                   <span class="text-faint shrink-0">📄</span>
                   <span class="truncate">{{ \Illuminate\Support\Str::limit($u->label, 42) }}</span>
                 </a>
