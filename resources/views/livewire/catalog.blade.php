@@ -41,6 +41,9 @@
         </tbody>
       </table>
     </div>
+    @if($searchTruncated)
+      <p class="text-faint text-xs mt-2">{{ __('Showing the first :n — refine with search.', ['n' => $searchCap]) }}</p>
+    @endif
   @else
     {{-- The tree: chapter → position → leaf --}}
     <div class="card overflow-hidden">
@@ -90,13 +93,17 @@
                     <span class="tnum text-muted text-sm">{{ number_format($pos->count) }}</span>
                   </button>
                   @if($posOpen)
-                    @foreach(($leavesByPosition[$pos->code] ?? []) as $leaf)
+                    @php $leaves = $leavesByPosition[$pos->code] ?? collect(); $leafMore = $leaves->count() > $leafCap; @endphp
+                    @foreach($leaves->take($leafCap) as $leaf)
                       <a href="{{ route('catalog.item', ['cache' => $leaf->id]) }}" wire:navigate wire:key="lf-{{ $leaf->id }}"
                          class="grid grid-cols-[1fr_auto] items-center gap-3 pl-[4.5rem] pr-5 py-2 hover:bg-paper/60 transition">
                         <span class="truncate text-sm link-under">{{ $leaf->name }}</span>
                         <span class="font-mono text-xs text-faint">{{ $pos->code }}</span>
                       </a>
                     @endforeach
+                    @if($leafMore)
+                      <p class="pl-[4.5rem] pr-5 py-2 text-faint text-xs">{{ __('Showing the first :n — refine with search.', ['n' => $leafCap]) }}</p>
+                    @endif
                   @endif
                 @endforeach
               @endif
