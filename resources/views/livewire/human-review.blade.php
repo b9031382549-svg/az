@@ -91,10 +91,12 @@
           @if($proposals->isNotEmpty())
             <div class="flex flex-wrap gap-2">
               @foreach($proposals as $p)
-                <span class="chip px-2.5 py-1 text-sm">
+                @php $pname = $headingNames[$p->heading] ?? ''; @endphp
+                <span class="chip px-2.5 py-1 text-sm {{ $pname ? 'hint-head' : '' }}"
+                      @if($pname) data-hint-title="{{ $p->heading }}" data-hint-body="{{ $pname }}" @endif>
                   <span class="text-faint">{{ $mechLabel($p->mechanism) }}</span>
                   <span class="font-mono">{{ $p->heading }}</span>
-                  <span class="text-muted">{{ \Illuminate\Support\Str::limit($headingNames[$p->heading] ?? '', 28) }}</span>
+                  <span class="text-muted">{{ \Illuminate\Support\Str::limit($pname, 28) }}</span>
                 </span>
               @endforeach
             </div>
@@ -103,18 +105,22 @@
           @endif
         </div>
 
-        {{-- Pick a candidate heading --}}
+        {{-- Candidate codes to choose from — each with an explicit Confirm button, so it's
+             clear the action happens on click (not that the rows are already confirmed). --}}
         @if($candidates->isNotEmpty())
           <div class="mt-5">
-            <p class="kicker mb-2">{{ __('Confirm a heading') }}</p>
+            <p class="kicker mb-2">{{ __('Candidate codes') }}</p>
             <div class="flex flex-col gap-1.5">
               @foreach($candidates as $code)
-                <button type="button" wire:click="confirm('{{ $code }}')"
-                        class="w-full flex items-center gap-3 text-left px-3 py-2 rounded-lg border hair hover:border-ink bg-surface transition">
+                @php $cname = $headingNames[$code] ?? ''; @endphp
+                <div class="w-full flex items-center gap-3 px-3 py-2 rounded-lg border hair bg-surface">
                   <span class="font-mono text-sm shrink-0">{{ $code }}</span>
-                  <span class="text-muted text-sm truncate min-w-0">{{ $headingNames[$code] ?? '—' }}</span>
-                  <span class="ml-auto text-ledger text-sm shrink-0">✓ {{ __('Confirm') }}</span>
-                </button>
+                  <span class="text-muted text-sm truncate min-w-0 {{ $cname ? 'hint-head' : '' }}"
+                        @if($cname) data-hint-title="{{ $code }}" data-hint-body="{{ $cname }}" @endif>{{ $cname ?: '—' }}</span>
+                  <button type="button" wire:click="confirm('{{ $code }}')"
+                          wire:confirm="{{ __('Confirm code :code for this item?', ['code' => $code]) }}"
+                          class="btn btn-ink btn-sm ml-auto shrink-0">{{ __('Confirm') }}</button>
+                </div>
               @endforeach
             </div>
           </div>
@@ -127,7 +133,7 @@
             <div class="flex items-center gap-2">
               <input wire:model="manualCode" wire:keydown.enter="confirmManual" placeholder="0000"
                      class="field-input font-mono w-28 h-10" maxlength="10">
-              <button wire:click="confirmManual" class="btn btn-ink btn-sm">{{ __('Confirm') }}</button>
+              <button wire:click="confirmManual" wire:confirm="{{ __('Confirm this code for the item?') }}" class="btn btn-ink btn-sm">{{ __('Confirm') }}</button>
             </div>
           </div>
           <div class="flex items-center gap-2 ml-auto">
