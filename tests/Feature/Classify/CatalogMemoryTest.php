@@ -92,6 +92,22 @@ class CatalogMemoryTest extends TestCase
             ->assertSee('Zeytun');
     }
 
+    public function test_human_review_filter_shows_only_human_confirmed_entries(): void
+    {
+        $this->memory('Base item', '1104');   // source 'fedor' — a base import
+        AnswerCache::create([                  // added via a human confirmation
+            'test_dataset_id' => 0, 'source' => 'confirmed', 'tier' => 'human', 'name' => 'Human item',
+            'name_key' => AnswerCache::keyFor('Human item'), 'heading' => '1104', 'is_service' => false,
+        ]);
+
+        $names = Livewire::actingAs(User::factory()->create())->test(Catalog::class)
+            ->set('source', 'human')
+            ->viewData('search')->pluck('name');
+
+        $this->assertTrue($names->contains('Human item'));
+        $this->assertFalse($names->contains('Base item'));
+    }
+
     public function test_memory_card_changes_the_code_and_logs_it(): void
     {
         $cache = $this->memory('Oat flakes 1kg', '1104');

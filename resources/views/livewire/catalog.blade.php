@@ -5,11 +5,23 @@
       <h1 class="font-display text-4xl">{{ __('Catalog (memory)') }}</h1>
       @isset($total)<p class="text-muted text-sm mt-1">{{ __(':n answers in memory', ['n' => number_format($total)]) }}</p>@endisset
     </div>
-    <div class="flex items-center gap-2">
-      <div class="flex items-center gap-2 bg-surface border hair rounded-xl px-3 h-10 w-64 max-w-full">
+    <div class="flex items-center gap-2 flex-wrap">
+      {{-- Provenance filter --}}
+      <div class="flex bg-surface border hair rounded-xl overflow-hidden text-sm">
+        <button wire:click="$set('source','all')" class="px-3 h-10 {{ $source === 'all' ? 'bg-ink text-paper' : 'hover:bg-paper/60' }}">{{ __('All') }}</button>
+        <button wire:click="$set('source','human')" class="px-3 h-10 {{ $source === 'human' ? 'bg-ink text-paper' : 'hover:bg-paper/60' }}">{{ __('Human review') }}</button>
+      </div>
+      {{-- Search --}}
+      <div class="flex items-center gap-2 bg-surface border hair rounded-xl px-3 h-10 w-56 max-w-full">
         <span class="text-faint">⌕</span>
         <input wire:model.live.debounce.300ms="q" placeholder="{{ __('Search product or heading…') }}" class="w-full bg-transparent outline-none text-sm">
       </div>
+      {{-- Date picker + date sort (Human review / date views) --}}
+      @if($withDate)
+        <input type="date" wire:model.live="date" class="h-10 px-2.5 rounded-xl border hair bg-surface text-sm outline-none hover:border-ink transition cursor-pointer">
+        @if($date !== '')<button wire:click="$set('date','')" class="btn btn-ghost btn-sm" title="{{ __('Clear date') }}">✕</button>@endif
+        <button wire:click="toggleSort" class="btn btn-ghost btn-sm" title="{{ __('Sort by date') }}">{{ $sort === 'date_asc' ? '↑' : '↓' }} {{ __('Date') }}</button>
+      @endif
       @unless($search)
         <button wire:click="collapseAll" class="btn btn-ghost btn-sm">{{ __('Collapse all') }}</button>
       @endunless
@@ -17,14 +29,15 @@
   </div>
 
   @if($search !== null)
-    {{-- Flat search results --}}
-    @php $hl = fn ($name) => preg_replace('/('.preg_quote($term, '/').')/iu', '<mark>$1</mark>', e($name)); @endphp
+    {{-- Flat list: search results and/or the Human-review filter, optionally by date. --}}
+    @php $hl = fn ($name) => $term !== '' ? preg_replace('/('.preg_quote($term, '/').')/iu', '<mark>$1</mark>', e($name)) : e($name); @endphp
     <div class="card-flat overflow-hidden">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-muted border-b hair bg-paper/50">
             <th class="font-medium px-4 py-3">{{ __('Product / service') }}</th>
             <th class="font-medium px-4 py-3">{{ __('Code') }}</th>
+            @if($withDate)<th class="font-medium px-4 py-3">{{ __('Date') }}</th>@endif
           </tr>
         </thead>
         <tbody>
@@ -34,9 +47,18 @@
                 <a href="{{ route('catalog.item', ['cache' => $r->id]) }}" wire:navigate class="link-under">{!! $hl($r->name) !!}</a>
               </td>
               <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $r->is_service ? '99' : $r->heading }}</td>
+              @if($withDate)<td class="px-4 py-3 text-muted tnum whitespace-nowrap">{{ $r->created_at?->format('Y-m-d') ?? '—' }}</td>@endif
             </tr>
           @empty
-            <tr><td colspan="2" class="px-4 py-10 text-center text-muted">{{ __('Nothing in memory matches ":term".', ['term' => $term]) }}</td></tr>
+            <tr><td colspan="{{ $withDate ? 3 : 2 }}" class="px-4 py-10 text-center text-muted">
+              @if($term !== '')
+                {{ __('Nothing in memory matches ":term".', ['term' => $term]) }}
+              @elseif($source === 'human')
+                {{ $date !== '' ? __('No Human-review entries on this date.') : __('No entries were added via Human review yet.') }}
+              @else
+                {{ __('Nothing here.') }}
+              @endif
+            </td></tr>
           @endforelse
         </tbody>
       </table>

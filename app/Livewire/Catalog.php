@@ -22,10 +22,27 @@ class Catalog extends Component
     #[Url]
     public string $q = '';
 
+    /** Provenance filter: all | human (added via Human review). */
+    #[Url]
+    public string $source = 'all';
+
+    /** Date sort for the flat view: date_desc | date_asc. */
+    #[Url]
+    public string $sort = 'date_desc';
+
+    /** Optional exact day (Y-m-d) to filter the flat view by created_at. */
+    #[Url]
+    public string $date = '';
+
     /** Expanded chapter codes (2-digit, or SV) and position codes (4-digit). */
     public array $openChapters = [];
 
     public array $openPositions = [];
+
+    public function toggleSort(): void
+    {
+        $this->sort = $this->sort === 'date_asc' ? 'date_desc' : 'date_asc';
+    }
 
     public function toggleChapter(string $code): void
     {
@@ -52,19 +69,29 @@ class Catalog extends Component
         $term = trim($this->q);
         $scope = fn () => AnswerCache::where('test_dataset_id', 0);
 
-        // Search short-circuits the tree: a flat, highlightable list of matching memory
-        // entries (by product name, or by heading when the term is numeric).
-        if ($term !== '') {
+        // A flat list replaces the tree whenever there's a search term, the Human-review
+        // filter, or a date — the tree is for browsing, the list for finding.
+        $flat = $term !== '' || $this->source === 'human' || $this->date !== '';
+        if ($flat) {
             // ILIKE (case-insensitive, trgm-indexed) on Postgres; LIKE on sqlite (tests).
             $likeOp = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
             $searchCap = 200;
+            // Date-oriented view (Human review / a picked date) sorts by date; a plain
+            // name search sorts by name.
+            $byDate = $this->source === 'human' || $this->date !== '';
+
             $results = $scope()
-                ->when(preg_match('/^\d+$/', $term),
-                    fn ($w) => $w->where('heading', 'like', $term.'%'),
-                    fn ($w) => $w->where('name', $likeOp, '%'.$term.'%'))
-                ->orderBy('name')
+                ->when($this->source === 'human',
+                    fn ($w) => $w->where(fn ($h) => $h->where('tier', 'human')->orWhere('source', 'confirmed')))
+                ->when($term !== '', fn ($w) => $w->when(preg_match('/^\d+$/', $term),
+                    fn ($n) => $n->where('heading', 'like', $term.'%'),
+                    fn ($n) => $n->where('name', $likeOp, '%'.$term.'%')))
+                ->when($this->date !== '', fn ($w) => $w->whereDate('created_at', $this->date))
+                ->when($byDate,
+                    fn ($w) => $w->orderBy('created_at', $this->sort === 'date_asc' ? 'asc' : 'desc'),
+                    fn ($w) => $w->orderBy('name'))
                 ->limit($searchCap + 1)
-                ->get(['id', 'name', 'heading', 'is_service']);
+                ->get(['id', 'name', 'heading', 'is_service', 'created_at']);
             $searchTruncated = $results->count() > $searchCap;
 
             return view('livewire.catalog', [
@@ -72,6 +99,10 @@ class Catalog extends Component
                 'term' => $term,
                 'searchTruncated' => $searchTruncated,
                 'searchCap' => $searchCap,
+                'withDate' => $byDate,
+                'source' => $this->source,
+                'sort' => $this->sort,
+                'date' => $this->date,
             ]);
         }
 
@@ -142,6 +173,10 @@ class Catalog extends Component
             'leafCap' => $leafCap,
             'servicesCode' => self::SERVICES,
             'total' => (int) $scope()->count(),
+            'withDate' => false,
+            'source' => $this->source,
+            'sort' => $this->sort,
+            'date' => $this->date,
         ]);
     }
 }
