@@ -4,7 +4,11 @@
       <h1 class="font-display text-4xl">{{ __('Review queue') }}</h1>
       <p class="text-muted text-sm mt-1">{{ __('Pick an upload to see its report and items.') }}</p>
     </div>
-    <div class="flex items-center gap-2 text-sm">
+    <div class="flex items-center gap-2 text-sm flex-wrap">
+      <div class="flex items-center gap-2 bg-surface border hair rounded-lg px-3 h-9 w-56 max-w-full">
+        <span class="text-faint">⌕</span>
+        <input wire:model.live.debounce.300ms="q" placeholder="{{ __('Search uploads…') }}" class="w-full bg-transparent outline-none text-sm">
+      </div>
       <span class="text-faint">{{ __('Rows') }}</span>
       <select wire:model.live="perPage" class="h-9 px-2.5 rounded-lg border hair bg-surface outline-none hover:border-ink transition cursor-pointer tnum">
         <option value="10">10</option>
@@ -27,7 +31,8 @@
           </tr>
         </thead>
         <tbody>
-          {{-- All uploads — pinned, exact sums across every upload. --}}
+          {{-- All uploads — pinned, exact sums across every upload (hidden while searching). --}}
+          @if(trim($q) === '')
           <tr wire:key="up-all" class="border-b hair bg-paper/40">
             <td class="px-5 py-3">
               <a href="{{ route('review.batch', ['batch' => 'all']) }}" wire:navigate class="flex items-center gap-2 min-w-0 font-semibold hover:text-stamp transition">
@@ -42,6 +47,7 @@
             </td>
             <td class="px-5 py-3 text-faint text-xs">{{ __('everything') }}</td>
           </tr>
+          @endif
           {{-- One row per upload --}}
           @forelse($uploads as $u)
             @php
@@ -79,7 +85,9 @@
               </td>
             </tr>
           @empty
-            <tr><td colspan="5" class="px-5 py-10 text-center text-muted">{{ __('No uploads yet. Classify some items first.') }}</td></tr>
+            <tr><td colspan="5" class="px-5 py-10 text-center text-muted">
+              {{ trim($q) !== '' ? __('No uploads match ":term".', ['term' => $q]) : __('No uploads yet. Classify some items first.') }}
+            </td></tr>
           @endforelse
         </tbody>
       </table>

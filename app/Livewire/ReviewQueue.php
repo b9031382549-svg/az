@@ -10,6 +10,7 @@ use App\Services\Classify\BatchStats;
 use App\Support\Audit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -60,9 +61,19 @@ class ReviewQueue extends Component
 
     public int $uploadPage = 1;
 
+    /** Live search: upload label on the list, item name on the run page. */
+    #[Url]
+    public string $q = '';
+
     public function mount(?string $batch = null): void
     {
         $this->batch = $batch;
+    }
+
+    public function updatedQ(): void
+    {
+        $this->resetPage();      // item paginator (run page)
+        $this->uploadPage = 1;   // uploads list
     }
 
     public function setFilter(string $filter): void
@@ -173,6 +184,13 @@ class ReviewQueue extends Component
         }
 
         $allUploads = $this->batchOptions();
+
+        // Live filter by upload name (label).
+        $term = trim($this->q);
+        if ($term !== '') {
+            $allUploads = $allUploads->filter(fn ($u) => mb_stripos((string) $u->label, $term) !== false)->values();
+        }
+
         $uploadTotal = $allUploads->count();
         $uploadPages = max(1, (int) ceil($uploadTotal / $this->perPage));
         $this->uploadPage = min(max(1, $this->uploadPage), $uploadPages);
@@ -215,6 +233,16 @@ class ReviewQueue extends Component
             'all' => $q,
             default => $q->where('resolution', $this->filter),
         };
+
+        // Live search by item name — the original AZ text and its en/ru translations,
+        // so it matches whatever the reviewer sees. ILIKE on Postgres, LIKE on sqlite.
+        $term = trim($this->q);
+        if ($term !== '') {
+            $likeOp = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $like = '%'.$term.'%';
+            $q->where(fn ($w) => $w->where('source_text', $likeOp, $like)
+                ->orWhereHas('translation', fn ($t) => $t->where('en', $likeOp, $like)->orWhere('ru', $likeOp, $like)));
+        }
         $items = $q->latest()->paginate(15);
 
         $rawCounts = $scoped()->selectRaw('resolution, count(*) as c')->groupBy('resolution')->pluck('c', 'resolution');
@@ -290,7 +318,7 @@ class ReviewQueue extends Component
             ->selectRaw('batch, count(*) as total, max(created_at) as last_at')
             ->groupBy('batch')
             ->orderByRaw('max(created_at) desc')
-            ->limit(50)
+            ->limit(200) // headroom so the list search can reach beyond the newest uploads
             ->get();
 
         // import_batches.key is a UUID column, so only look up UUID batch keys — a
