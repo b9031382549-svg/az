@@ -111,6 +111,12 @@
     @endif
   </div>
 
+  {{-- Live search by item name (original + en/ru translation). --}}
+  <div class="mb-3 flex items-center gap-2 bg-surface border hair rounded-lg px-3 h-9 w-72 max-w-full">
+    <span class="text-faint">⌕</span>
+    <input wire:model.live.debounce.300ms="q" placeholder="{{ __('Search items…') }}" class="w-full bg-transparent outline-none text-sm">
+  </div>
+
   {{-- Results table (shared with the Classify page). Confirm/reject moved to the
        decision page — the item name links there. --}}
   @include('livewire.partials.results-table', ['rows' => $items, 'headingNames' => $headingNames, 'from' => 'review'])

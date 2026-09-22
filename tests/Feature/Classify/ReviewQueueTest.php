@@ -193,6 +193,30 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $this->detailComponent('up-beta')->viewData('items')->total());
     }
 
+    public function test_item_search_filters_items_by_name_on_the_run_page(): void
+    {
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'Red apple', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+        ClassificationItem::create(['batch' => 'b', 'source_text' => 'Yellow banana', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+
+        $c = Livewire::actingAs(User::factory()->create())->test(ReviewQueue::class, ['batch' => 'b'])->set('q', 'apple');
+
+        $this->assertSame(1, $c->viewData('items')->total());
+        $this->assertSame('Red apple', $c->viewData('items')->first()->source_text);
+    }
+
+    public function test_upload_search_filters_the_list_by_label(): void
+    {
+        \App\Models\ImportBatch::create(['key' => '11111111-1111-1111-1111-111111111111', 'label' => 'March invoices']);
+        \App\Models\ImportBatch::create(['key' => '22222222-2222-2222-2222-222222222222', 'label' => 'April report']);
+        ClassificationItem::create(['batch' => '11111111-1111-1111-1111-111111111111', 'source_text' => 'x', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+        ClassificationItem::create(['batch' => '22222222-2222-2222-2222-222222222222', 'source_text' => 'y', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
+
+        $labels = $this->actingComponent()->set('q', 'March')->viewData('uploads')->pluck('label');
+
+        $this->assertTrue($labels->contains('March invoices'));
+        $this->assertFalse($labels->contains('April report'));
+    }
+
     public function test_perpage_is_clamped_to_the_allowed_set(): void
     {
         ClassificationItem::create(['batch' => 'up-a', 'source_text' => 'a', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'agreed', 'final_code' => '8471']);
