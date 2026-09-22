@@ -238,6 +238,7 @@
     "To Memory": "Yaddaşa",
     "Skip": "Ötür",
     "Candidate codes": "Təklif olunan variantlar",
+    ":n identical item(s) were auto-confirmed with the same code.": ":n eyni mövqe eyni kodla avtomatik təsdiqləndi.",
     "Search uploads…": "Yükləmələri axtar…",
     "Search items…": "Mövqeləri axtar…",
     "No uploads match \":term\".": "\":term\" üzrə yükləmə tapılmadı.",

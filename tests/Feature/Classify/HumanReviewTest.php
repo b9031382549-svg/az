@@ -77,6 +77,21 @@ class HumanReviewTest extends TestCase
         $this->assertFalse($c->viewData('queue')->pluck('id')->contains($item->id));
     }
 
+    public function test_confirming_one_item_auto_confirms_identical_twins(): void
+    {
+        // Same normalized name → same source_hash (as the pipeline computes it).
+        $hash = \App\Models\ItemTranslation::hashFor('Milk 1L');
+        $a = ClassificationItem::create(['batch' => 'a', 'source_text' => 'Milk 1L', 'source_hash' => $hash, 'resolution' => 'no_match']);
+        $b = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Milk 1L', 'source_hash' => $hash, 'resolution' => 'no_match']);
+
+        $c = $this->acting()->call('selectItem', $a->id)->call('confirm', '1104');
+
+        $this->assertSame('confirmed', $a->fresh()->resolution);
+        $this->assertSame('confirmed', $b->fresh()->resolution);   // the twin auto-confirmed
+        $this->assertSame('1104', $b->fresh()->final_code);
+        $this->assertSame(1, $c->get('twinsConfirmed'));
+    }
+
     public function test_skip_leaves_the_item_untouched(): void
     {
         $a = $this->open('no_match', 'first');

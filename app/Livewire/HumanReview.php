@@ -36,6 +36,9 @@ class HumanReview extends Component
     /** Manual code entry in the decision panel. */
     public string $manualCode = '';
 
+    /** How many identical items were auto-confirmed alongside the last confirm (notice). */
+    public ?int $twinsConfirmed = null;
+
     public function updatedBatch(): void
     {
         // Switching upload can drop the selected item out of view — reselect on render.
@@ -46,6 +49,7 @@ class HumanReview extends Component
     {
         $this->selected = $id;
         $this->manualCode = '';
+        $this->twinsConfirmed = null;
         $this->resetErrorBag('confirm');
     }
 
@@ -55,17 +59,28 @@ class HumanReview extends Component
         if ($item === null) {
             return;
         }
-        $next = $this->neighbourAfter($item->id);
-        if ($this->applyConfirm($item, $code)) {
-            $this->selected = $next ?? $this->queueQuery()->value('id');
-            $this->manualCode = '';
+        if (! $this->applyConfirm($item, $code)) {
+            // applyConfirm rejects a code that is neither "99" nor an active catalog position —
+            // tell the reviewer instead of silently doing nothing.
+            $this->addError('confirm', __('That code can\'t be confirmed — it isn\'t an active 4-digit heading (or 99 for a service).'));
 
             return;
         }
 
-        // applyConfirm rejects a code that is neither "99" nor an active catalog position —
-        // tell the reviewer instead of silently doing nothing.
-        $this->addError('confirm', __('That code can\'t be confirmed — it isn\'t an active 4-digit heading (or 99 for a service).'));
+        // Identical names get the same decision: auto-confirm every other queue item whose
+        // normalized name (source_hash) matches this one, with the same code.
+        $twins = ClassificationItem::humanQueue()
+            ->where('source_hash', $item->source_hash)
+            ->whereKeyNot($item->id)
+            ->get();
+        foreach ($twins as $twin) {
+            $this->applyConfirm($twin, $code);
+        }
+        $this->twinsConfirmed = $twins->count() ?: null;
+
+        // Move to the first item still open (a just-confirmed twin may have been "next").
+        $this->selected = $this->queueQuery()->value('id');
+        $this->manualCode = '';
     }
 
     public function confirmManual(): void
@@ -86,6 +101,7 @@ class HumanReview extends Component
         $this->applyReject($item);
         $this->selected = $next ?? $this->queueQuery()->value('id');
         $this->manualCode = '';
+        $this->twinsConfirmed = null;
     }
 
     /** Skip: leave the item untouched (per the decision, no DB write) and move on. */
@@ -98,6 +114,7 @@ class HumanReview extends Component
         $pos = $ids->search($this->selected);
         $this->selected = ($pos === false) ? $ids->first() : ($ids->get($pos + 1) ?? $ids->first());
         $this->manualCode = '';
+        $this->twinsConfirmed = null;
     }
 
     /** @return Builder<ClassificationItem> */
