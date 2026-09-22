@@ -46,6 +46,10 @@
     <div class="card-flat p-4"><p class="kicker mb-1.5">{{ __('Processed today') }}</p><p class="font-display text-2xl tnum">{{ number_format($processedToday) }}</p></div>
   </div>
 
+  @if($twinsConfirmed)
+    <p class="text-ledger text-sm mb-4">✓ {{ __(':n identical item(s) were auto-confirmed with the same code.', ['n' => $twinsConfirmed]) }}</p>
+  @endif
+
   <div class="grid lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-5">
     {{-- LEFT: the queue --}}
     <div class="card overflow-hidden self-start">

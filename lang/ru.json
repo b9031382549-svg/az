@@ -238,6 +238,7 @@
     "To Memory": "В память",
     "Skip": "Пропустить",
     "Candidate codes": "Предлагаемые варианты",
+    ":n identical item(s) were auto-confirmed with the same code.": "Автоматически подтверждено одинаковых позиций тем же кодом: :n.",
     "Search uploads…": "Поиск загрузок…",
     "Search items…": "Поиск позиций…",
     "No uploads match \":term\".": "Нет загрузок по запросу «:term».",
