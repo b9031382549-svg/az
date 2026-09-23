@@ -30,7 +30,7 @@
         <tbody>
           @forelse($invoices as $inv)
             <tr wire:key="inv-{{ $inv->id }}" class="border-b hair last:border-0 hover:bg-paper/40 transition">
-              <td class="px-4 py-3 tnum whitespace-nowrap">{{ $inv->invoice_date->format('d.m.Y') }}</td>
+              <td class="px-4 py-3 tnum whitespace-nowrap">{{ $inv->invoice_date?->format('d.m.Y') ?? '—' }}</td>
               <td class="px-4 py-3 font-mono whitespace-nowrap">{{ $inv->series }}·{{ $inv->number }}</td>
               <td class="px-4 py-3 font-mono">{{ $inv->supplier_tin }}</td>
               <td class="px-4 py-3 font-mono">{{ $inv->recipient_tin }}</td>

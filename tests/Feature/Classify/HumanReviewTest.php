@@ -5,6 +5,8 @@ namespace Tests\Feature\Classify;
 use App\Livewire\HumanReview;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
+use App\Models\EInvoice;
+use App\Models\ItemTranslation;
 use App\Models\TestDataset;
 use App\Models\TestRun;
 use App\Models\User;
@@ -80,7 +82,7 @@ class HumanReviewTest extends TestCase
     public function test_confirming_one_item_auto_confirms_identical_twins(): void
     {
         // Same normalized name → same source_hash (as the pipeline computes it).
-        $hash = \App\Models\ItemTranslation::hashFor('Milk 1L');
+        $hash = ItemTranslation::hashFor('Milk 1L');
         $a = ClassificationItem::create(['batch' => 'a', 'source_text' => 'Milk 1L', 'source_hash' => $hash, 'resolution' => 'no_match']);
         $b = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Milk 1L', 'source_hash' => $hash, 'resolution' => 'no_match']);
 
@@ -132,5 +134,31 @@ class HumanReviewTest extends TestCase
         $this->acting()->assertOk()
             ->assertSee('Waiting on a human')
             ->assertSee('Processed today');
+    }
+
+    public function test_the_panel_shows_what_the_invoices_declared_for_the_item(): void
+    {
+        $item = $this->open('no_match', 'ÇAYDAN ARZUM TEAMOND');
+        $line = fn (string $unit) => EInvoice::create([
+            'item_name' => 'ÇAYDAN ARZUM TEAMOND', 'declared_code' => '3305200000',
+            'declared_group' => 'Saç üçün vasitələr', 'unit' => $unit, 'classification_item_id' => $item->id,
+        ]);
+        $line('ƏDƏD');
+        $line('ədəd');
+
+        $page = $this->acting()->call('selectItem', $item->id);
+
+        $hints = $page->viewData('invoiceHints');
+        $this->assertSame(2, $hints['lines']);
+        $this->assertSame([['code' => '3305200000', 'group' => 'Saç üçün vasitələr', 'lines' => 2]], $hints['codes']);
+        $this->assertSame([['unit' => 'ədəd', 'lines' => 2]], $hints['units']);   // one unit, any case
+        $page->assertSee('3305200000')->assertSee('Saç üçün vasitələr');
+    }
+
+    public function test_an_item_without_invoice_lines_has_no_invoice_hint(): void
+    {
+        $this->open('no_match', 'typed on the Classify page');
+
+        $this->assertNull($this->acting()->viewData('invoiceHints'));
     }
 }

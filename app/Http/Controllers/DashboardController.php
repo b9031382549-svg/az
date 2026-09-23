@@ -22,6 +22,7 @@ class DashboardController extends Controller
         $period = $this->periodLabel($agg->first_date, $agg->last_date);
 
         $monthsRaw = EInvoice::query()
+            ->whereNotNull('invoice_date') // a line-level export row may carry no date
             ->selectRaw("to_char(invoice_date,'YYYY-MM') as ym, sum(total_amount) as t")
             ->groupBy('ym')->orderBy('ym')->get();
 

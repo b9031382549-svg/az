@@ -4,10 +4,11 @@ namespace App\Services\Import;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use Throwable;
 
+// The legacy invoice list: one row per invoice, 15 columns in a fixed order (mapped by
+// position). The line-level export has its own importer (InvoiceLinesImporter).
 class InvoiceImporter
 {
     /** Column order expected in the invoice export. */
@@ -24,6 +25,10 @@ class InvoiceImporter
         'zero_rated_vat_amount', 'vat_amount', 'road_tax', 'total_amount',
     ];
 
+    public function __construct(
+        private readonly SheetReader $reader,
+    ) {}
+
     /**
      * Inspect a file without importing: validate the header and return a sample.
      *
@@ -32,11 +37,24 @@ class InvoiceImporter
     public function preview(string $path, int $limit = 8): array
     {
         try {
-            [$header, $rows] = $this->read($path);
+            [$header, $rows] = $this->reader->read($path);
         } catch (Throwable $e) {
             return ['ok' => false, 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()]), 'count' => 0, 'duplicates' => 0, 'header' => [], 'sample' => []];
         }
 
+        return $this->previewRows($header, $rows, $limit);
+    }
+
+    /**
+     * preview() over rows already read — the upload page reads a file once to recognise its
+     * layout, then previews it with the matching importer.
+     *
+     * @param  array<int, mixed>  $header
+     * @param  array<int, array<int, mixed>>  $rows
+     * @return array{ok: bool, error: ?string, count: int, duplicates: int, header: array<int,mixed>, sample: array<int, array<string,mixed>>}
+     */
+    public function previewRows(array $header, array $rows, int $limit = 8): array
+    {
         $ok = is_array($header) && count($header) >= count(self::COLUMNS);
         $count = 0;
         $duplicates = 0;
@@ -77,14 +95,27 @@ class InvoiceImporter
      *
      * @return array{imported: int, skipped: int, total: int, error: ?string}
      */
-    public function import(string $path, bool $skipDuplicates = false): array
+    public function import(string $path, bool $skipDuplicates = false, ?string $batch = null): array
     {
         try {
-            [$header, $rows] = $this->read($path);
+            [$header, $rows] = $this->reader->read($path);
         } catch (Throwable $e) {
             return ['imported' => 0, 'skipped' => 0, 'total' => $this->total(), 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()])];
         }
 
+        return $this->importRows($header, $rows, $skipDuplicates, $batch);
+    }
+
+    /**
+     * import() over rows already read. $batch stamps every row with the upload it came from
+     * (import_batches.key), so that upload can be deleted on its own later.
+     *
+     * @param  array<int, mixed>  $header
+     * @param  array<int, array<int, mixed>>  $rows
+     * @return array{imported: int, skipped: int, total: int, error: ?string}
+     */
+    public function importRows(array $header, array $rows, bool $skipDuplicates = false, ?string $batch = null): array
+    {
         if (! is_array($header) || count($header) < count(self::COLUMNS)) {
             return ['imported' => 0, 'skipped' => 0, 'total' => $this->total(), 'error' => __('Unexpected columns in file.')];
         }
@@ -114,7 +145,12 @@ class InvoiceImporter
                 $existingKeys[$key] = true;
             }
 
-            $buffer[] = $mapped + ['created_at' => $now, 'updated_at' => $now];
+            $buffer[] = $mapped + [
+                'invoice_key' => $key,
+                'import_batch' => $batch,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
             $imported++;
 
             if (count($buffer) >= 1000) {
@@ -136,21 +172,6 @@ class InvoiceImporter
         DB::table('e_invoices')->truncate();
 
         return $count;
-    }
-
-    /**
-     * @return array{0: array<int,mixed>, 1: array<int, array<int,mixed>>}
-     */
-    private function read(string $path): array
-    {
-        ini_set('memory_limit', '1024M');
-        $reader = IOFactory::createReaderForFile($path);
-        $reader->setReadDataOnly(true);
-        $sheet = $reader->load($path)->getActiveSheet();
-        $rows = $sheet->toArray(null, true, false, false);
-        $header = array_shift($rows);
-
-        return [$header, $rows];
     }
 
     /** @return array<string, mixed> */

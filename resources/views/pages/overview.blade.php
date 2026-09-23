@@ -58,7 +58,7 @@
             </div>
             <div class="text-right leading-tight">
               <div class="tnum font-medium">₼ {{ number_format($inv->total_amount, 0, '.', ' ') }}</div>
-              <div class="text-faint text-xs tnum">{{ $inv->invoice_date->format('d.m.Y') }}</div>
+              <div class="text-faint text-xs tnum">{{ $inv->invoice_date?->format('d.m.Y') ?? '—' }}</div>
             </div>
           </li>
         @endforeach
