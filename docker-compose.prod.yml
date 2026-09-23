@@ -26,6 +26,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Big invoice uploads wait here between preview and import; the worker reads them.
+    volumes:
+      - uploads:/var/www/html/storage/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/up || exit 1"]
       interval: 15s
@@ -61,6 +64,8 @@ services:
       # rebuilds/deploys (the DB registry points at the path). GPU_ADAPTER_DIR in .env →
       # /opt/az-assets/adapters. Mirrors the /opt/az-assets pattern used for the pilot adapter.
       - /opt/az-assets:/opt/az-assets
+      # Shared with app: the big invoice uploads the worker reads and imports.
+      - uploads:/var/www/html/storage/app/uploads
     # Horizon supervises up to maxProcesses (16) worker processes inside this one
     # container. Each worker's soft memory cap is 256MB (Horizon restarts it above
     # that), so 16 × 256MB + master/supervisor overhead ⇒ 4.5g. Realistic RSS per
@@ -177,3 +182,5 @@ volumes:
   pgdata:
   ollama:
   redis:
+  # Created on first `up` from the image's storage/app/uploads (owned by www-data).
+  uploads:

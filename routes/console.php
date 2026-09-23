@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\GpuActionJob;
+use App\Jobs\TendInvoiceUploadsJob;
 use App\Models\FinetuneRun;
 use App\Models\GpuServer;
 use Illuminate\Foundation\Inspiring;
@@ -18,6 +19,11 @@ Schedule::command('horizon:snapshot')->everyFiveMinutes();
 // (crash between the Postgres claim and the Redis enqueue). No-op when the resolver is
 // disabled. See App\Console\Commands\ReapSearchResolves.
 Schedule::command('classify:reap-search-resolves')->everyFifteenMinutes()->withoutOverlapping();
+
+// Big invoice uploads: resume an import or a classification-feeding chain that went silent,
+// fail a read that died, remove previews nobody imported. Queued on the WORKER — the scheduler
+// container has no uploads volume.
+Schedule::job(new TendInvoiceUploadsJob)->everyFiveMinutes();
 
 // Drive the A/B GPU state machine unattended. The tick runs as a QUEUED job on the WORKER —
 // the nebius CLI + SSH key are mounted only there (the scheduler container has neither), so it

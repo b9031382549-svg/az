@@ -739,5 +739,16 @@
     "Search item, TIN, series, number…": "Поиск по товару, ИНН, серии, номеру…",
     "classifying…": "классифицируется…",
     "decl.": "заявл.",
-    "+ :n lines without invoice number": "+ строк без номера накладной: :n"
+    "+ :n lines without invoice number": "+ строк без номера накладной: :n",
+    "Reading the file… :n lines": "Читаю файл… строк: :n",
+    "Importing… :done / :total lines": "Импорт… :done / :total строк",
+    "a big file is handled in the background — you can leave this page and come back.": "большой файл обрабатывается в фоне — можно уйти со страницы и вернуться.",
+    "the items are classified once the import is done": "позиции уйдут на классификацию после импорта",
+    "Supported: .xlsx and .csv up to :mb MB, .xls up to 25 MB": "Поддерживаются: .xlsx и .csv до :mb МБ, .xls до 25 МБ",
+    "Two layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; its items are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.": "Формат определяется автоматически: <b>построчная выгрузка (Şablon)</b> — одна строка на позицию накладной с названием товара, позиции <b>сразу отправляются на классификацию</b>; и <b>список накладных</b> из 15 стандартных столбцов (№, ИНН поставщика/получателя, даты, серия, номер, столбцы сумм НДС и итого). Большие файлы читаются и импортируются <b>в фоне</b> — со страницы можно уйти.",
+    "importing…": "импортируется…",
+    "import failed": "импорт не удался",
+    "An .xls file can be up to 25 MB — save bigger files as .xlsx or .csv.": "Файл .xls может быть не больше 25 МБ — большие файлы сохраните как .xlsx или .csv.",
+    "The file has more than :max lines.": "В файле больше :max строк.",
+    "Reading the file stopped unexpectedly. Please upload it again.": "Чтение файла неожиданно прервалось. Загрузите его ещё раз."
 }

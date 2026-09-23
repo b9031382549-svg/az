@@ -3,9 +3,12 @@
 namespace App\Services\Import;
 
 use App\Models\ClassificationItem;
+use App\Models\EInvoice;
 use App\Models\ImportBatch;
 use App\Models\ItemTranslation;
 use App\Services\Classify\ClassificationQueue;
+use Closure;
+use DateTimeInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,8 +24,8 @@ use Throwable;
 class InvoiceLinesImporter
 {
     /**
-     * Lines accepted per file while the import runs inside the web request (big files are out
-     * of scope for now): 20k lines read in ~11 s / ~300 MB, measured on a synthetic export.
+     * Lines a file may have to be previewed and imported inside the web request (20k lines read
+     * in ~11 s / ~300 MB, measured). Bigger files go through BackgroundInvoiceUploads instead.
      */
     public const MAX_LINES = 20000;
 
@@ -96,23 +99,48 @@ class InvoiceLinesImporter
         $lines = $this->mapRows($header, $rows);
 
         if ($error = $this->sizeError(count($lines))) {
-            return ['ok' => false, 'error' => $error, 'count' => count($lines), 'sample' => []];
+            // too_many: a streamable file this big is handed to the background path instead.
+            return ['ok' => false, 'error' => $error, 'count' => count($lines), 'sample' => [], 'too_many' => count($lines) > $this->maxLines];
         }
 
-        $known = $this->existingKeys($lines);
-        $dupes = array_filter($lines, fn ($l) => $l['invoice_key'] !== null && isset($known[$l['invoice_key']]));
+        $stats = new InvoiceLineStats;
+        foreach ($lines as $line) {
+            $stats->add($line);
+        }
 
-        $same = ImportBatch::where('checksum', $checksum)->whereNull('lines_deleted_at')->latest('id')->first();
+        return $this->preview($stats, $checksum, array_slice($lines, 0, $limit));
+    }
+
+    /**
+     * The preview of a line-level export from its counted stats — shared by the in-request path
+     * and the background reader: counts, duplicates of invoices already loaded, a re-upload of
+     * the same file, and a sample.
+     *
+     * @param  array<int, array<string, mixed>>  $sample
+     * @return array<string, mixed>
+     */
+    public function preview(InvoiceLineStats $stats, string $checksum, array $sample, ?string $exceptBatch = null): array
+    {
+        $counts = $stats->keyCounts();
+        $known = EInvoice::existingKeys(array_keys($counts), $exceptBatch);
+        $duplicates = array_sum(array_intersect_key($counts, $known));
+
+        $same = ImportBatch::where('checksum', $checksum)
+            ->whereNull('lines_deleted_at')
+            ->when($exceptBatch !== null, fn ($q) => $q->where('key', '!=', $exceptBatch))
+            ->where(fn ($q) => $q->whereNull('status')->orWhereIn('status', ['importing', 'imported']))
+            ->latest('id')
+            ->first();
 
         return [
             'ok' => true,
             'error' => null,
-            'count' => count($lines),
-            'stats' => $this->stats($lines),
-            'duplicates' => count($dupes),
-            'duplicate_invoices' => count(array_unique(array_column($dupes, 'invoice_key'))),
+            'count' => $stats->toArray()['lines'],
+            'stats' => $stats->toArray(),
+            'duplicates' => $duplicates,
+            'duplicate_invoices' => count($known),
             'same_file' => $same ? ['label' => $same->label, 'at' => $same->created_at?->toDateTimeString()] : null,
-            'sample' => array_slice($lines, 0, $limit),
+            'sample' => $sample,
         ];
     }
 
@@ -136,7 +164,7 @@ class InvoiceLinesImporter
         // Duplicates are whole invoices already in the database (by series|number). Lines that
         // share a key WITHIN the file are simply the lines of one invoice; a line without a key
         // cannot be matched to anything, so it is never skipped.
-        $known = $skipDuplicates ? $this->existingKeys($lines) : [];
+        $known = $skipDuplicates ? EInvoice::existingKeys(array_filter(array_column($lines, 'invoice_key'))) : [];
         $keep = array_values(array_filter($lines, fn ($l) => $l['invoice_key'] === null || ! isset($known[$l['invoice_key']])));
         $skipped = count($lines) - count($keep);
         $stats = $this->stats($keep);
@@ -163,14 +191,7 @@ class InvoiceLinesImporter
                     'stats' => $stats + ['skipped' => $skipped],
                 ]);
 
-                $items = $names ? $this->queue->createItems($names, $batch) : collect();
-
-                $now = now();
-                foreach (array_chunk($keep, self::INSERT_CHUNK) as $chunk) {
-                    DB::table('e_invoices')->insert(array_map(fn ($l) => $this->toRow($l, $batch, $items, $now), $chunk));
-                }
-
-                return $items;
+                return $this->writeLines($keep, $batch, false)['items'];
             });
         } catch (Throwable $e) {
             return ['imported' => 0, 'skipped' => 0, 'total' => $this->total(), 'error' => __('Import failed: :error', ['error' => $e->getMessage()]), 'batch' => null, 'items' => 0, 'stats' => []];
@@ -190,6 +211,34 @@ class InvoiceLinesImporter
     }
 
     /**
+     * Write one portion of an upload's lines: skip whole invoices already loaded by OTHER
+     * uploads (when asked — the upload's own earlier portions never count), create the
+     * classification items for the portion's names, insert the lines linked to them. Runs in
+     * the caller's transaction and dispatches nothing — the caller decides when to classify.
+     *
+     * @param  array<int, array<string, mixed>>  $lines
+     * @return array{imported: int, skipped: int, items: Collection<string, ClassificationItem>}
+     */
+    public function writeLines(array $lines, string $batch, bool $skipDuplicates): array
+    {
+        $known = $skipDuplicates
+            ? EInvoice::existingKeys(array_filter(array_column($lines, 'invoice_key')), $batch)
+            : [];
+        $keep = array_values(array_filter($lines, fn ($l) => $l['invoice_key'] === null || ! isset($known[$l['invoice_key']])));
+
+        $names = collect($keep)->pluck('item_name')->filter()
+            ->unique(fn ($t) => ItemTranslation::hashFor($t))->values()->all();
+        $items = $names ? $this->queue->createItems($names, $batch) : collect();
+
+        $now = now();
+        foreach (array_chunk($keep, self::INSERT_CHUNK) as $chunk) {
+            DB::table('e_invoices')->insert(array_map(fn ($l) => $this->toRow($l, $batch, $items, $now), $chunk));
+        }
+
+        return ['imported' => count($keep), 'skipped' => count($lines) - count($keep), 'items' => $items];
+    }
+
+    /**
      * How much of the upload can be tied to specific invoices — the export does not always
      * carry VÖEN / series / number, and the reader has to know that.
      *
@@ -198,23 +247,12 @@ class InvoiceLinesImporter
      */
     private function stats(array $lines): array
     {
-        $count = fn (callable $test) => count(array_filter($lines, $test));
-        $keys = array_filter(array_column($lines, 'invoice_key'));
+        $stats = new InvoiceLineStats;
+        foreach ($lines as $line) {
+            $stats->add($line);
+        }
 
-        return [
-            'lines' => count($lines),
-            'invoices' => count(array_unique($keys)),
-            'identified_lines' => count($keys),
-            'unidentified_lines' => count($lines) - count($keys),
-            'no_supplier_tin' => $count(fn ($l) => $l['supplier_tin'] === null),
-            'no_recipient_tin' => $count(fn ($l) => $l['recipient_tin'] === null),
-            'no_date' => $count(fn ($l) => $l['invoice_date'] === null),
-            'no_item' => $count(fn ($l) => $l['item_name'] === null),
-            'unique_items' => count(array_unique(array_map(
-                fn ($t) => ItemTranslation::hashFor($t),
-                array_filter(array_column($lines, 'item_name')),
-            ))),
-        ];
+        return $stats->toArray();
     }
 
     private function sizeError(int $count): ?string
@@ -230,25 +268,6 @@ class InvoiceLinesImporter
         }
 
         return null;
-    }
-
-    /**
-     * Invoice keys of these lines that already exist in e_invoices.
-     *
-     * @param  array<int, array<string, mixed>>  $lines
-     * @return array<string, true>
-     */
-    private function existingKeys(array $lines): array
-    {
-        $keys = array_values(array_unique(array_filter(array_column($lines, 'invoice_key'))));
-        $known = [];
-        foreach (array_chunk($keys, 1000) as $chunk) {
-            foreach (DB::table('e_invoices')->whereIn('invoice_key', $chunk)->distinct()->pluck('invoice_key') as $k) {
-                $known[$k] = true;
-            }
-        }
-
-        return $known;
     }
 
     /**
@@ -288,17 +307,35 @@ class InvoiceLinesImporter
      */
     private function mapRows(array $header, array $rows): array
     {
-        $map = self::columnMap($header);
+        $map = $this->lineMapper($header);
         $lines = [];
-
         foreach ($rows as $i => $row) {
+            if (($line = $map($row, $i + 1)) !== null) {
+                $lines[] = $line;
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * A row → line mapper for this header (null for a blank row) — one row at a time, so a big
+     * file can be read as a stream. $rowNo = the line's position in the file (the export's own
+     * first column is just a 0-based index without a header).
+     *
+     * @param  array<int, mixed>  $header
+     * @return Closure(array<int, mixed>, int): ?array<string, mixed>
+     */
+    public function lineMapper(array $header): Closure
+    {
+        $map = self::columnMap($header);
+
+        return function (array $row, int $rowNo) use ($map): ?array {
             if ($this->isBlank($row)) {
-                continue;
+                return null;
             }
 
-            // row_no = the line's position in the file (the export's own first column is just
-            // a 0-based index without a header).
-            $line = ['row_no' => $i + 1];
+            $line = ['row_no' => $rowNo];
             foreach (array_keys(self::HEADERS) as $column) {
                 $line[$column] = $this->normalize($column, isset($map[$column]) ? ($row[$map[$column]] ?? null) : null);
             }
@@ -308,10 +345,8 @@ class InvoiceLinesImporter
                 ? $line['series'].'|'.$line['number']
                 : null;
 
-            $lines[] = $line;
-        }
-
-        return $lines;
+            return $line;
+        };
     }
 
     private function normalize(string $column, mixed $value): mixed
@@ -330,6 +365,9 @@ class InvoiceLinesImporter
 
         if ($value === null) {
             return null;
+        }
+        if ($value instanceof DateTimeInterface) {
+            $value = $value->format('Y-m-d');
         }
 
         if (in_array($column, self::IDENTIFIER_COLS, true) && (is_int($value) || is_float($value))) {
@@ -354,6 +392,9 @@ class InvoiceLinesImporter
     {
         if ($value === null || $value === '') {
             return null;
+        }
+        if ($value instanceof DateTimeInterface) { // a date-formatted xlsx cell read as a stream
+            return $value->format('Y-m-d');
         }
         if (is_int($value) || is_float($value)) {
             return ExcelDate::excelToDateTimeObject((float) $value)->format('Y-m-d');
@@ -382,7 +423,7 @@ class InvoiceLinesImporter
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
-        if ($value === null) {
+        if ($value === null || $value instanceof DateTimeInterface) {
             return null;
         }
 

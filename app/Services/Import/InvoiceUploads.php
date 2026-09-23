@@ -86,8 +86,13 @@ class InvoiceUploads
      */
     public function recent(int $limit = 10): Collection
     {
+        // Not the previews of big files still being read / waiting for Import — those are the
+        // uploader's own business until imported.
         $batches = ImportBatch::where('source', 'invoices')
             ->whereNull('lines_deleted_at')
+            ->where(fn ($q) => $q->whereNull('status')->orWhereIn('status', [
+                BackgroundInvoiceUploads::IMPORTING, BackgroundInvoiceUploads::IMPORTED, BackgroundInvoiceUploads::FAILED,
+            ]))
             ->latest('id')
             ->limit($limit)
             ->get();
@@ -101,10 +106,14 @@ class InvoiceUploads
             'key' => $b->key,
             'label' => $b->label,
             'format' => $b->format,
+            'status' => $b->status,
             'lines' => (int) ($lines[$b->key] ?? 0),
             'items' => (int) $b->item_count,
             'at' => $b->created_at,
-        ]);
+        ])
+            // A failed big import is listed only when it got rows in (so they can be deleted).
+            ->filter(fn ($u) => $u->status !== BackgroundInvoiceUploads::FAILED || $u->lines > 0)
+            ->values();
     }
 
     /**
@@ -117,8 +126,12 @@ class InvoiceUploads
             return 0;
         }
 
-        $deleted = EInvoice::where('import_batch', $key)->delete();
         $batch = ImportBatch::where('key', $key)->where('source', 'invoices')->first();
+        if ($batch?->status === BackgroundInvoiceUploads::IMPORTING) {
+            return 0; // still being written — delete it once the import is done
+        }
+
+        $deleted = EInvoice::where('import_batch', $key)->delete();
         if ($batch) {
             $this->retire($batch);
         }
@@ -131,7 +144,12 @@ class InvoiceUploads
     {
         $deleted = $this->legacy->deleteAll();
 
-        ImportBatch::where('source', 'invoices')->whereNull('lines_deleted_at')->get()
+        // Previews of big files still being read / waiting for Import have no rows yet — leave
+        // them (and their files) to their own cancel / prune.
+        ImportBatch::where('source', 'invoices')
+            ->whereNull('lines_deleted_at')
+            ->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', BackgroundInvoiceUploads::PENDING))
+            ->get()
             ->each(fn (ImportBatch $b) => $this->retire($b));
 
         return $deleted;

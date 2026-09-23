@@ -25,12 +25,17 @@ class ItemTranslation extends Model
      */
     public static function hashFor(string $text): string
     {
+        return hash('sha256', self::normalizeName($text));
+    }
+
+    /** The normalised form hashFor() hashes — for callers that only need to tell names apart. */
+    public static function normalizeName(string $text): string
+    {
         $norm = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
         $norm = str_replace(['İ', 'I'], ['i', 'ı'], $norm);
         $norm = mb_strtolower($norm, 'UTF-8');
-        $norm = str_replace("\u{0307}", '', $norm); // stray combining dot above
 
-        return hash('sha256', $norm);
+        return str_replace("\u{0307}", '', $norm); // stray combining dot above
     }
 
     /**
