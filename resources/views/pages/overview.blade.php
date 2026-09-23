@@ -24,6 +24,9 @@
       <div class="card-flat p-5">
         <p class="kicker mb-2">{{ $label }}</p>
         <p class="font-display text-3xl tnum">{{ $value }}</p>
+        @if($label === __('Invoices') && (int) $agg->unidentified > 0)
+          <p class="text-faint text-xs mt-1">{{ __('+ :n lines without invoice number', ['n' => number_format((int) $agg->unidentified, 0, '.', ' ')]) }}</p>
+        @endif
       </div>
     @endforeach
   </div>
@@ -52,9 +55,17 @@
       <ul class="space-y-3.5 text-sm">
         @foreach($recent as $inv)
           <li class="flex items-center justify-between">
-            <div class="leading-tight">
-              <div class="font-medium font-mono">{{ $inv->series }}·{{ $inv->number }}</div>
-              <div class="text-faint text-xs">{{ $inv->supplier_tin }} → {{ $inv->recipient_tin }}</div>
+            <div class="leading-tight min-w-0">
+              @if($inv->item_name)
+                <div class="font-medium truncate max-w-[260px]" title="{{ $inv->item_name }}">{{ $inv->item_name }}</div>
+              @else
+                <div class="font-medium font-mono">{{ $inv->series }}·{{ $inv->number }}</div>
+              @endif
+              @if($inv->supplier_tin || $inv->recipient_tin)
+                <div class="text-faint text-xs">{{ $inv->supplier_tin ?? '—' }} → {{ $inv->recipient_tin ?? '—' }}</div>
+              @elseif($inv->invoice_key)
+                <div class="text-faint text-xs font-mono">{{ $inv->series }}·{{ $inv->number }}</div>
+              @endif
             </div>
             <div class="text-right leading-tight">
               <div class="tnum font-medium">₼ {{ number_format($inv->total_amount, 0, '.', ' ') }}</div>

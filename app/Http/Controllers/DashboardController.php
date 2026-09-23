@@ -10,8 +10,11 @@ class DashboardController extends Controller
 {
     public function index(): View
     {
+        // A row is an invoice LINE: invoices are the distinct series|number keys; lines of the
+        // line-level export that carry no series/number cannot be tied to an invoice.
         $agg = EInvoice::query()
-            ->selectRaw('count(*) as invoices')
+            ->selectRaw('count(distinct invoice_key) as invoices')
+            ->selectRaw('sum(case when invoice_key is null then 1 else 0 end) as unidentified')
             ->selectRaw('coalesce(sum(total_amount),0) as turnover')
             ->selectRaw('coalesce(sum(vat_amount),0) as vat')
             ->selectRaw('count(distinct supplier_tin) as suppliers')

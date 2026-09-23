@@ -716,5 +716,9 @@
     "Delete": "Удалить",
     "Import failed: :error": "Импорт не удался: :error",
     "No invoice lines found in the file.": "В файле не найдено строк накладных.",
-    "The file has :n lines — at most :max per upload for now. Split it into smaller files.": "В файле :n строк — пока можно не больше :max за одну загрузку. Разбейте его на файлы поменьше."
+    "The file has :n lines — at most :max per upload for now. Split it into smaller files.": "В файле :n строк — пока можно не больше :max за одну загрузку. Разбейте его на файлы поменьше.",
+    "Search item, TIN, series, number…": "Поиск по товару, ИНН, серии, номеру…",
+    "classifying…": "классифицируется…",
+    "decl.": "заявл.",
+    "+ :n lines without invoice number": "+ строк без номера накладной: :n"
 }

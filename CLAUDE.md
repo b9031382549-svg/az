@@ -35,9 +35,20 @@ The app is auth-gated (default login user `admin`).
   `data:build-rubricator`) backs the broker mechanism.
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
+- **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;
+  recognises the layout from the header) → `InvoiceLinesImporter` (line-level
+  export "Şablon": every line → `e_invoices`, every unique item name →
+  classification via `ClassificationQueue`, the shared path with the Classify
+  page) or `InvoiceImporter` (legacy 15-column invoice list). `e_invoices` is one
+  row per invoice LINE (legacy rows = whole invoices, `item_name` NULL);
+  `invoice_key` = series|number (NULL = line not tied to an invoice). Each upload
+  is an `ImportBatch` (source `invoices`). The supplier's `declared_code` is
+  stored only — never fed to the classifier or to memory.
 - **NL→SQL:** `NlSqlService`, `SchemaContext` (from `metadata_catalog`),
-  `SqlGuard`/`SqlGuardException` (enforce read-only + table allow-list). A
-  read-only DB role `app_ro` is used for the actual query (`nlsql:grant`).
+  `SqlGuard`/`SqlGuardException` (enforce read-only + table allow-list). The chat
+  reads only the `invoice_lines` VIEW (e_invoices + each line's classification +
+  upload). A read-only DB role `app_ro` is used for the actual query
+  (`nlsql:grant`).
 - **LLM:** `OpenRouterClient`, `JsonExtractor`. Query-expansion model via
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,
@@ -98,6 +109,8 @@ The app is auth-gated (default login user `admin`).
   directly to `main` for non-trivial changes.
 - Migrations run **once per deploy** (never from a container entrypoint). Changing
   `.env` on the server requires a redeploy / `php artisan optimize`.
+- The deploy also re-runs `nlsql:grant` (chat role grants ← `config/nlsql.php`)
+  and `MetadataCatalogSeeder` (chat column descriptions) — both idempotent.
 
 ## Env & secrets
 
@@ -113,3 +126,7 @@ The app is auth-gated (default login user `admin`).
 - Queue `retry_after` (`REDIS_QUEUE_RETRY_AFTER`) must exceed the longest job
   timeout, or jobs re-dispatch while still running (duplicate paid LLM calls).
 - The catalog embed job self-chains in small batches — safe to interrupt/resume.
+- The `invoice_lines` view reads e_invoices / classification_items /
+  rubricator_nodes / import_batches columns: Postgres refuses to change the type of
+  a column a view uses — drop and recreate the view in such a migration. Adding a
+  column the chat should see = add it to the view AND to `MetadataCatalogSeeder`.

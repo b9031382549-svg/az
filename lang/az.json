@@ -716,5 +716,9 @@
     "Delete": "Sil",
     "Import failed: :error": "İdxal alınmadı: :error",
     "No invoice lines found in the file.": "Faylda qaimə sətri tapılmadı.",
-    "The file has :n lines — at most :max per upload for now. Split it into smaller files.": "Faylda :n sətir var — hələlik bir yükləmədə ən çox :max. Onu kiçik fayllara bölün."
+    "The file has :n lines — at most :max per upload for now. Split it into smaller files.": "Faylda :n sətir var — hələlik bir yükləmədə ən çox :max. Onu kiçik fayllara bölün.",
+    "Search item, TIN, series, number…": "Mal, VÖEN, seriya, nömrə üzrə axtarış…",
+    "classifying…": "təsnif edilir…",
+    "decl.": "bəyan.",
+    "+ :n lines without invoice number": "+ qaimə nömrəsi olmayan :n sətir"
 }
