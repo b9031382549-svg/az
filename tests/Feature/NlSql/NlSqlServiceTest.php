@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\NlSql;
 
+use App\Models\EInvoice;
 use App\Services\Llm\OpenRouterClient;
 use App\Services\NlSql\NlSqlService;
 use App\Services\NlSql\SchemaContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Mockery;
 use Tests\TestCase;
 
@@ -106,5 +108,23 @@ class NlSqlServiceTest extends TestCase
         $this->assertSame(['system', 'user', 'assistant', 'user'], array_column($messages, 'role'));
         $this->assertStringContainsString('"answer"', $messages[2]['content']);
         $this->assertStringContainsString('questions about your invoices', $messages[2]['content']);
+    }
+
+    public function test_the_prompt_explains_lines_and_counts_invoices_by_key(): void
+    {
+        EInvoice::create(['invoice_date' => '2026-09-01', 'invoice_key' => 'MT|1', 'item_name' => 'Divan', 'total_amount' => 10]);
+        EInvoice::create(['invoice_date' => '2026-09-02', 'invoice_key' => 'MT|1', 'item_name' => 'Yan masa', 'total_amount' => 20]);
+        EInvoice::create(['invoice_date' => '2026-09-03', 'item_name' => 'Noutbuk', 'total_amount' => 30]);
+
+        // Let the read-only probe see this test's in-memory database (same PDO).
+        DB::purge('pgsql_ro');
+        DB::connection('pgsql_ro')->setPdo(DB::connection()->getPdo());
+
+        $system = $this->messagesFor('how many invoices?', [])[0]['content'];
+
+        $this->assertStringContainsString('COUNT(DISTINCT invoice_key)', $system);
+        $this->assertStringContainsString('ai_code', $system);
+        // Coverage comes from the chat's own view: 3 lines, 1 identified invoice.
+        $this->assertStringContainsString('3 invoice lines, 1 identified invoices', $system);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Livewire\Concerns\ConfirmsClassifications;
 use App\Models\ClassificationItem;
+use App\Models\EInvoice;
 use App\Models\ImportBatch;
 use App\Models\RubricatorNode;
 use App\Services\Classify\BatchStats;
@@ -162,7 +163,11 @@ class ReviewQueue extends Component
 
         $deleted = ClassificationItem::where('batch', $this->batch)->count();
         ClassificationItem::where('batch', $this->batch)->delete(); // cascades to results
-        ImportBatch::where('key', $this->batch)->delete();
+        // An invoice upload's lines outlive its classification run — keep its batch row so the
+        // upload stays listed (and deletable) on the Upload page.
+        if (! EInvoice::where('import_batch', $this->batch)->exists()) {
+            ImportBatch::where('key', $this->batch)->delete();
+        }
         Audit::log('batch.delete', ['batch' => $this->batch, 'deleted' => $deleted]);
 
         // The upload is gone — back to the list.

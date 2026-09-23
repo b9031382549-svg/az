@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
 use App\Models\RubricatorNode;
+use App\Services\Classify\InvoiceLineHints;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -186,6 +187,8 @@ class HumanReview extends Component
             'candidates' => $candidates,
             'proposals' => $proposals->unique(fn ($p) => $p->mechanism.$p->heading)->values(),
             'headingNames' => $headingNames,
+            // What the invoice lines said (declared code, unit) — for the reviewer, never the AI.
+            'invoiceHints' => $item ? app(InvoiceLineHints::class)->for($item) : null,
             'uploads' => $this->uploads(),
             'waiting' => $this->queueQuery()->count(),
             'oldest' => $this->queueQuery()->min('created_at'),

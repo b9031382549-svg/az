@@ -7,9 +7,12 @@ return [
     | grants are all derived from this list — so system tables (users, jobs,
     | sessions, cache, migrations, catalog, …) are never exposed.
     |
-    | After changing this list, run: php artisan nlsql:grant
+    | The deploy runs `php artisan nlsql:grant` to sync the role's grants with this
+    | list (run it by hand after changing the list outside a deploy).
     */
     'tables' => [
-        'e_invoices',
+        // A view over e_invoices (one row = one invoice line) plus the classification of
+        // each line's item — see the create_invoice_lines_view migration.
+        'invoice_lines',
     ],
 ];

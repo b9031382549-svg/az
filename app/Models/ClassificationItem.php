@@ -83,6 +83,17 @@ class ClassificationItem extends Model
     }
 
     /**
+     * Invoice lines (e_invoices) carrying this item's name — set by an invoice upload, empty
+     * for items typed or listed on the Classify page.
+     *
+     * @return HasMany<EInvoice, $this>
+     */
+    public function invoiceLines(): HasMany
+    {
+        return $this->hasMany(EInvoice::class, 'classification_item_id');
+    }
+
+    /**
      * Codes a reviewer may confirm for this item: every candidate any mechanism
      * considered, plus each mechanism's own pick (a mechanism's pick may not be
      * in another's candidate list). Requires `results` to be loaded.

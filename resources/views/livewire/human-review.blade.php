@@ -89,6 +89,31 @@
                 data-hint="{{ $item->displayResolution() }}">{{ $reasonLabel($item->displayResolution()) }}</span>
         </div>
 
+        {{-- What the invoices said about this item — the supplier's declared code and unit.
+             A hint for the reviewer only; the classifier never sees it. --}}
+        @if($invoiceHints)
+          <div class="mt-4 card-flat p-3.5 text-sm">
+            <p class="kicker mb-2">{{ __('From the invoices') }} <span class="text-faint">· {{ __(':n line(s)', ['n' => number_format($invoiceHints['lines'])]) }}</span></p>
+            @foreach($invoiceHints['codes'] as $c)
+              <div class="flex items-baseline gap-2 min-w-0">
+                <span class="text-faint shrink-0">{{ __('Declared code') }}</span>
+                <span class="font-mono shrink-0">{{ mb_substr($c['code'], 0, 4) }}</span>
+                <span class="font-mono text-faint text-xs shrink-0">{{ $c['code'] }}</span>
+                <span class="text-muted truncate min-w-0 {{ $c['group'] ? 'hint-head' : '' }}"
+                      @if($c['group']) data-hint-title="{{ $c['code'] }}" data-hint-body="{{ $c['group'] }}" @endif>{{ $c['group'] ?? '' }}</span>
+                @if(count($invoiceHints['codes']) > 1)<span class="text-faint text-xs shrink-0 tnum">× {{ $c['lines'] }}</span>@endif
+              </div>
+            @endforeach
+            @if(! empty($invoiceHints['units']))
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-faint">{{ __('Unit') }}</span>
+                <span>{{ collect($invoiceHints['units'])->map(fn ($u) => $u['unit'].(count($invoiceHints['units']) > 1 ? ' ×'.$u['lines'] : ''))->implode(', ') }}</span>
+              </div>
+            @endif
+            <p class="text-faint text-xs mt-2">{{ __('What the supplier wrote on the invoice — a hint, not a verified code.') }}</p>
+          </div>
+        @endif
+
         {{-- What each mechanism proposed --}}
         <div class="mt-5">
           <p class="kicker mb-2">{{ __('What the mechanisms proposed') }}</p>

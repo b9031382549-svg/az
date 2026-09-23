@@ -2,17 +2,12 @@
 
 namespace App\Livewire;
 
-use App\Jobs\ClassifyMechanismJob;
-use App\Jobs\TranslateItemJob;
-use App\Models\ClassificationItem;
 use App\Models\ImportBatch;
-use App\Models\ItemTranslation;
-use App\Models\RubricatorNode;
-use App\Services\Classify\AnswerCacheService;
+use App\Services\Classify\BatchProgress;
 use App\Services\Classify\BatchStats;
+use App\Services\Classify\ClassificationQueue;
 use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,9 +23,6 @@ class Classify extends Component
 
     /** Max items queued from a single file upload. */
     private const FILE_LIMIT = 100000;
-
-    /** Jobs pushed to the queue per bulk insert. */
-    private const DISPATCH_CHUNK = 500;
 
     public string $input = '';
 
@@ -151,61 +143,10 @@ class Classify extends Component
         $this->reset('file');
     }
 
-    /**
-     * Create one parent ClassificationItem per unique (batch, source_hash) and
-     * fan out a ClassifyMechanismJob per enabled mechanism, plus one background
-     * translation job per item. Returns the number of distinct items enqueued.
-     *
-     * @param  array<int, string>  $texts
-     */
+    /** Put the texts on the shared classification pipeline; returns the distinct item count. */
     private function enqueue(array $texts, string $batch): int
     {
-        $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
-        $now = now();
-
-        // Parent rows in bulk. keyBy(source_hash) so a single upsert never
-        // targets the same (batch, source_hash) row twice.
-        $rows = collect($texts)
-            ->map(fn ($t) => [
-                'batch' => $batch,
-                'source_hash' => ItemTranslation::hashFor($t),
-                'source_text' => $t,
-                'resolution' => 'pending',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ])
-            ->keyBy('source_hash')
-            ->values()
-            ->all();
-
-        ClassificationItem::upsert($rows, ['batch', 'source_hash'], ['source_text']);
-
-        $items = ClassificationItem::where('batch', $batch)->get();
-        $cache = app(AnswerCacheService::class);
-
-        // FIRST step: a verified answer in the cache resolves the item immediately —
-        // no mechanism jobs, no LLM. Only cache MISSES fan out to the AI pipeline.
-        $jobs = [];
-        foreach ($items as $item) {
-            if ($cache->apply($item)) {
-                continue;
-            }
-            foreach ($enabled as $mechanism) {
-                $jobs[] = new ClassifyMechanismJob((int) $item->id, (string) $mechanism);
-            }
-        }
-        foreach (array_chunk($jobs, self::DISPATCH_CHUNK) as $chunk) {
-            Queue::bulk($chunk, '', 'default');
-        }
-
-        if (config('classify.translate_items', true)) {
-            $translate = collect($texts)->unique()->map(fn ($t) => new TranslateItemJob($t))->all();
-            foreach (array_chunk($translate, self::DISPATCH_CHUNK) as $chunk) {
-                Queue::bulk($chunk, '', 'default');
-            }
-        }
-
-        return $items->count();
+        return app(ClassificationQueue::class)->enqueue($texts, $batch);
     }
 
     /** Dismiss the progress panel and start a fresh classification. */
@@ -221,46 +162,9 @@ class Classify extends Component
         $batchStats = null;
 
         if ($this->queued) {
-            $batch = $this->queued['batch'];
-
-            // "Done" is every non-pending row — EXCEPT a raw 'conflict' that the web-search
-            // resolver hasn't finished yet. Consensus sets 'conflict' and only *then*
-            // dispatches SearchResolveJob, so a just-diverged item is non-pending while its
-            // resolver job is still queued/running. Counting it as done let the bar hit 100%
-            // and stop polling (blade: wire:poll only while !complete) before the resolver
-            // flipped those rows to 'ai_resolved' — "finished" on screen, still working in
-            // fact. A completed resolve *always* leaves a mechanism='search' trace row (the
-            // same signal the reaper trusts), so its presence is the real "resolver done"
-            // marker; search_resolved_at is only the dispatch claim, not completion.
-            $resolverEnabled = (bool) config('classify.search_resolver.enabled', false);
-            $done = ClassificationItem::where('batch', $batch)
-                ->where('resolution', '!=', 'pending')
-                ->when($resolverEnabled, fn ($q) => $q->where(fn ($w) => $w
-                    ->where('resolution', '!=', 'conflict')
-                    ->orWhereHas('results', fn ($r) => $r->where('mechanism', 'search'))))
-                ->count();
-
-            $rows = ClassificationItem::where('batch', $batch)
-                ->with(['finalCode', 'translation', 'results'])
-                ->latest()
-                ->limit(50)
-                ->get();
-
-            // A 4-digit heading (or "99") answer has no exact catalog leaf — resolve its
-            // display name from the rubricator (same source ReviewQueue uses).
-            $headingCodes = $rows->pluck('final_code')
-                ->filter(fn ($c) => ($n = mb_strlen((string) $c)) > 0 && $n < 10)->unique()->values();
-            $headingNames = RubricatorNode::whereIn('code', $headingCodes)->get(['code', 'title', 'title_en', 'title_ru'])
-                ->mapWithKeys(fn ($n) => [(string) $n->code => $n->localizedTitle()]);
-
-            $progress = [
-                'done' => $done,
-                'count' => (int) $this->queued['count'],
-                'complete' => $done >= (int) $this->queued['count'],
-                'rows' => $rows,
-            ];
-
-            $batchStats = app(BatchStats::class)->for($batch);
+            $progress = app(BatchProgress::class)->for($this->queued['batch'], (int) $this->queued['count']);
+            $headingNames = $progress['headingNames'];
+            $batchStats = app(BatchStats::class)->for($this->queued['batch']);
         }
 
         return view('livewire.classify', [

@@ -67,6 +67,12 @@ jobs:
             grep -q '^RESULTS_API_KEY=' .env || printf '\nRESULTS_API_KEY=%s\n' "${{ secrets.RESULTS_API_KEY }}" >> .env
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml run --rm app php artisan migrate --force
+            # The AI chat reads only config('nlsql.tables') through the read-only role:
+            # re-sync that role's grants (idempotent — a new/renamed view would otherwise
+            # be "permission denied" until someone ran it by hand) and refresh the
+            # column descriptions the chat prompt is built from (idempotent upsert).
+            docker compose -f docker-compose.prod.yml run --rm app php artisan nlsql:grant
+            docker compose -f docker-compose.prod.yml run --rm app php artisan db:seed --class='Database\Seeders\MetadataCatalogSeeder' --force
             # Rebuild the rubricator tree from the catalog (deterministic, idempotent,
             # titles need no LLM). Required by the broker mechanism.
             docker compose -f docker-compose.prod.yml run --rm app php artisan data:build-rubricator

@@ -185,7 +185,24 @@ class NlSqlService
           the current date/time — set "sql" to null and put a short, direct reply
           in "answer" (for date questions use the current date from CONTEXT).
         - Use only the tables and columns listed above. Do not invent columns.
-        - "total_amount" is the turnover. VAT is "vat_amount".
+          Earlier turns may mention an old table name (e_invoices) — always use
+          invoice_lines.
+        - One row of invoice_lines is one invoice LINE (a goods/service position).
+          Rows of the older invoice-list format are whole invoices stored as a
+          single line with item_name NULL.
+        - "total_amount" is the turnover — sum it over rows. VAT is "vat_amount".
+        - An invoice is identified by "invoice_key" (series|number): count invoices
+          with COUNT(DISTINCT invoice_key). Lines with invoice_key NULL cannot be
+          tied to a specific invoice — when counting invoices, report them
+          separately instead of dropping them silently.
+        - Goods/service categories come from OUR classifier: "ai_code" (a 4-digit
+          heading, '99' = a service), "ai_heading_name", "ai_kind" and
+          "ai_status" (classified | in_progress | needs_review | rejected).
+          "declared_code" / "declared_heading" / "declared_group" are what the
+          SUPPLIER wrote on the invoice — unverified; use them only when the
+          question is about the declared codes.
+        - Match names case-insensitively with ILIKE (item_name, supplier_name,
+          …); units vary in case, compare lower(unit).
         - Dates are SQL DATE values. The current real-world date is given in
           CONTEXT above — use it when the user refers to "today" / "now" / a
           specific calendar date, and when answering conversationally about dates.
@@ -193,7 +210,7 @@ class NlSqlService
           CONTEXT. For an OPEN relative period ("last N days", "recent", "this
           month") with no explicit calendar year, measure it from the latest
           available date in the data, since the snapshot ends there, e.g.
-          invoice_date > (SELECT max(invoice_date) FROM e_invoices) - INTERVAL 'N days'.
+          invoice_date > (SELECT max(invoice_date) FROM invoice_lines) - INTERVAL 'N days'.
           Mention in the explanation that the window is relative to the latest
           data date.
         - If the user asks about a real calendar period the data does not cover
@@ -228,11 +245,13 @@ class NlSqlService
 
         try {
             $span = DB::connection('pgsql_ro')->selectOne(
-                'SELECT min(invoice_date) AS min_d, max(invoice_date) AS max_d, count(*) AS n FROM e_invoices'
+                'SELECT min(invoice_date) AS min_d, max(invoice_date) AS max_d, count(*) AS n,'
+                .' count(DISTINCT invoice_key) AS invoices FROM invoice_lines'
             );
             if ($span && $span->n > 0) {
                 $lines[] = '- The invoice data is historical: it covers '.$span->min_d.' … '.$span->max_d
-                    .' ('.number_format((int) $span->n).' invoices). There is no data for the current date.';
+                    .' ('.number_format((int) $span->n).' invoice lines, '.number_format((int) $span->invoices)
+                    .' identified invoices). There is no data for the current date.';
             } else {
                 $lines[] = '- The invoice table is currently empty.';
             }

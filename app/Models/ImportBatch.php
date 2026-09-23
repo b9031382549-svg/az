@@ -10,6 +10,14 @@ class ImportBatch extends Model
 {
     protected $guarded = ['id'];
 
+    protected function casts(): array
+    {
+        return [
+            'stats' => 'array',
+            'lines_deleted_at' => 'datetime',
+        ];
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -24,5 +32,11 @@ class ImportBatch extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ClassificationItem::class, 'batch', 'key');
+    }
+
+    /** Invoice rows (e_invoices) this upload brought in — invoice uploads only. */
+    public function lines(): HasMany
+    {
+        return $this->hasMany(EInvoice::class, 'import_batch', 'key');
     }
 }
