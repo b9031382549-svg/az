@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Classify;
 
+use App\Jobs\ClassifyMechanismJob;
 use App\Livewire\ClassificationDecision;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -279,5 +281,31 @@ class ClassificationDecisionTest extends TestCase
             ->assertOk()
             ->assertSee('AI search')
             ->assertSee('diverged');
+    }
+
+    public function test_a_trash_item_shows_the_rule_and_can_be_sent_to_the_ai(): void
+    {
+        Queue::fake();
+        config()->set('classify.mechanisms.enabled', ['vector', 'direct']);
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => 'POLAR BOYA MMC',
+            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'trash', 'answered_at' => now(),
+        ]);
+        $item->results()->create(['mechanism' => 'trash', 'status' => 'trash', 'trace' => ['rule' => 'company']]);
+
+        $page = Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('Trash filter')
+            ->assertSee('Only a company name — no product is named.')
+            ->assertSee('Not trash — classify')
+            ->assertDontSee('awaiting a human decision');
+
+        $page->call('classifyAnyway')
+            ->assertSee('overridden by a reviewer')
+            ->assertDontSee('Not trash — classify');
+
+        $this->assertSame('pending', $item->fresh()->resolution);
+        Queue::assertPushed(ClassifyMechanismJob::class, 2);
     }
 }

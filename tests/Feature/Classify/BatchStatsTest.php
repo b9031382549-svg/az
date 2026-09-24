@@ -68,6 +68,20 @@ class BatchStatsTest extends TestCase
         $this->assertNull($mem['human']);
     }
 
+    public function test_trash_is_its_own_row_not_human_review(): void
+    {
+        $this->item(['resolution' => 'trash', 'answered_at' => now()]);
+        $this->item(['resolution' => 'conflict', 'answered_at' => now()]);
+
+        $stats = app(BatchStats::class)->for('b');
+
+        $ran = collect($stats['rows'])->pluck('ran', 'key');
+        $this->assertSame(1, $ran['trash']);
+        $this->assertSame(1, $ran['human']);          // the conflict only
+        $this->assertTrue($stats['complete']);
+        $this->assertSame(2, collect($stats['rows'])->sum('ran'));
+    }
+
     public function test_recognition_time_spans_start_to_last_answered(): void
     {
         $start = now()->subMinutes(5);

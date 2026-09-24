@@ -67,6 +67,7 @@
                   <span class="text-faint text-xs">{{ match (true) {
                       $ci->resolution === 'pending' || $ci->isResolving() => __('classifying…'),
                       $ci->resolution === 'rejected' => __('rejected'),
+                      $ci->resolution === 'trash' => __('trash'),
                       default => __('needs review'),
                   } }}</span>
                 @else

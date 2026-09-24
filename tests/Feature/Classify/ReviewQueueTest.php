@@ -351,4 +351,23 @@ class ReviewQueueTest extends TestCase
         $this->assertSame(1, $c->viewData('items')->total());
         $this->assertSame('still searching', $c->viewData('items')->first()->source_text);
     }
+
+    public function test_trash_has_its_own_bucket_and_counts_as_done_for_the_upload(): void
+    {
+        $this->agreedItem(); // batch 'b', resolution agreed
+        $trash = ClassificationItem::create(['batch' => 'b', 'source_text' => 'Müqaviləyə əsasən', 'source_hash' => bin2hex(random_bytes(16)), 'resolution' => 'trash']);
+        $trash->results()->create(['mechanism' => 'trash', 'status' => 'trash', 'trace' => ['rule' => 'paperwork']]);
+
+        $c = $this->detailComponent('b');
+        $this->assertSame(1, (int) ($c->viewData('counts')['trash'] ?? 0));
+        $this->assertSame(0, $c->viewData('openCount'));  // never a human's job
+        $c->assertSee('Trash')                            // its tab + donut legend
+            ->call('setFilter', 'trash');
+        $this->assertSame(1, $c->viewData('items')->total());
+        $c->assertSee('Müqaviləyə əsasən')->assertSee('trash filter');
+
+        $upload = $this->actingComponent()->viewData('uploads')->firstWhere('key', 'b');
+        $this->assertSame(1, $upload->trash);
+        $this->assertSame(100, $upload->done);            // agreed + trash = everything settled
+    }
 }

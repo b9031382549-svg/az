@@ -8,8 +8,10 @@ use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\GoldLabel;
 use App\Models\RubricatorNode;
+use App\Services\Classify\ClassificationQueue;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use App\Support\Audit;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -39,6 +41,15 @@ class ClassificationDecision extends Component
     public function reject(): void
     {
         $this->applyReject($this->item);
+        $this->item = $this->item->fresh(['results', 'finalCode', 'translation', 'adjudications', 'confirmedBy']);
+    }
+
+    /** "Not trash": the reviewer says the line does name a product — send it to the AI after all. */
+    public function classifyAnyway(): void
+    {
+        if (app(ClassificationQueue::class)->classifyAnyway($this->item)) {
+            Audit::log('classification.not_trash', ['id' => $this->item->id], $this->item);
+        }
         $this->item = $this->item->fresh(['results', 'finalCode', 'translation', 'adjudications', 'confirmedBy']);
     }
 
@@ -95,6 +106,8 @@ class ClassificationDecision extends Component
         $mechResults = $results->whereIn('mechanism', ['vector', 'broker', 'direct'])
             ->sortBy(fn ($r) => $order[$r->mechanism] ?? 9)->values();
         $cache = $results->firstWhere('mechanism', 'cache');
+        // The TrashFilter's verdict ('trash', or 'overridden' once a human sent it to the AI).
+        $trashCheck = $results->firstWhere('mechanism', 'trash');
         // The divergence resolver is two-step (flow v2): a self-consistency ENSEMBLE vote
         // runs first and, when it agrees, settles the item locally (mechanism='ensemble');
         // only a split/shadow falls through to the paid web SEARCH (mechanism='search').
@@ -157,6 +170,7 @@ class ClassificationDecision extends Component
             'gold' => $gold,
             'mechResults' => $mechResults,
             'cache' => $cache,
+            'trashCheck' => $trashCheck,
             'ensemble' => $ensemble,
             'search' => $search,
             'inMemory' => $inMemory,

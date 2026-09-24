@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Queue;
 
 // Puts item names on the classification pipeline — the one path shared by the Classify page
 // and invoice uploads: one parent ClassificationItem per unique (batch, name); a verified
-// memory (answer cache) hit resolves it at once, every miss fans out one ClassifyMechanismJob
-// per enabled mechanism; plus one background translation per name.
+// memory (answer cache) hit resolves it at once, a name that names no product at all is marked
+// 'trash' (TrashFilter), every other name fans out one ClassifyMechanismJob per enabled
+// mechanism; plus one background translation per name.
 class ClassificationQueue
 {
     /**
@@ -23,6 +24,7 @@ class ClassificationQueue
 
     public function __construct(
         private readonly AnswerCacheService $cache,
+        private readonly TrashFilter $trash,
     ) {}
 
     /** Create the items and put them on the pipeline; returns the number of distinct items. */
@@ -69,22 +71,19 @@ class ClassificationQueue
 
     /**
      * FIRST step: a verified answer in the cache resolves the item immediately — no mechanism
-     * jobs, no LLM. Only cache MISSES fan out to the AI pipeline.
+     * jobs, no LLM. SECOND: a cache miss whose name names no product (TrashFilter) is marked
+     * 'trash', again with no AI. Only what is left fans out to the AI pipeline.
      *
      * @param  Collection<array-key, ClassificationItem>  $items
      */
     public function dispatch(Collection $items): void
     {
-        $enabled = (array) config('classify.mechanisms.enabled', ['vector']);
-
         $jobs = [];
         foreach ($items as $item) {
-            if ($this->cache->apply($item)) {
+            if ($this->cache->apply($item) || $this->trash->apply($item)) {
                 continue;
             }
-            foreach ($enabled as $mechanism) {
-                $jobs[] = new ClassifyMechanismJob((int) $item->id, (string) $mechanism);
-            }
+            array_push($jobs, ...$this->mechanismJobs($item));
         }
         foreach (array_chunk($jobs, self::CHUNK) as $chunk) {
             Queue::bulk($chunk, '', 'default');
@@ -97,5 +96,37 @@ class ClassificationQueue
                 Queue::bulk($chunk, '', 'default');
             }
         }
+    }
+
+    /**
+     * A human's "not trash — classify it": put a trashed item back on the pipeline. Its 'trash'
+     * trace row stays, marked 'overridden' — the filter never re-trashes the item and the
+     * decision page still shows what happened. The automatic pipeline starts over, so
+     * answered_at is cleared for it to be stamped again. Returns false when not trash.
+     */
+    public function classifyAnyway(ClassificationItem $item): bool
+    {
+        if ($item->resolution !== 'trash') {
+            return false;
+        }
+
+        $item->results()->where('mechanism', 'trash')->update(['status' => 'overridden']);
+        $item->update(['resolution' => 'pending', 'answered_at' => null]);
+
+        // Memory first, as for any item — the same name may have been answered since.
+        if (! $this->cache->apply($item)) {
+            Queue::bulk($this->mechanismJobs($item), '', 'default');
+        }
+
+        return true;
+    }
+
+    /** @return array<int, ClassifyMechanismJob> one job per enabled mechanism */
+    private function mechanismJobs(ClassificationItem $item): array
+    {
+        return array_map(
+            fn ($mechanism) => new ClassifyMechanismJob((int) $item->id, (string) $mechanism),
+            (array) config('classify.mechanisms.enabled', ['vector']),
+        );
     }
 }

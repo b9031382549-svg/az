@@ -55,6 +55,7 @@
               $wr = $u->total ? $u->review / $u->total * 100 : 0;
               $ws = $u->total ? ($u->resolving ?? 0) / $u->total * 100 : 0;
               $wk = $u->total ? $u->conflict / $u->total * 100 : 0;
+              $wt = $u->total ? ($u->trash ?? 0) / $u->total * 100 : 0;
             @endphp
             <tr wire:key="up-{{ $u->key }}" class="border-b hair last:border-0 hover:bg-paper/40 transition">
               <td class="px-5 py-3">
@@ -73,12 +74,13 @@
                 <div class="flex items-center gap-2.5">
                   <span class="w-24 h-2 rounded-full bg-line/40 overflow-hidden flex shrink-0 cursor-help"
                         data-hint-title="{{ __('Result') }}"
-                        data-hint-body="{{ __(':resolved resolved · :searching searching · :review needs attention · :conflict conflict', ['resolved' => $u->resolved, 'searching' => $u->resolving ?? 0, 'review' => $u->review, 'conflict' => $u->conflict]) }}"
+                        data-hint-body="{{ __(':resolved resolved · :searching searching · :review needs attention · :conflict conflict · :trash trash', ['resolved' => $u->resolved, 'searching' => $u->resolving ?? 0, 'review' => $u->review, 'conflict' => $u->conflict, 'trash' => $u->trash ?? 0]) }}"
                         data-hint-meta="{{ __(':done% of :total resolved.', ['done' => $u->done, 'total' => $u->total]) }}">
                     <span class="bg-ledger block h-full" style="width:{{ $wc }}%"></span>
                     <span class="bg-amber block h-full" style="width:{{ $wr }}%"></span>
                     <span class="bg-amber/50 block h-full animate-pulse" style="width:{{ $ws }}%"></span>
                     <span class="bg-stamp block h-full" style="width:{{ $wk }}%"></span>
+                    <span class="bg-faint block h-full" style="width:{{ $wt }}%"></span>
                   </span>
                   <span class="text-faint tnum text-xs whitespace-nowrap">{{ $u->done }}% {{ __('resolved') }}</span>
                 </div>

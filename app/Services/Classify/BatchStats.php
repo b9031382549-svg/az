@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Always-on per-batch classification statistics — the funnel Roman asked for: how many of a
- * batch's items each step resolved (Memory → Local AI / Ensemble → Web search → Human), the
- * share of each, how many of those answers were written back to memory & training, and the
- * total recognition time (start → every item answered).
+ * batch's items each step resolved (Memory / Trash filter → Local AI / Ensemble → Web search →
+ * Human), the share of each, how many of those answers were written back to memory & training,
+ * and the total recognition time (start → every item answered).
  *
  * "Source" is derived from the trace rows, not the resolution alone, because resolution
  * conflates them: a cache hit and a consensus agreement are both 'agreed', and an ensemble
@@ -39,6 +39,8 @@ class BatchStats
         $answered = $base()->whereNotNull('answered_at')->count();
         $agreed = $base()->where('resolution', 'agreed')->count();
         $memory = $base()->whereHas('results', fn ($r) => $r->where('mechanism', 'cache'))->count();
+        // Names that name no product — settled by the TrashFilter before any AI.
+        $trash = $base()->where('resolution', 'trash')->count();
         $localAi = max(0, $agreed - $memory);
         $aiResolved = $base()->where('resolution', 'ai_resolved')->count();
         $ensemble = $ensembleSourced($base()->where('resolution', 'ai_resolved'))->count();
@@ -46,7 +48,7 @@ class BatchStats
         // Everything else that reached an outcome (a done conflict/no_match, or a human
         // confirm/reject) is the human-review bucket — computed as the remainder so the rows
         // always sum to the answered total and never double-count an in-flight conflict.
-        $human = max(0, $answered - $memory - $localAi - $ensemble - $web);
+        $human = max(0, $answered - $memory - $trash - $localAi - $ensemble - $web);
         $processing = max(0, $total - $answered);
 
         // Sent to memory & training — what ACTUALLY went to answer_cache (memory_promoted_at),
@@ -63,6 +65,7 @@ class BatchStats
 
         $rows = [
             ['step' => 1, 'key' => 'memory', 'label' => 'Memory', 'ran' => $memory, 'pct' => $pct($memory), 'memory' => null],
+            ['step' => 1, 'key' => 'trash', 'label' => 'Trash filter (no product named)', 'ran' => $trash, 'pct' => $pct($trash), 'memory' => null],
             ['step' => 2, 'key' => 'local_ai', 'label' => 'Local AI (Vector + Direct)', 'ran' => $localAi, 'pct' => $pct($localAi), 'memory' => $agreedPromoted],
             ['step' => 2, 'key' => 'ensemble', 'label' => 'Ensemble (Vector + Direct + Web)', 'ran' => $ensemble, 'pct' => $pct($ensemble), 'memory' => $ensemblePromoted],
             ['step' => 3, 'key' => 'web', 'label' => 'Web search', 'ran' => $web, 'pct' => $pct($web), 'memory' => $webPromoted],

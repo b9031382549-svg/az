@@ -197,7 +197,9 @@ class NlSqlService
           separately instead of dropping them silently.
         - Goods/service categories come from OUR classifier: "ai_code" (a 4-digit
           heading, '99' = a service), "ai_heading_name", "ai_kind" and
-          "ai_status" (classified | in_progress | needs_review | rejected).
+          "ai_status" (classified | in_progress | needs_review | rejected | trash —
+          the item name names no product, e.g. only a contract reference or a
+          date, so it is never classified).
           "declared_code" / "declared_heading" / "declared_group" are what the
           SUPPLIER wrote on the invoice — unverified; use them only when the
           question is about the declared codes.
