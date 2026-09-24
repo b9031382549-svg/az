@@ -14,6 +14,7 @@ class ImportBatch extends Model
     {
         return [
             'stats' => 'array',
+            'meta' => 'array',
             'lines_deleted_at' => 'datetime',
         ];
     }

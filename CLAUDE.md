@@ -50,6 +50,15 @@ The app is auth-gated (default login user `admin`).
   `invoice_key` = series|number (NULL = line not tied to an invoice). Each upload
   is an `ImportBatch` (source `invoices`). The supplier's `declared_code` is
   stored only — never fed to the classifier or to memory.
+- **Big uploads** (.xlsx/.csv above `uploads.background_bytes`, up to 200 MB —
+  `config/uploads.php`): same steps (preview → Import) but on the worker via
+  `BackgroundInvoiceUploads` (status on `import_batches`: analyzing → ready →
+  importing → imported / failed; the page polls). `SheetStream` (OpenSpout)
+  reads in one pass → NDJSON; `ImportInvoiceUploadJob` imports it in portions
+  from a saved offset; `FeedUploadClassificationJob` feeds the names to the
+  single queue in small portions (Redis 512 MB); `TendInvoiceUploadsJob` (every
+  5 min) resumes/prunes. Files live in the `uploads` volume shared by app +
+  worker (`storage/app/uploads`).
 - **NL→SQL:** `NlSqlService`, `SchemaContext` (from `metadata_catalog`),
   `SqlGuard`/`SqlGuardException` (enforce read-only + table allow-list). The chat
   reads only the `invoice_lines` VIEW (e_invoices + each line's classification +
@@ -132,6 +141,9 @@ The app is auth-gated (default login user `admin`).
 - Queue `retry_after` (`REDIS_QUEUE_RETRY_AFTER`) must exceed the longest job
   timeout, or jobs re-dispatch while still running (duplicate paid LLM calls).
 - The catalog embed job self-chains in small batches — safe to interrupt/resume.
+- `AnalyzeInvoiceUploadJob`'s timeout (1500 s) is deliberately ABOVE retry_after:
+  a per-upload cache lock makes the copy the queue re-releases back off. Don't
+  copy that pattern without such a lock.
 - The `invoice_lines` view reads e_invoices / classification_items /
   rubricator_nodes / import_batches columns: Postgres refuses to change the type of
   a column a view uses — drop and recreate the view in such a migration. Adding a

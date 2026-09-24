@@ -2,6 +2,8 @@
 
 namespace App\Services\Import;
 
+use App\Models\EInvoice;
+use DateTimeInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
@@ -120,20 +122,48 @@ class InvoiceImporter
             return ['imported' => 0, 'skipped' => 0, 'total' => $this->total(), 'error' => __('Unexpected columns in file.')];
         }
 
-        $existingKeys = $skipDuplicates ? $this->existingKeys() : [];
+        $mapped = [];
+        foreach ($rows as $row) {
+            if (! $this->isBlank($row)) {
+                $mapped[] = $this->mapRow($row);
+            }
+        }
+        ['imported' => $imported, 'skipped' => $skipped] = $this->writeRows($mapped, $batch, $skipDuplicates);
+
+        return ['imported' => $imported, 'skipped' => $skipped, 'total' => $this->total(), 'error' => null];
+    }
+
+    /** Wipe every invoice row. The only place this class truncates. */
+    public function deleteAll(): int
+    {
+        $count = $this->total();
+        DB::table('e_invoices')->truncate();
+
+        return $count;
+    }
+
+    /**
+     * Insert mapped rows (one portion of an upload, or all of a small one). With
+     * $skipDuplicates a row whose series|number is already in the table — from any upload,
+     * this one's earlier portions included — or earlier in these rows is skipped, so only the
+     * first occurrence of an invoice is kept.
+     *
+     * @param  array<int, array<string, mixed>>  $mapped
+     * @return array{imported: int, skipped: int}
+     */
+    public function writeRows(array $mapped, ?string $batch, bool $skipDuplicates): array
+    {
+        $existingKeys = $skipDuplicates
+            ? EInvoice::existingKeys(array_filter(array_map(fn ($r) => $this->naturalKey($r), $mapped)))
+            : [];
 
         $now = Carbon::now();
         $buffer = [];
         $imported = 0;
         $skipped = 0;
 
-        foreach ($rows as $row) {
-            if ($this->isBlank($row)) {
-                continue;
-            }
-
-            $mapped = $this->mapRow($row);
-            $key = $this->naturalKey($mapped);
+        foreach ($mapped as $record) {
+            $key = $this->naturalKey($record);
 
             if ($skipDuplicates && $key !== null && isset($existingKeys[$key])) {
                 $skipped++;
@@ -145,7 +175,7 @@ class InvoiceImporter
                 $existingKeys[$key] = true;
             }
 
-            $buffer[] = $mapped + [
+            $buffer[] = $record + [
                 'invoice_key' => $key,
                 'import_batch' => $batch,
                 'created_at' => $now,
@@ -162,20 +192,15 @@ class InvoiceImporter
             DB::table('e_invoices')->insert($buffer);
         }
 
-        return ['imported' => $imported, 'skipped' => $skipped, 'total' => $this->total(), 'error' => null];
+        return ['imported' => $imported, 'skipped' => $skipped];
     }
 
-    /** Wipe every invoice row. The only place this class truncates. */
-    public function deleteAll(): int
-    {
-        $count = $this->total();
-        DB::table('e_invoices')->truncate();
-
-        return $count;
-    }
-
-    /** @return array<string, mixed> */
-    private function mapRow(array $row): array
+    /**
+     * One raw row → an e_invoices record (by position).
+     *
+     * @return array<string, mixed>
+     */
+    public function mapRow(array $row): array
     {
         $record = [];
         foreach (self::COLUMNS as $i => $col) {
@@ -191,7 +216,7 @@ class InvoiceImporter
     }
 
     /** Natural business key for de-duplication: series+number. Null when either is missing. */
-    private function naturalKey(array $mapped): ?string
+    public function naturalKey(array $mapped): ?string
     {
         $series = $mapped['series'] ?? null;
         $number = $mapped['number'] ?? null;
@@ -241,6 +266,9 @@ class InvoiceImporter
             if ($value === null || $value === '') {
                 return null;
             }
+            if ($value instanceof DateTimeInterface) { // a date-formatted xlsx cell read as a stream
+                return $value->format('Y-m-d');
+            }
             if (is_numeric($value)) {
                 return ExcelDate::excelToDateTimeObject((float) $value)->format('Y-m-d');
             }
@@ -255,6 +283,10 @@ class InvoiceImporter
 
         if ($col === 'row_no') {
             return is_numeric($value) ? (int) $value : null;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            $value = $value->format('Y-m-d');
         }
 
         return $value === null ? null : trim((string) $value);

@@ -41,6 +41,40 @@
     @endforeach
   </ol>
 
+  {{-- A big file read / imported in the background — the page follows it. --}}
+  @if($background)
+    @php
+      $isReading = $background['status'] === 'analyzing';
+      $pct = ! $isReading && $background['total'] > 0 ? min(100, (int) round($background['done'] / $background['total'] * 100)) : null;
+    @endphp
+    <div class="card p-6" wire:poll.2s="refreshPending">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="w-7 h-7 grid place-items-center shrink-0">
+          <span class="inline-block w-4 h-4 border-2 border-ink/25 border-t-ink rounded-full animate-spin"></span>
+        </span>
+        <div class="min-w-0">
+          <p class="font-medium tnum">
+            @if($isReading)
+              {{ __('Reading the file… :n lines', ['n' => $nf($background['read'])]) }}
+            @else
+              {{ __('Importing… :done / :total lines', ['done' => $nf($background['done']), 'total' => $nf($background['total'])]) }}
+            @endif
+          </p>
+          <p class="text-muted text-sm">{{ $background['label'] }} · {{ __('a big file is handled in the background — you can leave this page and come back.') }}</p>
+        </div>
+        @if($isReading)
+          <button wire:click="startOver" class="btn btn-ghost btn-sm ml-auto">{{ __('Cancel') }}</button>
+        @endif
+      </div>
+      @if($pct !== null)
+        <div class="h-2 rounded-full bg-line/40 overflow-hidden mt-4">
+          <div class="h-full bg-ledger transition-all duration-500" style="width: {{ $pct }}%"></div>
+        </div>
+        <p class="text-faint text-xs mt-1.5 tnum">{{ $pct }}%@if($background['format'] === 'sablon') · {{ __('the items are classified once the import is done') }}@endif</p>
+      @endif
+    </div>
+  @endif
+
   {{-- STEP 1 — choose file --}}
   @if($step === 1)
     <label class="dropzone card bg-surface border-2 border-dashed hair p-12 text-center block cursor-pointer hover:border-ink transition"
@@ -57,7 +91,7 @@
         <p class="font-display text-2xl mb-1">{{ __('Drag your file here') }}</p>
         <p class="text-muted mb-5">{{ __('or click to choose a file') }}</p>
         <span class="btn btn-ink">{{ __('Choose file') }}</span>
-        <p class="text-xs text-faint mt-5">{{ __('Supported: .xlsx, .xls, .csv · up to 25') }}&nbsp;{{ __('MB') }}</p>
+        <p class="text-xs text-faint mt-5">{{ __('Supported: .xlsx and .csv up to :mb MB, .xls up to 25 MB', ['mb' => $maxMegabytes]) }}</p>
       </div>
       <div wire:loading wire:target="file" class="py-6">
         <p class="font-display text-xl">{{ __('Reading file…') }}</p>
@@ -66,7 +100,7 @@
     @error('file') <p class="text-sm text-stamp mt-3">{{ $message }}</p> @enderror
     <div class="mt-4 flex items-start gap-2.5 text-sm text-muted card-flat p-3.5">
       <span class="text-amber">ℹ</span>
-      <span>{!! __('Two layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; its items are <b>classified right away</b> (up to :max lines per file); and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total).', ['max' => $nf($maxLines)]) !!}</span>
+      <span>{!! __('Two layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; its items are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.') !!}</span>
     </div>
     @if($existing > 0)
       <div class="mt-3 flex items-start gap-2.5 text-sm card-flat p-3.5 border-amber/40">
@@ -77,11 +111,11 @@
   @endif
 
   {{-- STEP 2 — preview --}}
-  @if($step === 2)
+  @if($step === 2 && $preview)
     <div class="card-flat p-5 mb-4">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-2.5 flex-wrap">
-          <span class="font-mono text-sm">{{ $file?->getClientOriginalName() }}</span>
+          <span class="font-mono text-sm">{{ $preview['label'] ?? $file?->getClientOriginalName() }}</span>
           @if($preview['format'] ?? null)
             <span class="px-2 py-0.5 rounded-md text-xs bg-line/40 text-muted">{{ $formatLabel($preview['format']) }}</span>
           @endif
@@ -254,7 +288,7 @@
   @endif
 
   {{-- STEP 3 — result --}}
-  @if($step === 3)
+  @if($step === 3 && $report)
     <div class="card p-8 text-center">
       @if($report['error'])
         <div class="text-3xl mb-3 text-stamp">✕</div>
@@ -325,10 +359,17 @@
                     <span class="text-faint">—</span>
                   @endif
                 </td>
-                <td class="px-4 py-2.5 text-right">
-                  <button wire:click="deleteUpload('{{ $u->key }}')"
-                          wire:confirm="{{ __('Delete the :n rows of “:file”? Its classification stays in Review.', ['n' => $nf($u->lines), 'file' => $u->label]) }}"
-                          class="btn btn-ghost btn-sm text-stamp">{{ __('Delete') }}</button>
+                <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                  @if($u->status === 'importing')
+                    <span class="text-faint text-xs">{{ __('importing…') }}</span>
+                  @else
+                    @if($u->status === 'failed')
+                      <span class="text-stamp text-xs mr-2">{{ __('import failed') }}</span>
+                    @endif
+                    <button wire:click="deleteUpload('{{ $u->key }}')"
+                            wire:confirm="{{ __('Delete the :n rows of “:file”? Its classification stays in Review.', ['n' => $nf($u->lines), 'file' => $u->label]) }}"
+                            class="btn btn-ghost btn-sm text-stamp">{{ __('Delete') }}</button>
+                  @endif
                 </td>
               </tr>
             @endforeach

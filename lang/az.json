@@ -739,5 +739,16 @@
     "Search item, TIN, series, number…": "Mal, VÖEN, seriya, nömrə üzrə axtarış…",
     "classifying…": "təsnif edilir…",
     "decl.": "bəyan.",
-    "+ :n lines without invoice number": "+ qaimə nömrəsi olmayan :n sətir"
+    "+ :n lines without invoice number": "+ qaimə nömrəsi olmayan :n sətir",
+    "Reading the file… :n lines": "Fayl oxunur… :n sətir",
+    "Importing… :done / :total lines": "İdxal… :done / :total sətir",
+    "a big file is handled in the background — you can leave this page and come back.": "böyük fayl arxa planda emal olunur — səhifədən çıxıb sonra qayıda bilərsiniz.",
+    "the items are classified once the import is done": "mallar idxal bitdikdən sonra təsnif ediləcək",
+    "Supported: .xlsx and .csv up to :mb MB, .xls up to 25 MB": "Dəstəklənir: .xlsx və .csv :mb MB-dək, .xls 25 MB-dək",
+    "Two layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; its items are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.": "İki format avtomatik tanınır: <b>sətir səviyyəli ixrac (Şablon)</b> — malın adı ilə hər qaimə sətri üçün bir sətir, malları <b>dərhal təsnif edilir</b>; və 15 standart sütunlu <b>qaimə siyahısı</b> (№, təchizatçı/alıcı VÖEN, tarixlər, seriya, nömrə, ƏDV məbləği sütunları və cəmi). Böyük fayllar <b>arxa planda</b> oxunur və idxal olunur — bu vaxt səhifədən çıxa bilərsiniz.",
+    "importing…": "idxal edilir…",
+    "import failed": "idxal alınmadı",
+    "An .xls file can be up to 25 MB — save bigger files as .xlsx or .csv.": ".xls faylı 25 MB-dək ola bilər — daha böyük faylları .xlsx və ya .csv kimi saxlayın.",
+    "The file has more than :max lines.": "Faylda :max sətirdən çox var.",
+    "Reading the file stopped unexpectedly. Please upload it again.": "Faylın oxunması gözlənilmədən dayandı. Zəhmət olmasa, yenidən yükləyin."
 }

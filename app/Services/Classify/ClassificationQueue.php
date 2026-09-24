@@ -42,7 +42,7 @@ class ClassificationQueue
      * it commits (a job must never pick up an item whose upload was rolled back).
      *
      * @param  array<int, string>  $texts
-     * @return Collection<string, ClassificationItem> keyed by source_hash
+     * @return Collection<string, ClassificationItem> the items of $texts, keyed by source_hash
      */
     public function createItems(array $texts, string $batch): Collection
     {
@@ -66,7 +66,14 @@ class ClassificationQueue
             ClassificationItem::upsert($chunk, ['batch', 'source_hash'], ['source_text']);
         }
 
-        return ClassificationItem::where('batch', $batch)->get()->keyBy('source_hash');
+        // Only THESE names' items — a big upload writes its batch in portions, and reloading the
+        // whole batch for every portion would grow quadratically.
+        $items = collect();
+        foreach (array_chunk(array_column($rows, 'source_hash'), 1000) as $hashes) {
+            $items = $items->merge(ClassificationItem::where('batch', $batch)->whereIn('source_hash', $hashes)->get());
+        }
+
+        return $items->keyBy('source_hash');
     }
 
     /**

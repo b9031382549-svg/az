@@ -33,4 +33,30 @@ class EInvoice extends Model
     {
         return $this->belongsTo(ClassificationItem::class);
     }
+
+    /**
+     * Which of these invoice keys (series|number) are already in the table — optionally ignoring
+     * the rows of one upload, so a big upload imported in portions never treats its own earlier
+     * portions as duplicates.
+     *
+     * @param  array<int, string>  $keys
+     * @return array<string, true>
+     */
+    public static function existingKeys(array $keys, ?string $exceptBatch = null): array
+    {
+        $known = [];
+        foreach (array_chunk(array_values(array_unique($keys)), 1000) as $chunk) {
+            $found = static::query()
+                ->whereIn('invoice_key', $chunk)
+                ->when($exceptBatch !== null, fn ($q) => $q->where(fn ($w) => $w
+                    ->whereNull('import_batch')->orWhere('import_batch', '!=', $exceptBatch)))
+                ->distinct()
+                ->pluck('invoice_key');
+            foreach ($found as $key) {
+                $known[$key] = true;
+            }
+        }
+
+        return $known;
+    }
 }
