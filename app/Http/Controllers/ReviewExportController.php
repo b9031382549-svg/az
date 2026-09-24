@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReviewExportController extends Controller
 {
-    private const STATUSES = ['open', 'found', 'conflict', 'blocked_on_fact', 'confirmed', 'rejected', 'no_match', 'all'];
+    private const STATUSES = ['open', 'found', 'conflict', 'blocked_on_fact', 'confirmed', 'rejected', 'no_match', 'trash', 'all'];
 
     /** Resolutions grouped under the "open" (needs a human) filter. */
     private const OPEN = ['conflict', 'blocked_on_fact'];

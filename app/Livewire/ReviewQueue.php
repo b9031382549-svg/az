@@ -48,6 +48,8 @@ class ReviewQueue extends Component
         'blocked_on_fact' => ['label' => 'Blocked (fact)', 'color' => '#7c5cbf'],
         'no_match' => ['label' => 'No match', 'color' => '#9a9183'],
         'rejected' => ['label' => 'Rejected', 'color' => '#8a8175'],
+        // Names that name no product (TrashFilter) — settled, never a human's job.
+        'trash' => ['label' => 'Trash', 'color' => '#c9c0b0'],
     ];
 
     /** Selected upload (batch key) or "all" for the run view; null on the list. */
@@ -368,6 +370,7 @@ class ReviewQueue extends Component
             $review = $cnt('review');
             $resolving = (int) ($resolvingByBatch[$r->batch] ?? 0);
             $conflict = max(0, $cnt('conflict') + $cnt('blocked_on_fact') - $resolving);
+            $trash = $cnt('trash');
             $total = (int) $r->total;
 
             return (object) [
@@ -379,8 +382,10 @@ class ReviewQueue extends Component
                 'review' => $review,
                 'resolving' => $resolving,
                 'conflict' => $conflict,
+                'trash' => $trash,
                 'memory' => (int) ($memoryByBatch[$r->batch] ?? 0),
-                'done' => $total > 0 ? (int) round($resolved / $total * 100) : 0,
+                // Trash is settled too — nothing left to do for it.
+                'done' => $total > 0 ? (int) round(($resolved + $trash) / $total * 100) : 0,
             ];
         });
     }

@@ -1,4 +1,4 @@
-<section class="p-5 sm:p-8 max-w-[1000px]" @if($item->isResolving()) wire:poll.3s @endif>
+<section class="p-5 sm:p-8 max-w-[1000px]" @if($item->isResolving() || $item->resolution === 'pending') wire:poll.3s @endif>
   @php
     $nm = fn ($c) => $names[(string) $c] ?? '';
     // Localized rubricator title by code, falling back to the title stored in the trace.
@@ -20,6 +20,7 @@
         'review' => __('needs review'),
         'pending' => __('pending'),
         'blocked_on_fact' => __('blocked on fact'),
+        'trash' => __('trash'),
         default => str_replace('_', ' ', (string) $r),
     };
     $mechLabel = fn ($m) => match ($m) {
@@ -53,6 +54,11 @@
         && (string) $ensemble->matched_code === (string) $item->final_code;
     $resolverRan = $ensembleRan || $searchRan;
     $resolverSettled = $item->resolution === 'ai_resolved';
+
+    // The TrashFilter's rule, when the name tripped one (see TrashFilter::RULES).
+    $trashRule = (string) data_get($trashCheck?->trace, 'rule', '');
+    // Stages are numbered in the order they are shown — most items skip some of them.
+    $stage = 0;
   @endphp
 
   <div class="mb-6">
@@ -102,6 +108,8 @@
           <span class="px-2 py-0.5 rounded-md text-xs font-medium {{ $pill('good') }}" title="{{ __('This answer was written to Memory (answer cache) — a future identical item is answered from the cache.') }}">✓ {{ __('saved to memory') }}</span>
           @if($memoryVia)<span class="text-faint text-xs">{{ __('via') }} {{ $memoryVia }}</span>@endif
         @endif
+      @elseif($item->resolution === 'trash')
+        <span class="text-muted">{{ \App\Services\Classify\TrashFilter::explain($trashRule) }}</span>
       @else
         <span class="text-muted">{{ __('awaiting a human decision') }}</span>
       @endif
@@ -138,15 +146,15 @@
     </div>
   @endif
 
-  {{-- The stages of the flow: cache → AI consensus → web search → human. Each shows
-       its input → output up front; the deep trace is collapsible. --}}
+  {{-- The stages of the flow: cache → trash filter → AI consensus → web search → human.
+       Each shows its input → output up front; the deep trace is collapsible. --}}
   <ol class="space-y-3">
 
     {{-- ① CACHE --}}
     <li class="card p-5">
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-2.5">
-          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">1</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
           <span class="font-medium">{{ __('Cache') }}</span>
           <span class="text-faint text-xs">{{ __('exact-name lookup') }}</span>
         </div>
@@ -164,7 +172,7 @@
             <p><span class="font-mono">{{ $cache->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($cache->matched_code), 60) }}</span></p>
             <p class="text-ledger text-xs mt-0.5">{{ __('found — answered from the cache, no AI needed') }}</p>
           @else
-            <p class="text-muted">{{ __('not found → passed to the AI') }}</p>
+            <p class="text-muted">{{ $trashCheck ? __('not found → passed to the trash filter') : __('not found → passed to the AI') }}</p>
           @endif
         </div>
       </div>
@@ -180,12 +188,47 @@
       @endif
     </li>
 
-    {{-- ② AI CONSENSUS (3 mechanisms) — only when the cache missed --}}
+    {{-- ② TRASH FILTER — only when the name tripped a rule: a line that names no product (only
+         paperwork, a date, a number, a plate, a company) is settled here with no AI. A reviewer
+         who sees a product in it sends it to the AI; the row then reads "overridden". --}}
+    @if($trashCheck)
+      @php $overridden = $trashCheck->status === 'overridden'; @endphp
+      <li class="card p-5">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
+            <span class="font-medium">{{ __('Trash filter') }}</span>
+            <span class="text-faint text-xs">{{ __('does the name name a product at all?') }}</span>
+          </div>
+          <span class="hint-head px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($overridden ? 'warn' : 'muted') }}" data-hint="{{ $overridden ? 'trash:overridden' : 'trash' }}">{{ $overridden ? __('overridden by a reviewer') : __('trash') }}</span>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 text-sm">
+          <div class="flex-1 rounded-lg border hair p-3 min-w-0">
+            <p class="kicker mb-1">{{ __('Input') }}</p>
+            <p class="break-words">{{ $item->source_text }}</p>
+          </div>
+          <div class="flex items-center justify-center text-faint">→</div>
+          <div class="flex-1 rounded-lg border hair p-3 min-w-0">
+            <p class="kicker mb-1">{{ __('Output') }}</p>
+            <p>{{ \App\Services\Classify\TrashFilter::explain($trashRule) }}</p>
+            <p class="text-xs mt-0.5 {{ $overridden ? 'text-amber' : 'text-muted' }}">{{ $overridden ? __('a reviewer said it is a product → sent to the AI') : __('not classified — no AI was run') }}</p>
+          </div>
+        </div>
+        @if(! $overridden && $item->resolution === 'trash')
+          <div class="mt-3 flex items-center justify-between gap-3 flex-wrap">
+            <p class="text-xs text-muted">{{ __('If this line does name a product or a service, send it to the AI.') }}</p>
+            <button wire:click="classifyAnyway" wire:confirm="{{ __('Not trash — classify this item with the AI?') }}" class="btn btn-ghost btn-sm">↻ {{ __('Not trash — classify') }}</button>
+          </div>
+        @endif
+      </li>
+    @endif
+
+    {{-- ③ AI CONSENSUS (3 mechanisms) — only when the cache missed --}}
     @if($aiRan)
       <li class="card p-5">
         <div class="flex items-center justify-between gap-3 mb-3">
           <div class="flex items-center gap-2.5">
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">2</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
             <span class="font-medium">{{ __('AI search') }}</span>
             <span class="text-faint text-xs">{{ __('direct, corroborated by the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</span>
           </div>
@@ -285,9 +328,9 @@
       </li>
     @endif
 
-    {{-- ③ ENSEMBLE — the first resolver step after a divergence: a self-consistency vote
+    {{-- ④ ENSEMBLE — the first resolver step after a divergence: a self-consistency vote
          over the vector shortlist. Agreement settles the item locally; a split falls
-         through to the web search (stage ④). --}}
+         through to the web search (stage ⑤). --}}
     @if($ensembleRan)
       @php
         $ensAgreement = (string) data_get($ensemble->trace, 'agreement', '');
@@ -298,7 +341,7 @@
       <li class="card p-5">
         <div class="flex items-center justify-between gap-3 mb-3">
           <div class="flex items-center gap-2.5">
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">3</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
             <span class="font-medium">{{ __('Ensemble') }}</span>
             <span class="text-faint text-xs">{{ __('self-consistency vote over the vector shortlist') }}</span>
           </div>
@@ -345,13 +388,13 @@
       </li>
     @endif
 
-    {{-- ④ WEB SEARCH — the paid online lookup, reached only when the ensemble split (or in
+    {{-- ⑤ WEB SEARCH — the paid online lookup, reached only when the ensemble split (or in
          shadow). Its own step, since when it runs it is usually the deciding one. --}}
     @if($searchRan)
       <li class="card p-5">
         <div class="flex items-center justify-between gap-3 mb-3">
           <div class="flex items-center gap-2.5">
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">4</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
             <span class="font-medium">{{ __('Web search') }}</span>
             <span class="text-faint text-xs">{{ __('a thinking model looks it up online') }}</span>
           </div>
@@ -407,7 +450,7 @@
       <li class="card p-5">
         <div class="flex items-center justify-between gap-3 mb-3">
           <div class="flex items-center gap-2.5">
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">4</span>
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
             <span class="font-medium">{{ __('AI adjudicator') }}</span>
             <span class="text-faint text-xs">{{ __('legacy — no longer in the flow') }}</span>
           </div>
@@ -421,15 +464,15 @@
       </li>
     @endif
 
-    {{-- ④ HUMAN — shown only when a human is actually part of the story: the item is
+    {{-- ⑥ HUMAN — shown only when a human is actually part of the story: the item is
          still open (conflict / no_match / blocked) or a human already confirmed/rejected
          it. An auto-found item (agreed / ai_resolved) is settled, so this stage is
-         omitted — the decision is already made and the goods are found. --}}
-    @if(! in_array($item->resolution, ['agreed', 'ai_resolved'], true) && ! $item->isResolving())
+         omitted — the decision is already made and the goods are found; so is trash. --}}
+    @if(! in_array($item->resolution, ['agreed', 'ai_resolved', 'trash'], true) && ! $item->isResolving())
     <li class="card p-5">
       <div class="flex items-center justify-between gap-3 mb-3">
         <div class="flex items-center gap-2.5">
-          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">5</span>
+          <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
           <span class="font-medium">{{ __('Human') }}</span>
           <span class="text-faint text-xs">{{ __('review & confirm') }}</span>
         </div>

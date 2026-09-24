@@ -6,6 +6,7 @@
     // under the web-search resolver.
     $tabs = ['all' => __('All'), 'found' => __('AI classified'), 'confirmed' => __('Human confirmed'), 'rejected' => __('Human rejected')];
     if (($counts['resolving'] ?? 0) > 0) { $tabs['resolving'] = __('Searching…'); }
+    if (($counts['trash'] ?? 0) > 0) { $tabs['trash'] = __('Trash'); }
     $tabCount = fn ($key) => $key === 'all' ? $counts->sum() : ($key === 'open' ? $openCount : ($counts[$key] ?? 0));
     $cs = $report['consensus']; $csTotal = max(1, $report['total']);
     $gs = $report['good'] + $report['service'];

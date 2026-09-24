@@ -76,6 +76,7 @@ class InvoiceLinesViewTest extends TestCase
             'in_progress' => [$this->item('pending'), $this->item('conflict')],      // conflict still under web search
             'needs_review' => [$this->item('conflict', null, true), $this->item('no_match')],
             'rejected' => [$this->item('rejected')],
+            'trash' => [$this->item('trash')],                                       // names no product
             'classified' => [$this->item('confirmed', '99'), $this->item('ai_resolved', '8471')],
         ];
 

@@ -23,11 +23,13 @@
     rejected: { title: 'rejected', body: 'A reviewer rejected the answer. <b>Terminal</b> — the item keeps no final code.', meta: 'Consensus never overwrites it.' },
     blocked_on_fact: { title: 'blocked_on_fact', body: 'Reserved from an earlier phase. It is still in the vocabulary and in the “Needs attention” filter, but <b>no current code path writes it</b> — the count stays at zero.', meta: 'Legacy value, kept for backward compatibility.' },
     resolving: { title: 'searching…', body: 'A conflict whose <b>web-search resolver has not finished yet</b>. The machine is still working — this is not a final conflict.', meta: 'Display-only status (displayResolution); the stored value is still conflict.' },
+    trash: { title: 'trash', body: 'The name says <b>nothing about what was sold</b> — only a document reference, a date or period, a bare number, a vehicle plate, an e-mail or a company name. Settled by the trash filter right after the cache: <b>no AI calls</b>, no code.', meta: 'Rules, not a model: they catch only names recognisable by form. A reviewer can still send the item to the AI (“Not trash — classify”).' },
+    'trash:overridden': { title: 'trash · overridden', body: 'The trash filter flagged the name, but a reviewer said it <b>does name a product</b> and sent it to the AI.', meta: 'The filter never re-flags this item.' },
 
     // ---- column headers ----
     'column:memory': { title: 'To Memory', body: 'How many items of this upload were <b>promoted into the answer cache</b> — so the same name never costs an AI call again.', meta: 'Only unanimous answers qualify: broker = direct with the vector corroborating. A web-resolved answer is promoted only when its heading overlaps a candidate the mechanisms had already proposed.' },
     'column:status': { title: 'Status column', body: 'The item-level <b>resolution</b> — the outcome of the whole flow, not one mechanism\'s opinion. A mechanism can be auto-confirmed on its own and the item still land in conflict.', meta: 'Hover any badge for what that value means.' },
-    'column:result': { title: 'Result', body: 'The mix of outcomes for this upload: <b>resolved</b> (green), <b>searching</b> (pulsing), <b>needs attention</b> (amber) and <b>conflict</b> (red).', meta: 'Click a row to open the upload.' },
+    'column:result': { title: 'Result', body: 'The mix of outcomes for this upload: <b>resolved</b> (green), <b>searching</b> (pulsing), <b>needs attention</b> (amber), <b>conflict</b> (red) and <b>trash</b> (grey — names that name no product).', meta: 'Click a row to open the upload. Trash counts as done.' },
 
     // ---- decision-flow stage pills ----
     'cache:hit': { title: 'Cache · hit', body: 'An exact normalized-name match in the verified answer cache. The item resolves immediately, with <b>no AI calls at all</b>.', meta: 'A cache row is written only on a hit; its status is always auto_confirmed.' },

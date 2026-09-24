@@ -11,6 +11,7 @@
       'blocked_on_fact' => 'bg-amber/15 text-amber',
       'resolving' => 'bg-amber/15 text-amber animate-pulse', // web-search resolver still running — NOT a final conflict
       'conflict' => 'bg-stamp/12 text-stamp',
+      'trash' => 'bg-line/25 text-faint', // names no product — settled by the TrashFilter, no AI
       default => 'bg-line/40 text-muted', // no_match, rejected, pending
   };
   // 'resolving' is display-only (ClassificationItem::displayResolution): a conflict whose
@@ -21,6 +22,7 @@
   // otherwise a human correction (which leaves the old cache/search row in place) would be
   // miscredited to the cache. Anything else with a final code is the consensus fallback.
   $sourceOf = function ($item) {
+      if ($item->resolution === 'trash') return 'trash filter'; // settled, with no code by design
       $final = (string) ($item->final_code ?? '');
       if ($final === '') return null; // not resolved yet
       if (optional($item->results->firstWhere('mechanism', 'cache'))->matched_code === $final) return 'memory';

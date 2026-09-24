@@ -103,7 +103,7 @@ class MetadataCatalogSeeder extends Seeder
                 'Name of the ai_code heading (Azerbaijani).',
                 ['category name', 'название категории', 'kateqoriyanın adı']],
             ['Classification status', 'ai_status', 'string', 'dimension',
-                'classified | in_progress | needs_review (waiting for a human expert) | rejected; NULL for rows without an item name.',
+                'classified | in_progress | needs_review (waiting for a human expert) | rejected | trash (the item name names no product — only a document reference, date, number or company name; never classified); NULL for rows without an item name.',
                 ['status', 'статус классификации', 'status']],
             ['Upload', 'upload_name', 'string', 'dimension',
                 'File name of the upload the row came from (NULL for rows loaded before uploads were tracked).',

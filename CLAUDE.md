@@ -33,6 +33,12 @@ The app is auth-gated (default login user `admin`).
   lexical/synonyms); `ProductFactLookupService`. Jobs: `ClassifyMechanismJob`,
   `GenerateCatalogEmbeddings`. A **rubricator** tree (`RubricatorNode`,
   `data:build-rubricator`) backs the broker mechanism.
+- **Trash filter:** `TrashFilter` — rules (no AI), run by `ClassificationQueue`
+  right after the answer cache: a name that names no product (only a document
+  reference / date / period, digits, a plate, an e-mail, a bare company name) →
+  resolution `trash`, no mechanism jobs. Conservative by design (~98% precision,
+  catches ~16% of human-labelled trash). A reviewer can send it back ("Not trash —
+  classify" on the decision page → trace row `overridden`, never re-trashed).
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
 - **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;
