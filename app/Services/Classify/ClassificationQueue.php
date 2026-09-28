@@ -87,7 +87,8 @@ class ClassificationQueue
     {
         $jobs = [];
         foreach ($items as $item) {
-            if ($this->cache->apply($item) || $this->trash->apply($item)) {
+            // Absolute trash (only digits) wins even over a cached answer.
+            if ($this->trash->apply($item, absoluteOnly: true) || $this->cache->apply($item) || $this->trash->apply($item)) {
                 continue;
             }
             array_push($jobs, ...$this->mechanismJobs($item));
@@ -109,11 +110,17 @@ class ClassificationQueue
      * A human's "not trash — classify it": put a trashed item back on the pipeline. Its 'trash'
      * trace row stays, marked 'overridden' — the filter never re-trashes the item and the
      * decision page still shows what happened. The automatic pipeline starts over, so
-     * answered_at is cleared for it to be stamped again. Returns false when not trash.
+     * answered_at is cleared for it to be stamped again. Returns false when not trash, or when
+     * the rule is absolute (only digits).
      */
     public function classifyAnyway(ClassificationItem $item): bool
     {
         if ($item->resolution !== 'trash') {
+            return false;
+        }
+        // Only digits is always trash — no reviewer override for it.
+        $rule = (string) data_get($item->results()->where('mechanism', 'trash')->first()?->trace, 'rule', '');
+        if (TrashFilter::isAbsolute($rule)) {
             return false;
         }
 

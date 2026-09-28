@@ -326,6 +326,7 @@
     "Only a company name — no product is named.": "Только название компании — товар не назван.",
     "Only a document reference, date or period — no product is named.": "Только ссылка на документ, дата или период — товар не назван.",
     "Not a product.": "Не товар.",
+    "A name of only digits is always trash — it is never sent to the AI.": "Название только из цифр — всегда мусор, в ИИ не отправляется.",
     "Input": "Вход",
     "Translation": "Перевод",
     "Normalized": "Нормализовано",

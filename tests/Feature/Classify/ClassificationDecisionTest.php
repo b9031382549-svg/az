@@ -308,4 +308,19 @@ class ClassificationDecisionTest extends TestCase
         $this->assertSame('pending', $item->fresh()->resolution);
         Queue::assertPushed(ClassifyMechanismJob::class, 2);
     }
+
+    public function test_an_only_digits_item_offers_no_override(): void
+    {
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => '061.760',
+            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'trash', 'answered_at' => now(),
+        ]);
+        $item->results()->create(['mechanism' => 'trash', 'status' => 'trash', 'trace' => ['rule' => 'no_letters']]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('A name of only digits is always trash')
+            ->assertDontSee('Not trash — classify');
+    }
 }

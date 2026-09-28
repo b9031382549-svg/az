@@ -118,4 +118,21 @@ class ClassificationQueueTest extends TestCase
         $this->assertSame('confirmed', $item->fresh()->resolution);
         $this->assertFalse($item->results()->where('mechanism', 'trash')->exists());
     }
+
+    public function test_only_digits_is_always_trash_even_with_a_cached_answer_and_cannot_be_overridden(): void
+    {
+        Queue::fake();
+        AnswerCache::create(['source' => 'fedor', 'name' => '646', 'name_key' => AnswerCache::keyFor('646'), 'heading' => '8471', 'is_service' => false]);
+        $queue = app(ClassificationQueue::class);
+
+        $queue->enqueue(['646'], 'b7');
+
+        $item = ClassificationItem::where('batch', 'b7')->first();
+        $this->assertSame('trash', $item->resolution);
+        $this->assertFalse($item->results()->where('mechanism', 'cache')->exists());
+
+        $this->assertFalse($queue->classifyAnyway($item));
+        $this->assertSame('trash', $item->fresh()->resolution);
+        Queue::assertNotPushed(ClassifyMechanismJob::class);
+    }
 }

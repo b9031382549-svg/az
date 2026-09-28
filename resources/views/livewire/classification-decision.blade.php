@@ -214,7 +214,9 @@
             <p class="text-xs mt-0.5 {{ $overridden ? 'text-amber' : 'text-muted' }}">{{ $overridden ? __('a reviewer said it is a product → sent to the AI') : __('not classified — no AI was run') }}</p>
           </div>
         </div>
-        @if(! $overridden && $item->resolution === 'trash')
+        @if(! $overridden && $item->resolution === 'trash' && \App\Services\Classify\TrashFilter::isAbsolute($trashRule))
+          <p class="mt-3 text-xs text-muted">{{ __('A name of only digits is always trash — it is never sent to the AI.') }}</p>
+        @elseif(! $overridden && $item->resolution === 'trash')
           <div class="mt-3 flex items-center justify-between gap-3 flex-wrap">
             <p class="text-xs text-muted">{{ __('If this line does name a product or a service, send it to the AI.') }}</p>
             <button wire:click="classifyAnyway" wire:confirm="{{ __('Not trash — classify this item with the AI?') }}" class="btn btn-ghost btn-sm">↻ {{ __('Not trash — classify') }}</button>

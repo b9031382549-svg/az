@@ -28,6 +28,12 @@ final class TrashFilter
     public const RULES = ['no_letters', 'car_plate', 'email', 'company', 'paperwork'];
 
     /**
+     * Rules that hold no matter what (the business rule: a name of only digits is ALWAYS trash)
+     * — they win over the answer cache and a reviewer cannot send such an item to the AI.
+     */
+    public const ABSOLUTE = ['no_letters'];
+
+    /**
      * Paperwork stems (folded) that name a document, not a product — each may carry any run
      * of the suffixes below ("müqaviləyə" = muqavile+ye, "tarixinədək" = tarix+ine+dek).
      */
@@ -82,6 +88,11 @@ final class TrashFilter
         };
     }
 
+    public static function isAbsolute(string $rule): bool
+    {
+        return in_array($rule, self::ABSOLUTE, true);
+    }
+
     /** Which rule marks $text as trash, or null when it may name a product. */
     public function reason(string $text): ?string
     {
@@ -113,14 +124,19 @@ final class TrashFilter
      * Resolve an item as trash when its name is. Writes a 'trash' trace row (which rule, why)
      * and sets the item's resolution — terminal, no mechanism jobs. Returns true when trashed.
      *
+     * $absoluteOnly = only the ABSOLUTE rules (the step that runs before the answer cache).
+     *
      * Never touches an item already decided (a human's confirm must not be flipped by a
      * re-dispatch) nor one a human took OUT of trash ("classify anyway" leaves the trace row
      * as 'overridden'). Both checks run only for the rare names the rules match.
      */
-    public function apply(ClassificationItem $item): bool
+    public function apply(ClassificationItem $item, bool $absoluteOnly = false): bool
     {
         $rule = $this->reason((string) $item->source_text);
         if ($rule === null || ! in_array($item->resolution, ['pending', 'trash'], true)) {
+            return false;
+        }
+        if ($absoluteOnly && ! self::isAbsolute($rule)) {
             return false;
         }
         if ($item->results()->where('mechanism', 'trash')->where('status', 'overridden')->exists()) {
