@@ -73,6 +73,12 @@ final class TrashFilter
     private const LEGAL_FORMS = 'mmc|qsc|asc|llc|ltd|ооо|оао';
 
     /**
+     * A bare form name — "Qaimə", "Bəyannamələr", "Qaimə A4" — is the blank form itself, sold as
+     * printed goods; with a number or a date it is a reference to one document again.
+     */
+    private const BLANK_FORM = '/^(?:qaime|beyanname)(?:ler|lar)?(?:\s+a\d)?$/u';
+
+    /**
      * Human-readable reason per rule — in $locale (null = the current one). The trace row
      * stores it in English; the decision page shows it in the reviewer's language.
      */
@@ -115,6 +121,9 @@ final class TrashFilter
             && preg_match('/(?<![\p{L}\p{N}])(?:'.self::LEGAL_FORMS.')[^\p{L}\p{N}]*$/u', $folded)
             && ! preg_match('/[\d()_]|--/u', $folded)) {
             return 'company';
+        }
+        if (preg_match(self::BLANK_FORM, trim((string) preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $folded)))) {
+            return null;
         }
 
         return $this->contentWords($folded) === [] ? 'paperwork' : null;

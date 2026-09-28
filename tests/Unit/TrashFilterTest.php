@@ -20,6 +20,9 @@ class TrashFilterTest extends TestCase
             'e-mail' => ['chinara.m30@gmail.com', 'email'],
             'company' => ['POLAR BOYA MMC', 'company'],
             'company in quotes' => ['"AZNUR" MMC ', 'company'],
+            // Labellers file a bare company as trash even when its name says what it does (17 vs 4).
+            'operator company' => ['Bakcell MMC', 'company'],
+            'invoice of a month' => ['Qaimə iyun', 'paperwork'],
             'invoice reference' => ['26.02.2018 tarixli 001/IE/18 nomreli hesaba əsasən', 'paperwork'],
             'upper case, no diacritics' => ['05.02.2018-CI IL TARIXLI 12/18 SAYLI HESABA ESASEN', 'paperwork'],
             'contract alone' => ['Müqaviləyə əsasən', 'paperwork'],
@@ -54,6 +57,10 @@ class TrashFilterTest extends TestCase
             // A product line that names its supplier.
             'fuel from a company' => ['BENZIN_A-92_SOCAR(SUN FOOD MMC)'],
             'ordinary item' => ['SPRITE PET-2 LT 1X6'],
+            // A bare form name is the blank form itself — printed goods.
+            'blank invoice forms' => ['Qaimə'],
+            'blank forms A4' => ['Qaimə A4'],
+            'blank declarations' => ['Bəyannamələr'],
         ];
     }
 
