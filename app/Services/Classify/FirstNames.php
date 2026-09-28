@@ -1,0 +1,76 @@
+<?php
+
+namespace App\Services\Classify;
+
+/**
+ * First names (AzFold'ed: ə→e, ı→i, ş→s…) — Azerbaijani, Russian, Turkish and a few Western —
+ * for TrashFilter's person rule: a line that is only a person's name names no product.
+ * Deliberately NO names that are also common words or brands ("bala", "qara", "yeddi gözəl").
+ */
+final class FirstNames
+{
+    public const LIST = [
+        'abas', 'abbas', 'abdulla', 'abdusattar', 'adalat', 'adil', 'adnan', 'afaq', 'afdandil', 'afet',
+        'afiyyetdin', 'agagul', 'agamemmed', 'agaverdi', 'agayar', 'agil', 'ahmed', 'ahmet', 'aida', 'akber',
+        'akif', 'aladdin', 'alasgar', 'aleksandr', 'aleksei', 'aleksey', 'alesker', 'alexander', 'alexei',
+        'alexey', 'ali', 'alim', 'alla', 'allahsukur', 'allahverdi', 'altay', 'alyona', 'amid', 'amil',
+        'anar', 'anastasiya', 'anatoliy', 'andrey', 'anna', 'anton', 'anvar', 'aqil', 'arif', 'ariz', 'artem',
+        'arzu', 'asif', 'asim', 'aslan', 'atabala', 'atash', 'ataxan', 'ayaz', 'aydan', 'aydin', 'aygun',
+        'aynur', 'aynure', 'ayse', 'aysel', 'aysen', 'aysu', 'aytac', 'aytekin', 'ayten', 'azad', 'azer',
+        'babek', 'bahar', 'bahram', 'bakhtiyar', 'baladdin', 'banu', 'bayram', 'behbud', 'behlul', 'behruz',
+        'bextiyar', 'boris', 'boyukaga', 'burak', 'cabbar', 'cahangir', 'calal', 'camal', 'can', 'cavad',
+        'cavahir', 'cavansir', 'cavid', 'cefer', 'cem', 'cemil', 'cemile', 'cesaret', 'ceyhun', 'cinare',
+        'cingiz', 'cumali', 'david', 'dayanat', 'deniz', 'deyanet', 'dilare', 'dilber', 'dilsad', 'dmitriy',
+        'dmitry', 'dunya', 'dunyamali', 'ebulfez', 'edail', 'eduard', 'efqan', 'efsane', 'ehmed', 'ehmet',
+        'ehtiram', 'ekaterina', 'ekber', 'eladdin', 'elbeyi', 'elcan', 'elchin', 'elcin', 'eldar', 'eldeniz',
+        'eleddin', 'elekber', 'elena', 'elesker', 'elgiz', 'elgun', 'eli', 'eliaga', 'eliheyder', 'elimuxtar',
+        'elisa', 'elixan', 'eliyar', 'elizade', 'elmaddin', 'elman', 'elmar', 'elmdar', 'elmin', 'elmir',
+        'elmira', 'elnara', 'elnare', 'elnaz', 'elnur', 'elnure', 'elsad', 'elsan', 'elsen', 'elsever',
+        'elshad', 'eltun', 'elvin', 'elxan', 'elyar', 'emil', 'emin', 'emine', 'emrah', 'emre', 'enver',
+        'ercan', 'erdem', 'erol', 'esger', 'esma', 'esmira', 'esref', 'etibar', 'evezaga', 'evgenii',
+        'evgeniy', 'evgeny', 'eyvaz', 'eyyub', 'eziz', 'faiq', 'famil', 'farid', 'fariz', 'fathiya', 'fatime',
+        'fatma', 'fazil', 'feqan', 'ferhad', 'ferid', 'ferman', 'ferzali', 'fexreddin', 'fexri', 'fexriyar',
+        'fidan', 'fikret', 'firudin', 'firuze', 'fuad', 'fuzuli', 'galina', 'gasim', 'gennadiy', 'georgiy',
+        'gulaga', 'gulara', 'gulay', 'gulbeniz', 'gulcin', 'gulnar', 'gulnare', 'gulsen', 'gulshan',
+        'gulshen', 'gulsum', 'gunay', 'gunduz', 'gunel', 'gurban', 'habil', 'haci', 'hafiz', 'hakan', 'hakim',
+        'hamid', 'hamlet', 'hasan', 'hecer', 'hemid', 'hesen', 'heyder', 'hicran', 'hidayet', 'hikmet',
+        'humay', 'humbet', 'huseyin', 'huseyn', 'huseynaga', 'huseynqulu', 'ibad', 'ibrahim', 'igor', 'ilaha',
+        'ilahe', 'ilgar', 'ilham', 'ilkin', 'ilqar', 'ilya', 'ilyas', 'imran', 'inna', 'intiqam', 'irade',
+        'irfan', 'irina', 'isa', 'ismayil', 'ismet', 'israfil', 'ivan', 'ixtiyar', 'jale', 'james', 'john',
+        'kamal', 'kamale', 'kamaleddin', 'kamil', 'kamran', 'kazim', 'kemal', 'kenan', 'kerem', 'kerim',
+        'kifayet', 'konstansin', 'konstantin', 'konul', 'kseniya', 'lachin', 'lale', 'lamiya', 'lamiye',
+        'larisa', 'leman', 'lemen', 'leonid', 'letife', 'leyla', 'lutfi', 'lutvi', 'lyudmila', 'mahammad',
+        'mahbube', 'mahir', 'maksim', 'malik', 'mammad', 'maria', 'marina', 'mariya', 'mark', 'masallah',
+        'maxim', 'mayil', 'mayis', 'mehbub', 'mehdi', 'mehemmed', 'mehemmedali', 'meherrem', 'mehman',
+        'mehmet', 'mehriban', 'mehti', 'mehyeddin', 'melahet', 'memmed', 'memmedaga', 'metin', 'meybulla',
+        'mezahir', 'michael', 'mikayil', 'mikhail', 'minaye', 'mirsaleh', 'mirze', 'mirzebala', 'mirzehesen',
+        'mirzemed', 'mubariz', 'murad', 'murat', 'mursel', 'musa', 'mustafa', 'muzeffer', 'myriam', 'nadir',
+        'nail', 'naile', 'namik', 'namiq', 'narmin', 'nasib', 'nataliya', 'natalya', 'natig', 'natiq',
+        'nazile', 'nazim', 'nehmet', 'nehmetulla', 'nemet', 'nergiz', 'nermin', 'nesreddin', 'nezrin',
+        'nicat', 'nigar', 'nikolay', 'nilgun', 'nina', 'niyaz', 'niyazi', 'nizami', 'novruz', 'nurane',
+        'nureddin', 'nurehmed', 'nuriye', 'nurlan', 'nurlane', 'nuru', 'nusret', 'ofeliya', 'oktay', 'oleg',
+        'olga', 'omer', 'oqtay', 'orxan', 'osman', 'ozgur', 'parvin', 'paul', 'pavel', 'pervane', 'pervin',
+        'perviz', 'peter', 'petr', 'polad', 'qabil', 'qadir', 'qalib', 'qasim', 'qedir', 'qemer', 'qerib',
+        'qezenfer', 'qizbes', 'qudret', 'qurban', 'qurbaneli', 'rafael', 'rafail', 'rafiq', 'rafis', 'ragif',
+        'rahib', 'rahim', 'ramil', 'ramin', 'ramiq', 'ramiz', 'rasim', 'rasul', 'rauf', 'receb', 'recep',
+        'refayil', 'rehim', 'rena', 'resad', 'reshad', 'resid', 'reyhan', 'reyhane', 'robert', 'roman',
+        'rovsen', 'rovshan', 'roza', 'rubabe', 'rufet', 'ruhin', 'ruqiyye', 'ruslan', 'rustam', 'rustem',
+        'rza', 'saadet', 'sabina', 'sabir', 'sabit', 'sadaget', 'sadiq', 'sahib', 'sahil', 'sahin', 'sahmar',
+        'sahnaz', 'sahnaze', 'sakir', 'saleh', 'samed', 'samil', 'samir', 'samire', 'sanan', 'sara', 'sariye',
+        'sarkhan', 'sarxan', 'sebine', 'sebuhi', 'sedreddin', 'sefayil', 'sefure', 'sehran', 'sehriyar',
+        'selim', 'semaye', 'senan', 'sergei', 'sergey', 'serkan', 'server', 'settar', 'sevda', 'sevil',
+        'sevinc', 'sexavet', 'seyid', 'seymur', 'sezai', 'shahin', 'shahnaz', 'shahriyar', 'shamil',
+        'shelale', 'sinan', 'sirac', 'siraceddin', 'siraj', 'sitare', 'sohrab', 'solmaz', 'sona', 'sophia',
+        'stanislav', 'suceddin', 'suheyla', 'suleyman', 'sura', 'svetlana', 'sylvia', 'tabriz', 'tahir',
+        'tahmina', 'taleh', 'talib', 'tamara', 'tamilla', 'tarane', 'tarlan', 'tatiana', 'tatyana', 'tebriz',
+        'tehmine', 'telman', 'terane', 'teymur', 'teymuraz', 'teyyub', 'thomas', 'tofiq', 'togrul', 'tolga',
+        'tuncay', 'tural', 'turan', 'turgut', 'turkan', 'ugur', 'ulker', 'ulvi', 'ulviyye', 'ulya', 'urfan',
+        'vadim', 'valentina', 'valeriy', 'vaqif', 'vasif', 'vasiliy', 'vefa', 'vefadar', 'veli', 'vera',
+        'veysel', 'vidadi', 'viktor', 'viktoriya', 'vitaliy', 'vladimir', 'vladislav', 'volkan', 'vuqar',
+        'vusal', 'vusale', 'william', 'xalid', 'xalil', 'xanbala', 'xanim', 'xankisi', 'xaqani', 'xatire',
+        'xelil', 'xeyal', 'xeyale', 'xeyrulla', 'xeyyam', 'xose', 'yaqub', 'yaqut', 'yasar', 'yasin', 'yavuz',
+        'yegane', 'yelena', 'yuliya', 'yuriy', 'yury', 'yusif', 'yusuf', 'zahid', 'zaid', 'zakir', 'zamik',
+        'zamin', 'zarifa', 'zaur', 'zemfira', 'zenfira', 'zerife', 'zeynal', 'zeyneb', 'zeynep', 'zohrab',
+        'zohre', 'zulfiyye', 'zulfuqar', 'александр', 'андрей', 'ирина', 'ольга', 'сергей',
+    ];
+}
