@@ -23,6 +23,11 @@ class TrashFilterTest extends TestCase
             // Labellers file a bare company as trash even when its name says what it does (17 vs 4).
             'operator company' => ['Bakcell MMC', 'company'],
             'invoice of a month' => ['Qaimə iyun', 'paperwork'],
+            'person, surname first' => ['Ələkbərov Calal Məmməd', 'person'],
+            'person with qızı' => ['Quliyeva Cəmilə Cavanşir qızı', 'person'],
+            'person, upper case' => ['HÜSEYNOV FUAD AYDIN', 'person'],
+            'person with an initial' => ['D.Bəkirov Elçin', 'person'],
+            'russian person' => ['Tsygankova irina', 'person'],
             'invoice reference' => ['26.02.2018 tarixli 001/IE/18 nomreli hesaba əsasən', 'paperwork'],
             'upper case, no diacritics' => ['05.02.2018-CI IL TARIXLI 12/18 SAYLI HESABA ESASEN', 'paperwork'],
             'contract alone' => ['Müqaviləyə əsasən', 'paperwork'],
@@ -57,6 +62,10 @@ class TrashFilterTest extends TestCase
             // A product line that names its supplier.
             'fuel from a company' => ['BENZIN_A-92_SOCAR(SUN FOOD MMC)'],
             'ordinary item' => ['SPRITE PET-2 LT 1X6'],
+            // A first name that is also a brand, next to a product word.
+            'juice brand' => ['Jalə albalı'],
+            'surname-like brand alone' => ['Babayev'],
+            'name + shop' => ['Aslan Market'],
             // A bare form name is the blank form itself — printed goods.
             'blank invoice forms' => ['Qaimə'],
             'blank forms A4' => ['Qaimə A4'],

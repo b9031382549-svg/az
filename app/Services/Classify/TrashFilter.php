@@ -16,7 +16,8 @@ use App\Support\AzFold;
  * SLM" file, ~12k TRASH): these rules flag ~2k names at ~98% precision — i.e. only the ~16%
  * of trash that is recognisable by FORM. Person names, bare brands and addresses look exactly
  * like goods ("Babayev" is chocolate, "Davidov" cigarettes, "Krakov" sausage), so they are
- * left to the pipeline. The same wording can be either: "müqaviləyə əsasən xidmət haqqı" names
+ * left to the pipeline — unless the WHOLE line is a known first name + a surname (the person
+ * rule). The same wording can be either: "müqaviləyə əsasən xidmət haqqı" names
  * a service (a fee), "müqaviləyə əsasən" alone names nothing — the test is whether ANY word
  * remains once the paperwork words are taken out.
  *
@@ -25,7 +26,7 @@ use App\Support\AzFold;
 final class TrashFilter
 {
     /** Rule keys, in the order they are tried (also the vocabulary of the trace row). */
-    public const RULES = ['no_letters', 'car_plate', 'email', 'company', 'paperwork'];
+    public const RULES = ['no_letters', 'car_plate', 'email', 'company', 'person', 'paperwork'];
 
     /**
      * Rules that hold no matter what (the business rule: a name of only digits is ALWAYS trash)
@@ -71,6 +72,12 @@ final class TrashFilter
 
     /** Legal forms a bare company name ends with (folded). */
     private const LEGAL_FORMS = 'mmc|qsc|asc|llc|ltd|ооо|оао';
+
+    /**
+     * A surname (folded): Azerbaijani -ov/-ev/-zadə, Russian/Ukrainian -ski/-enko, Armenian -yan.
+     * NOT -lı/-lu: that ending is far more often an adjective ("albalı", "portağalı").
+     */
+    private const SURNAME = '/^\p{L}{3,}(?:ov|ova|ev|eva|yev|yeva|zade|ski|skiy|skaya|enko|yan|ian)$/u';
 
     /**
      * A bare form name — "Qaimə", "Bəyannamələr", "Qaimə A4" — is the blank form itself, sold as
@@ -121,6 +128,9 @@ final class TrashFilter
             && preg_match('/(?<![\p{L}\p{N}])(?:'.self::LEGAL_FORMS.')[^\p{L}\p{N}]*$/u', $folded)
             && ! preg_match('/[\d()_]|--/u', $folded)) {
             return 'company';
+        }
+        if ($this->isPersonName($folded)) {
+            return 'person';
         }
         if (preg_match(self::BLANK_FORM, trim((string) preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $folded)))) {
             return null;
@@ -178,6 +188,45 @@ final class TrashFilter
         ClassificationItem::markAnswered($item->id);
 
         return true;
+    }
+
+    /**
+     * Only a person's name: 2–4 words, no digits, and EVERY word is a known first name, a
+     * surname, an initial ("D.") or oğlu/qızı — with at least one first name and a surname or a
+     * second first name. Requiring a known first name keeps brands that look like surnames out
+     * ("Babayev şokolad", "Davidov nazik": the other word is not a name).
+     */
+    private function isPersonName(string $folded): bool
+    {
+        if (preg_match('/\d/u', $folded)) {
+            return false;
+        }
+        $words = preg_split('/[\s,]+/u', $folded, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($words) < 2 || count($words) > 4) {
+            return false;
+        }
+
+        static $first = null;
+        $first ??= array_flip(FirstNames::LIST);
+
+        $names = 0;
+        $surnames = 0;
+        foreach ($words as $word) {
+            foreach (preg_split('/\./u', trim($word, '."\'()'), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $part) {
+                if (mb_strlen($part) === 1 || in_array($part, ['oglu', 'qizi'], true)) {
+                    continue; // an initial, a patronymic marker
+                }
+                if (isset($first[$part])) {
+                    $names++;
+                } elseif (preg_match(self::SURNAME, $part)) {
+                    $surnames++;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        return $names >= 1 && ($surnames >= 1 || $names >= 2);
     }
 
     /**
