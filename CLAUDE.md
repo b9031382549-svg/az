@@ -38,8 +38,9 @@ The app is auth-gated (default login user `admin`).
   reference / date / period, digits, a plate, an e-mail, a bare company name, a
   person's name = known first name from `FirstNames` + surname) → resolution
   `trash`, no mechanism jobs. Conservative by design (~98% precision, catches ~20%
-  of human-labelled trash). Only digits is absolute (beats the cache, no override). A reviewer can send it back ("Not trash —
-  classify" on the decision page → trace row `overridden`, never re-trashed).
+  of human-labelled trash). Only digits is absolute (beats the cache, no override);
+  otherwise a reviewer can send it back ("Not trash — classify" on the decision
+  page → trace row `overridden`, never re-trashed).
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
 - **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;
