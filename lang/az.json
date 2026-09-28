@@ -326,6 +326,7 @@
     "Only a company name — no product is named.": "Yalnız şirkət adı — məhsul adı yoxdur.",
     "Only a document reference, date or period — no product is named.": "Yalnız sənədə istinad, tarix və ya dövr — məhsul adı yoxdur.",
     "Not a product.": "Məhsul deyil.",
+    "A name of only digits is always trash — it is never sent to the AI.": "Yalnız rəqəmlərdən ibarət ad həmişə yararsızdır — süni intellektə göndərilmir.",
     "Input": "Giriş",
     "Translation": "Tərcümə",
     "Normalized": "Normallaşdırılmış",
