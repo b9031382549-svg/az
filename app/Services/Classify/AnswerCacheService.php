@@ -71,6 +71,7 @@ class AnswerCacheService
                 'confidence' => 1.0,
                 'candidates' => [],
                 'explanation' => "Verified answer from the cache ({$hit->source}).",
+                'trace' => ['source' => $hit->source], // which memory path wrote the answer (DecisionSummary)
                 'model' => null,
             ],
         );

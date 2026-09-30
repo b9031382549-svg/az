@@ -16,6 +16,7 @@ class ResultsApiTest extends TestCase
     {
         parent::setUp();
         config()->set('services.results_api.key', $this->key);
+        config()->set('classify.search_resolver.enabled', false); // a conflict is then terminal
     }
 
     private function seedItem(string $batch = 'b1'): ClassificationItem
@@ -45,6 +46,8 @@ class ResultsApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('id', $item->id)
             ->assertJsonPath('resolution', 'conflict')
+            ->assertJsonPath('method', 'needs_human')
+            ->assertJsonPath('reason', 'The methods diverged — a human needs to decide.')
             ->assertJsonCount(2, 'results')
             ->assertJsonPath('results.0.mechanism', 'vector')
             ->assertJsonPath('results.0.trace.gate.status', 'needs_review');
@@ -66,6 +69,7 @@ class ResultsApiTest extends TestCase
             ->assertJsonPath('batch', 'up1')
             ->assertJsonPath('total', 2)
             ->assertJsonCount(2, 'items')
+            ->assertJsonPath('items.0.method', 'needs_human')
             ->assertJsonPath('items.0.mechanisms.vector.code', '8471300000');
     }
 

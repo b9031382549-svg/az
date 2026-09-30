@@ -73,6 +73,10 @@ The app is auth-gated (default login user `admin`).
 - **Results API:** `routes/api.php` → `Api/ResultsApiController`, guarded by
   `ApiKeyAuth` (`RESULTS_API_KEY`) — read-only inspection of results + decision
   traces.
+- **Method + reason:** `DecisionSummary` — per item, which step found the code
+  (memory / trash / Direct+vector / ensemble / web search / human) and why, in the
+  UI language (model quotes stay English). Feeds the review Excel export
+  (`ReviewExportController` → `ClassificationExporter`) and the Results API.
 - **UI:** Livewire components (`Classify`, `ReviewQueue`, `ClassificationDecision`,
   `Invoices`, `AskAi`, `Catalog`, `UploadInvoices`, `Logs`, `ReportProblem`).
 
