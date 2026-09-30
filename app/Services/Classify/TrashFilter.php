@@ -96,6 +96,7 @@ final class TrashFilter
             'car_plate' => __('A vehicle registration number, not a product.', [], $locale),
             'email' => __('An e-mail address, not a product.', [], $locale),
             'company' => __('Only a company name — no product is named.', [], $locale),
+            'person' => __('Only a person\'s name — no product is named.', [], $locale),
             'paperwork' => __('Only a document reference, date or period — no product is named.', [], $locale),
             default => __('Not a product.', [], $locale),
         };
