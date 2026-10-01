@@ -787,5 +787,13 @@
     "import failed": "idxal alınmadı",
     "An .xls file can be up to 25 MB — save bigger files as .xlsx or .csv.": ".xls faylı 25 MB-dək ola bilər — daha böyük faylları .xlsx və ya .csv kimi saxlayın.",
     "The file has more than :max lines.": "Faylda :max sətirdən çox var.",
-    "Reading the file stopped unexpectedly. Please upload it again.": "Faylın oxunması gözlənilmədən dayandı. Zəhmət olmasa, yenidən yükləyin."
+    "Reading the file stopped unexpectedly. Please upload it again.": "Faylın oxunması gözlənilmədən dayandı. Zəhmət olmasa, yenidən yükləyin.",
+    "The sorter, a model trained on lines labelled by people, judged that no product is named.": "Çeşidləyici — insanların işarələdiyi sətirlər üzərində öyrədilmiş model — məhsul adı olmadığını müəyyən etdi.",
+    "AI: Direct + sorter": "Sİ: Direct + çeşidləyici",
+    "Two independent methods agree it is a service: the AI model (Direct) and the sorter, a model trained on lines labelled by people (:pct).": "İki müstəqil üsul bunun xidmət olduğunda razılaşır: Sİ modeli (Direct) və çeşidləyici — insanların işarələdiyi sətirlər üzərində öyrədilmiş model (:pct).",
+    "Sorter": "Çeşidləyici",
+    "a good, a service, or no product at all?": "mal, xidmət, yoxsa ümumiyyətlə məhsul deyil?",
+    "A model trained on lines labelled by people — an opinion independent of the AI below.": "İnsanların işarələdiyi sətirlər üzərində öyrədilmiş model — aşağıdakı Sİ-dən asılı olmayan rəy.",
+    "direct said service, confirmed by the sorter": "direct: xidmət, çeşidləyici təsdiqlədi",
+    "A service answer resolves when the sorter also says service.": "Xidmət cavabı çeşidləyici də «xidmət» dedikdə qəbul olunur."
 }

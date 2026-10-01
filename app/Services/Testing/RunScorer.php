@@ -168,7 +168,7 @@ class RunScorer
             // same way the runner did — independent of the later search flip.
             $authResults = $item->results->whereIn('mechanism', $authoritative)->values();
             if ($authResults->isNotEmpty()) {
-                $c = $this->consensus->resolve($authResults);
+                $c = $this->consensus->resolve($authResults, $item->results->firstWhere('mechanism', 'sorter'));
                 $this->tally($columns['majority'], $c['final_code'] ?? null, $c['kind'] ?? null, $expHeading, $expService);
             }
 

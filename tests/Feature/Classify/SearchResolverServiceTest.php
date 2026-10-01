@@ -200,6 +200,23 @@ class SearchResolverServiceTest extends TestCase
         $this->assertNull($item->results()->where('mechanism', 'search')->first());
     }
 
+    public function test_an_ensemble_answer_in_chapter_99_is_a_service(): void
+    {
+        config()->set('classify.flow.ensemble_resolver', true);
+        config()->set('classify.flow.shadow', false);
+
+        $item = $this->conflictItem();
+        $this->mockRetriever(['9966201100']); // shortlist = ['9966'], a retail-services heading
+        $this->mockLlmSeq([self::UNDERSTANDING, '{"heading":"9966"}', '{"heading":"9966"}', '{"heading":"9966"}']);
+
+        app(SearchResolverService::class)->resolve($item);
+
+        $item->refresh();
+        $this->assertSame('9966', $item->final_code);
+        $this->assertSame('service', $item->kind);   // was 'good': only the bare "99" counted
+        $this->assertSame('service', $item->results()->where('mechanism', 'ensemble')->first()->kind);
+    }
+
     public function test_ensemble_split_vote_abstains_and_falls_through_to_web(): void
     {
         config()->set('classify.flow.ensemble_resolver', true);

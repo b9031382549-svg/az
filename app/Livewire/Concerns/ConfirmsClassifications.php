@@ -5,6 +5,7 @@ namespace App\Livewire\Concerns;
 use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Services\Classify\AnswerCacheService;
+use App\Services\Classify\HeadingMatch;
 use App\Support\Audit;
 
 /**
@@ -33,7 +34,9 @@ trait ConfirmsClassifications
                 'resolution' => 'confirmed',
                 'final_code' => $code,
                 'final_catalog_id' => null,
-                'kind' => $code === '99' ? 'service' : ($item->kind ?? 'good'),
+                // From the confirmed code, not the item's old kind: 9970 is a service, and a
+                // service corrected to a goods heading is a good.
+                'kind' => HeadingMatch::isService(null, $code) ? 'service' : 'good',
                 'confirmed_by' => auth()->id(),
                 'confirmed_at' => now(),
             ]);

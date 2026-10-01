@@ -163,7 +163,7 @@ class TestingRun extends Component
 
             $authResults = $item ? $item->results->whereIn('mechanism', $authoritative)->values() : collect();
             if ($authResults->isNotEmpty()) {
-                $c = $consensus->resolve($authResults);
+                $c = $consensus->resolve($authResults, $item->results->firstWhere('mechanism', 'sorter'));
                 $cells['majority'] = $this->cell($c['final_code'] ?? null, $c['kind'] ?? null, $row);
             } else {
                 $cells['majority'] = null;

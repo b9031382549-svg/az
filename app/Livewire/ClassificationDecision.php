@@ -108,6 +108,9 @@ class ClassificationDecision extends Component
         $cache = $results->firstWhere('mechanism', 'cache');
         // The TrashFilter's verdict ('trash', or 'overridden' once a human sent it to the AI).
         $trashCheck = $results->firstWhere('mechanism', 'trash');
+        // The Sorter's verdict (good / service / trash + probabilities) — present for every
+        // name that reached the AI stage while the sorter service was up.
+        $sorter = $results->firstWhere('mechanism', 'sorter');
         // The divergence resolver is two-step (flow v2): a self-consistency ENSEMBLE vote
         // runs first and, when it agrees, settles the item locally (mechanism='ensemble');
         // only a split/shadow falls through to the paid web SEARCH (mechanism='search').
@@ -135,12 +138,17 @@ class ClassificationDecision extends Component
         // via the same Consensus::resolve() the pipeline ran, so this AI-stage preview can
         // never drift from the item's real resolution. agreementOf is kept only for the
         // descriptive "how many mechanisms' top pick shared a heading" count.
-        $decision = app(Consensus::class)->resolve($mechResults);
+        $decision = app(Consensus::class)->resolve($mechResults, $sorter);
         $ag = Consensus::agreementOf($mechResults);
         $consensus = [
             'ran' => $mechResults->isNotEmpty(),
             'heading' => $decision['final_code'] ?? $ag['heading'],
             'agreed' => $decision['resolution'] === 'agreed',
+            // Agreed by the services rule (Direct + the sorter), not by the vector shortlist.
+            'by_sorter' => $decision['resolution'] === 'agreed'
+                && ! Consensus::vectorContains($mechResults->firstWhere('mechanism', 'vector'),
+                    $mechResults->firstWhere('mechanism', 'direct')?->matched_code,
+                    $mechResults->firstWhere('mechanism', 'direct')?->kind),
             'top_count' => $ag['count'],
             'total' => $ag['total'],
         ];
@@ -171,6 +179,7 @@ class ClassificationDecision extends Component
             'mechResults' => $mechResults,
             'cache' => $cache,
             'trashCheck' => $trashCheck,
+            'sorter' => $sorter,
             'ensemble' => $ensemble,
             'search' => $search,
             'inMemory' => $inMemory,

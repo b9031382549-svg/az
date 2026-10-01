@@ -193,7 +193,8 @@ class SearchResolverService
 
         return [
             'answer' => $answer,
-            'kind' => $answer === '99' ? 'service' : 'good',
+            // Any chapter-99 heading is a service, not only the bare "99" (9966 was stored as a good).
+            'kind' => $answer !== null && HeadingMatch::isService(null, (string) $answer) ? 'service' : 'good',
             'agreement' => $agreement,
             'picks' => $picks,
             'groundings' => $groundings,
