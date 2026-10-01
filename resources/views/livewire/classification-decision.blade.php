@@ -74,6 +74,11 @@
     <a href="{{ $backUrl }}" class="text-sm text-muted hover:text-ink">← {{ $backLabel }}</a>
     <p class="kicker mt-3 mb-1">{{ __('Decision flow') }}</p>
     <h1 class="font-display text-3xl">{{ $item->localizedSourceText() }}</h1>
+    @if(! empty($units))
+      {{-- One name can come in several units across the invoice lines — counts only then. --}}
+      <p class="text-sm mt-1"><span class="text-faint">{{ __('Unit') }}</span>
+        {{ collect($units)->map(fn ($u) => $u['unit'].(count($units) > 1 ? ' ×'.$u['lines'] : ''))->implode(', ') }}</p>
+    @endif
 
     {{-- The overall outcome — what came out of the whole flow. --}}
     <div class="card-flat p-3 mt-3 flex items-center gap-2 flex-wrap text-sm">

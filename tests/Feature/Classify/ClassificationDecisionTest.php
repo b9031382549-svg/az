@@ -5,6 +5,7 @@ namespace Tests\Feature\Classify;
 use App\Jobs\ClassifyMechanismJob;
 use App\Livewire\ClassificationDecision;
 use App\Models\ClassificationItem;
+use App\Models\EInvoice;
 use App\Models\GoldLabel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -322,5 +323,33 @@ class ClassificationDecisionTest extends TestCase
             ->assertOk()
             ->assertSee('A name of only digits is always trash')
             ->assertDontSee('Not trash — classify');
+    }
+
+    public function test_shows_the_unit_from_the_invoice_lines(): void
+    {
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => 'Kabel VVG 3x2.5',
+            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict',
+        ]);
+        foreach (['METR', 'metr', 'kq'] as $unit) {
+            EInvoice::create(['item_name' => $item->source_text, 'unit' => $unit, 'classification_item_id' => $item->id]);
+        }
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertViewHas('units', [['unit' => 'metr', 'lines' => 2], ['unit' => 'kq', 'lines' => 1]])
+            ->assertSee('metr ×2, kq ×1');
+    }
+
+    public function test_no_unit_line_for_a_name_without_invoice_lines(): void
+    {
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => 'Şpris',
+            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'conflict',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertViewHas('units', []);
     }
 }

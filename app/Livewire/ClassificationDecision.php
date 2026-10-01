@@ -11,6 +11,7 @@ use App\Models\RubricatorNode;
 use App\Services\Classify\ClassificationQueue;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use App\Services\Classify\InvoiceLineHints;
 use App\Support\Audit;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -189,6 +190,8 @@ class ClassificationDecision extends Component
             'consensus' => $consensus,
             'vectorShortlist' => $vectorShortlist,
             'membershipK' => $membershipK,
+            // The unit on the invoice lines carrying the name — for the reviewer, never the AI.
+            'units' => app(InvoiceLineHints::class)->for($this->item)['units'] ?? [],
         ]);
     }
 }
