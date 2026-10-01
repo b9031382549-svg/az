@@ -42,6 +42,29 @@ class DatasetImporterTest extends TestCase
         $this->assertNull($rows[3]['expected_heading']);
     }
 
+    public function test_column_b_may_name_only_the_kind_of_line_to_score_the_sorter(): void
+    {
+        $ss = new Spreadsheet;
+        $ss->getActiveSheet()->fromArray([
+            ['Market', 'TRASH'],
+            ['Marketinq xidməti', 'услуга'],
+            ['Pivə 0,5', ' good '],
+            ['Coffee beans', '0901'],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'ds').'.xlsx';
+        (new Xlsx($ss))->save($path);
+
+        $rows = (new DatasetImporter)->rows($path);
+        @unlink($path);
+
+        $this->assertSame(['trash', 'service', 'good', 'good'], array_column($rows, 'expected_type'));
+        $this->assertSame([null, null, null, null], array_column($rows, 'skip_reason'));
+        // A kind alone carries no heading — only SERVICE is a code (the service level).
+        $this->assertSame([null, '99', null, '0901'], array_column($rows, 'expected_heading'));
+        $this->assertSame([false, true, false, false], array_column($rows, 'expected_is_service'));
+        $this->assertSame('TRASH', $rows[0]['expected_code']);
+    }
+
     public function test_picks_the_items_sheet_over_an_active_summary_sheet(): void
     {
         $ss = new Spreadsheet;

@@ -1,6 +1,6 @@
 <section class="p-5 sm:p-8 max-w-[1080px]">
   @php
-    $colLabels = ['memory' => __('Memory'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'majority' => __('Majority'), 'search' => __('Web search'), 'overall' => __('Overall')];
+    $colLabels = ['memory' => __('Memory'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'majority' => __('Majority'), 'search' => __('Web search'), 'overall' => __('Overall'), 'sorter' => __('Sorter')];
   @endphp
 
   <div class="mb-5">

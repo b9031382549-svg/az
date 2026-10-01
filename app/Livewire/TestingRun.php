@@ -19,7 +19,7 @@ class TestingRun extends Component
     use WithPagination;
 
     /** Column order shown in both the accuracy table and the per-row detail. */
-    public const COLUMNS = ['memory', 'vector', 'broker', 'direct', 'majority', 'search', 'overall'];
+    public const COLUMNS = ['memory', 'vector', 'broker', 'direct', 'majority', 'search', 'overall', 'sorter'];
 
     public TestRun $run;
 
@@ -47,6 +47,8 @@ class TestingRun extends Component
         $durationSeconds = $this->run->started_at ? (int) abs($end->diffInSeconds($this->run->started_at)) : null;
         $tokens = $this->run->accuracy['tokens'] ?? app(RunScorer::class)->tokens($this->run);
         $accuracy = $this->run->accuracy['columns'] ?? [];
+        // Runs scored before the sorter existed have no 'sorter' block — the view hides it.
+        $sorter = ($accuracy['sorter']['ran'] ?? 0) > 0 ? ($this->run->accuracy['sorter'] ?? null) : null;
 
         return view('livewire.testing-run', [
             'total' => $total,
@@ -55,6 +57,7 @@ class TestingRun extends Component
             'pct' => $total > 0 ? (int) round(min(100, $done / $total * 100)) : 0,
             'accuracy' => $accuracy,
             'funnelRows' => $this->funnelRows($this->run->accuracy['funnel'] ?? null, $accuracy),
+            'sorter' => $sorter,
             'durationSeconds' => $durationSeconds,
             'tokens' => (int) $tokens,
             'rowsPage' => $rowsPage,
@@ -147,8 +150,19 @@ class TestingRun extends Component
         return collect($rows)->map(function (TestDatasetRow $row) use ($items, $authoritative, $consensus) {
             $item = $items->get($row->id);
             $byMech = $item ? $item->results->keyBy('mechanism') : collect();
+            $sorterCell = $this->sorterCell($byMech->get('sorter'), $row);
 
-            $cells = [];
+            if (! $row->hasExpectedCode()) {
+                // A kind-only row (TRASH / GOOD): only the sorter looked at it.
+                return [
+                    'name' => $row->source_text,
+                    'expected' => mb_strtoupper((string) $row->expected_type),
+                    'item_id' => $item?->id,
+                    'cells' => ['sorter' => $sorterCell],
+                ];
+            }
+
+            $cells = ['sorter' => $sorterCell];
             foreach (['memory' => 'cache', 'vector' => 'vector', 'broker' => 'broker', 'direct' => 'direct', 'search' => 'search'] as $col => $mech) {
                 $r = $byMech->get($mech);
                 if ($mech === 'vector') {
@@ -178,6 +192,28 @@ class TestingRun extends Component
                 'cells' => $cells,
             ];
         })->all();
+    }
+
+    /**
+     * The sorter's verdict as RunScorer scores it: trash only at its threshold, a top "trash"
+     * below it is 'unsure'. Shows the class and its probability.
+     *
+     * @return array{heading:string, ok:bool}|null
+     */
+    private function sorterCell(?object $r, TestDatasetRow $row): ?array
+    {
+        if ($r === null || $row->expected_type === null) {
+            return null;
+        }
+        $probs = (array) data_get($r->trace, 'probs', []);
+        $threshold = (float) data_get($r->trace, 'trash_threshold', config('classify.sorter.trash_threshold'));
+        $predicted = (float) ($probs['trash'] ?? 0) >= $threshold ? 'trash' : ($r->kind === 'trash' ? 'unsure' : (string) $r->kind);
+        $p = (float) ($probs[$predicted === 'unsure' ? 'trash' : $predicted] ?? 0);
+
+        return [
+            'heading' => __($predicted).' '.number_format(100 * $p, $p >= 0.995 && $p < 1 ? 1 : 0).'%',
+            'ok' => $predicted === $row->expected_type,
+        ];
     }
 
     /** @return array{heading:string, ok:bool} */

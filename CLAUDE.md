@@ -49,6 +49,11 @@ The app is auth-gated (default login user `admin`).
   `classify.sorter.trash_threshold` → `trash` (rule `sorter`, same override as the rules).
   `Consensus::resolve`: Direct "service" + sorter "service" → `agreed` at 99 (the vector
   ranks goods and cannot back a service). Fail-open: service down → pipeline as before.
+  Testing tab: every run stores the sorter's verdict per row (`SortTestItemsJob`, verdicts
+  only) → a "Sorter" column scored on the kind of line (`RunScorer`: kind accuracy, trash
+  P/R alone and with the rules, service P/R, confusion). A dataset's column B may name only
+  the kind — TRASH / SERVICE / GOOD (`test_dataset_rows.expected_type`); TRASH / GOOD rows
+  are scored for the sorter alone: no memory, no AI, never in the code columns.
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
 - **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;

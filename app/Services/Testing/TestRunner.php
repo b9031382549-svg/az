@@ -4,10 +4,12 @@ namespace App\Services\Testing;
 
 use App\Jobs\ClassifyTestItemMechanismJob;
 use App\Jobs\ScoreRunJob;
+use App\Jobs\SortTestItemsJob;
 use App\Models\ClassificationItem;
 use App\Models\TestDataset;
 use App\Models\TestRun;
 use App\Services\Classify\AnswerCacheService;
+use App\Services\Classify\Sorter;
 use Illuminate\Support\Facades\Bus;
 
 /**
@@ -21,7 +23,10 @@ use Illuminate\Support\Facades\Bus;
  */
 class TestRunner
 {
-    public function __construct(private readonly AnswerCacheService $cache) {}
+    public function __construct(
+        private readonly AnswerCacheService $cache,
+        private readonly Sorter $sorter,
+    ) {}
 
     /**
      * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool}  $mechanisms
@@ -52,6 +57,8 @@ class TestRunner
         $enabled = $run->mechanisms['enabled'];
 
         $jobs = [];
+        $all = [];       // every item gets the sorter's verdict (the run's "Sorter" column)
+        $kindOnly = [];  // rows that name only a kind (TRASH / GOOD): nothing but the sorter scores them
         foreach ($dataset->scorableRows()->orderBy('id')->get() as $row) {
             $item = ClassificationItem::create([
                 'batch' => $run->batch,
@@ -66,6 +73,13 @@ class TestRunner
                 'resolution' => 'pending',
             ]);
 
+            $all[] = $item->id;
+            if (! $row->hasExpectedCode()) {
+                $kindOnly[] = $item->id; // no code to score — no memory, no AI spent on it
+
+                continue;
+            }
+
             // memory-on: dataset-scoped cache short-circuit, exactly like prod's cache-first step.
             if ($useCache && $this->cache->apply($item, $run->test_dataset_id)) {
                 continue; // hit → terminal, no mechanism jobs
@@ -73,6 +87,14 @@ class TestRunner
             foreach ($enabled as $mech) {
                 $jobs[] = new ClassifyTestItemMechanismJob($item->id, $mech);
             }
+        }
+
+        if ($this->sorter->enabled()) {
+            foreach (array_chunk($all, SortTestItemsJob::SIZE) as $chunk) {
+                $jobs[] = new SortTestItemsJob($chunk, array_values(array_intersect($chunk, $kindOnly)));
+            }
+        } else {
+            SortTestItemsJob::settleKindOnly($kindOnly); // no sorter: nothing will ever look at them
         }
 
         if ($jobs === []) {

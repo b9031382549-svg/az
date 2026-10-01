@@ -795,5 +795,15 @@
     "a good, a service, or no product at all?": "товар, услуга или вовсе не товар?",
     "A model trained on lines labelled by people — an opinion independent of the AI below.": "Модель, обученная на строках, размеченных людьми, — мнение, независимое от ИИ ниже.",
     "direct said service, confirmed by the sorter": "direct: услуга, подтверждено сортировщиком",
-    "A service answer resolves when the sorter also says service.": "Ответ «услуга» принимается, когда сортировщик тоже говорит «услуга»."
+    "A service answer resolves when the sorter also says service.": "Ответ «услуга» принимается, когда сортировщик тоже говорит «услуга».",
+    "unsure": "не уверен",
+    "a good, a service, or no product at all? Trash at p ≥ :t, as in production.": "товар, услуга или вовсе не товар? Мусор — при p ≥ :t, как на проде.",
+    "Kind correct": "Вид определён верно",
+    ":correct of :ran rows": ":correct из :ran строк",
+    "Trash · sorter": "Мусор · сортировщик",
+    "Trash · rules + sorter": "Мусор · правила + сортировщик",
+    "precision · recall :r": "точность · полнота :r",
+    "Expected ↓ · sorter said →": "Ожидалось ↓ · сортировщик сказал →",
+    "\"unsure\": its top class is trash, but below the threshold — in production it then acts on nothing. \"Rules + sorter\" is the whole trash step: a rule fires, or the sorter is sure.": "«не уверен»: верхний класс — мусор, но ниже порога; на проде тогда ничего не делается. «Правила + сортировщик» — весь шаг мусора: сработало правило или сортировщик уверен.",
+    "(or TRASH / SERVICE / GOOD — to score the sorter)": "(или TRASH / SERVICE / GOOD — для оценки сортировщика)"
 }
