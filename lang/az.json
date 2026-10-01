@@ -795,5 +795,15 @@
     "a good, a service, or no product at all?": "mal, xidmət, yoxsa ümumiyyətlə məhsul deyil?",
     "A model trained on lines labelled by people — an opinion independent of the AI below.": "İnsanların işarələdiyi sətirlər üzərində öyrədilmiş model — aşağıdakı Sİ-dən asılı olmayan rəy.",
     "direct said service, confirmed by the sorter": "direct: xidmət, çeşidləyici təsdiqlədi",
-    "A service answer resolves when the sorter also says service.": "Xidmət cavabı çeşidləyici də «xidmət» dedikdə qəbul olunur."
+    "A service answer resolves when the sorter also says service.": "Xidmət cavabı çeşidləyici də «xidmət» dedikdə qəbul olunur.",
+    "unsure": "əmin deyil",
+    "a good, a service, or no product at all? Trash at p ≥ :t, as in production.": "mal, xidmət, yoxsa ümumiyyətlə məhsul deyil? Yararsız — p ≥ :t olduqda, prod-dakı kimi.",
+    "Kind correct": "Növ düzgün",
+    ":correct of :ran rows": ":ran sətirdən :correct",
+    "Trash · sorter": "Yararsız · çeşidləyici",
+    "Trash · rules + sorter": "Yararsız · qaydalar + çeşidləyici",
+    "precision · recall :r": "dəqiqlik · tamlıq :r",
+    "Expected ↓ · sorter said →": "Gözlənilən ↓ · çeşidləyici dedi →",
+    "\"unsure\": its top class is trash, but below the threshold — in production it then acts on nothing. \"Rules + sorter\" is the whole trash step: a rule fires, or the sorter is sure.": "«əmin deyil»: ən yüksək sinif yararsızdır, lakin həddən aşağıdır — prod-da bu halda heç nə edilmir. «Qaydalar + çeşidləyici» bütün yararsız addımıdır: qayda işləyir və ya çeşidləyici əmindir.",
+    "(or TRASH / SERVICE / GOOD — to score the sorter)": "(və ya TRASH / SERVICE / GOOD — çeşidləyicini qiymətləndirmək üçün)"
 }

@@ -10,6 +10,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * code) into labelled rows. We score at the 4-digit HS heading, so expected_heading
  * and expected_is_service are derived here once.
  *
+ * Column B may instead hold only the KIND of line — TRASH / SERVICE / GOOD (also in
+ * Russian / Azerbaijani) — for scoring the sorter: a TRASH or GOOD row without a code is
+ * scored for the sorter alone; SERVICE is the service level, scored everywhere.
+ *
  * Sheet selection: workbooks often carry a summary/readme tab as the ACTIVE sheet with
  * the real items on another tab — so we scan EVERY worksheet and keep the one that
  * yields the most usable rows (rather than trusting getActiveSheet()).
@@ -27,8 +31,15 @@ class DatasetImporter
         'item', 'description', 'ad/xidmət', 'mal/xidmət', 'kod', 'code', 'hs', 'xif',
     ];
 
+    /** Column-B words that name the kind of line instead of a code (folded to lower case). */
+    private const KINDS = [
+        'trash' => 'trash', 'мусор' => 'trash', 'yararsız' => 'trash', 'yararsiz' => 'trash',
+        'service' => 'service', 'услуга' => 'service', 'xidmət' => 'service', 'xidmet' => 'service',
+        'good' => 'good', 'goods' => 'good', 'товар' => 'good', 'mal' => 'good',
+    ];
+
     /**
-     * @return array<int, array{source_text:string, expected_code:?string, expected_heading:?string, expected_is_service:bool, skip_reason:?string}>
+     * @return array<int, array{source_text:string, expected_code:?string, expected_heading:?string, expected_is_service:bool, expected_type:?string, skip_reason:?string}>
      */
     public function rows(string $path, int $limit = 10000): array
     {
@@ -60,7 +71,7 @@ class DatasetImporter
     }
 
     /**
-     * @return array<int, array{source_text:string, expected_code:?string, expected_heading:?string, expected_is_service:bool, skip_reason:?string}>
+     * @return array<int, array{source_text:string, expected_code:?string, expected_heading:?string, expected_is_service:bool, expected_type:?string, skip_reason:?string}>
      */
     private function parseSheet(Worksheet $sheet, int $limit): array
     {
@@ -75,6 +86,23 @@ class DatasetImporter
                 continue;
             }
             if (in_array(mb_strtolower($name), self::HEADERS, true)) {
+                continue;
+            }
+
+            $kind = is_string($row[1] ?? null) ? (self::KINDS[mb_strtolower(trim($row[1]))] ?? null) : null;
+            if ($kind !== null) {
+                $out[] = [
+                    'source_text' => $name,
+                    'expected_code' => mb_strtoupper($kind),
+                    'expected_heading' => $kind === 'service' ? '99' : null,
+                    'expected_is_service' => $kind === 'service',
+                    'expected_type' => $kind,
+                    'skip_reason' => null,
+                ];
+                if (count($out) >= $limit) {
+                    break;
+                }
+
                 continue;
             }
 
@@ -93,6 +121,7 @@ class DatasetImporter
                 'expected_code' => $code,
                 'expected_heading' => $heading,
                 'expected_is_service' => $isService,
+                'expected_type' => $skip !== null ? null : ($isService ? 'service' : 'good'),
                 'skip_reason' => $skip,
             ];
 

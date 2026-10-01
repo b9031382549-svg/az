@@ -2,7 +2,7 @@
   @php
     // 'majority' here is the per-row detail table's consensus column (unchanged shape),
     // not the funnel breakdown below — see $funnel for that.
-    $colLabels = ['memory' => __('Memory'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'majority' => __('Mechanism consensus'), 'search' => __('Web search'), 'overall' => __('Overall')];
+    $colLabels = ['memory' => __('Memory'), 'vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct'), 'majority' => __('Mechanism consensus'), 'search' => __('Web search'), 'overall' => __('Overall'), 'sorter' => __('Sorter')];
     $acc = fn ($b) => ($b && ($b['ran'] ?? 0) > 0) ? round(100 * $b['correct'] / $b['ran']) : null;
   @endphp
 
@@ -124,6 +124,76 @@
         @endif
       </div>
     </div>
+
+    {{-- Sorter: the KIND of line (good / service / trash) — scored over every row that names
+         one, including kind-only rows (TRASH / GOOD in column B) that no code column sees. --}}
+    @if($sorter)
+      @php
+        $cf = $sorter['confusion'] ?? [];
+        $n = fn ($e, $p) => (int) ($cf[$e][$p] ?? 0);
+        $rowSum = fn ($e) => array_sum($cf[$e] ?? []);
+        $pr = fn ($tp, $fp, $fn) => [$tp + $fp > 0 ? round(100 * $tp / ($tp + $fp), 1) : null, $tp + $fn > 0 ? round(100 * $tp / ($tp + $fn), 1) : null];
+        $kinds = ['good' => __('good'), 'service' => __('service'), 'trash' => __('trash')];
+        $sc = $accuracy['sorter'];
+        // A kind the dataset has no rows of: its precision/recall say nothing — show "—".
+        [$tP, $tR] = $rowSum('trash') > 0 ? $pr($n('trash', 'trash'), $n('good', 'trash') + $n('service', 'trash'), $rowSum('trash') - $n('trash', 'trash')) : [null, null];
+        $wr = $sorter['with_rules'] ?? ['tp' => 0, 'fp' => 0, 'fn' => 0];
+        [$wP, $wR] = $rowSum('trash') > 0 ? $pr($wr['tp'], $wr['fp'], $wr['fn']) : [null, null];
+        [$sP, $sR] = $rowSum('service') > 0 ? $pr($n('service', 'service'), $n('good', 'service') + $n('trash', 'service'), $rowSum('service') - $n('service', 'service')) : [null, null];
+        $fmt = fn ($v) => $v === null ? '—' : $v.'%';
+      @endphp
+      <p class="font-medium mb-2">{{ __('Sorter') }} <span class="text-sm text-muted font-normal">· {{ __('a good, a service, or no product at all? Trash at p ≥ :t, as in production.', ['t' => $sorter['threshold'] !== null ? rtrim(rtrim(number_format((float) $sorter['threshold'], 5, '.', ''), '0'), '.') : '—']) }}</span></p>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+        <div class="card-flat p-4">
+          <p class="kicker mb-1.5">{{ __('Kind correct') }}</p>
+          <p class="font-display text-2xl tnum">{{ $fmt($acc($sc)) }}</p>
+          <p class="text-xs text-muted mt-1">{{ __(':correct of :ran rows', ['correct' => $sc['correct'], 'ran' => $sc['ran']]) }}</p>
+        </div>
+        <div class="card-flat p-4">
+          <p class="kicker mb-1.5">{{ __('Trash · sorter') }}</p>
+          <p class="font-display text-2xl tnum">{{ $fmt($tP) }}</p>
+          <p class="text-xs text-muted mt-1">{{ __('precision · recall :r', ['r' => $fmt($tR)]) }}</p>
+        </div>
+        <div class="card-flat p-4">
+          <p class="kicker mb-1.5">{{ __('Trash · rules + sorter') }}</p>
+          <p class="font-display text-2xl tnum">{{ $fmt($wP) }}</p>
+          <p class="text-xs text-muted mt-1">{{ __('precision · recall :r', ['r' => $fmt($wR)]) }}</p>
+        </div>
+        <div class="card-flat p-4">
+          <p class="kicker mb-1.5">{{ __('Service') }}</p>
+          <p class="font-display text-2xl tnum">{{ $fmt($sP) }}</p>
+          <p class="text-xs text-muted mt-1">{{ __('precision · recall :r', ['r' => $fmt($sR)]) }}</p>
+        </div>
+      </div>
+      <div class="card p-0 overflow-hidden mb-6">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-muted text-left">
+              <tr class="border-b hair">
+                <th class="px-4 py-3 font-medium">{{ __('Expected ↓ · sorter said →') }}</th>
+                @foreach([...$kinds, 'unsure' => __('unsure')] as $label)
+                  <th class="px-4 py-3 font-medium text-right">{{ $label }}</th>
+                @endforeach
+                <th class="px-4 py-3 font-medium text-right">{{ __('Rows') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach($kinds as $e => $label)
+                @continue($rowSum($e) === 0)
+                <tr class="border-b hair">
+                  <td class="px-4 py-3">{{ $label }}</td>
+                  @foreach(['good', 'service', 'trash', 'unsure'] as $p)
+                    <td class="px-4 py-3 text-right tnum {{ $p === $e ? 'text-ledger font-medium' : ($n($e, $p) > 0 && $p !== 'unsure' ? 'text-stamp' : '') }}">{{ $n($e, $p) ?: '·' }}</td>
+                  @endforeach
+                  <td class="px-4 py-3 text-right tnum text-muted">{{ $rowSum($e) }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+        <p class="px-4 py-3 text-xs text-muted border-t hair">{{ __('"unsure": its top class is trash, but below the threshold — in production it then acts on nothing. "Rules + sorter" is the whole trash step: a rule fires, or the sorter is sure.') }}</p>
+      </div>
+    @endif
 
     {{-- Per-row detail --}}
     <p class="font-medium mb-2">{{ __('Per-row detail') }}</p>

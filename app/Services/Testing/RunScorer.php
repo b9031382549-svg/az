@@ -3,10 +3,13 @@
 namespace App\Services\Testing;
 
 use App\Models\ClassificationItem;
+use App\Models\ClassificationResult;
+use App\Models\TestDatasetRow;
 use App\Models\TestRun;
 use App\Services\Classify\AnswerCacheService;
 use App\Services\Classify\Consensus;
 use App\Services\Classify\HeadingMatch;
+use App\Services\Classify\TrashFilter;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +21,10 @@ use Illuminate\Support\Facades\DB;
  * vector/broker/direct only on cache-misses, search only on conflicts. To measure a
  * mechanism over ALL rows, run with memory off (then every row reaches the mechanism
  * stage). Everything is scored at the 4-digit heading via the shared HeadingMatch.
+ *
+ * The SORTER is scored on the KIND of line (good / service / trash) over every row that
+ * names one — including rows that carry only a kind (TRASH / GOOD), which the code
+ * columns ignore.
  */
 class RunScorer
 {
@@ -33,6 +40,7 @@ class RunScorer
     public function __construct(
         private readonly Consensus $consensus,
         private readonly AnswerCacheService $answerCache,
+        private readonly TrashFilter $trash,
     ) {}
 
     /**
@@ -96,7 +104,7 @@ class RunScorer
     }
 
     /**
-     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}}
+     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}, sorter: array{threshold: ?float, confusion: array<string, array<string, int>>, with_rules: array{tp:int, fp:int, fn:int}}}
      */
     public function score(TestRun $run): array
     {
@@ -110,9 +118,10 @@ class RunScorer
         $authCount = count($authoritative);
 
         $columns = array_fill_keys(
-            [...array_keys(self::MECHANISM_COLUMNS), 'majority', 'overall'],
+            [...array_keys(self::MECHANISM_COLUMNS), 'majority', 'overall', 'sorter'],
             ['ran' => 0, 'answered' => 0, 'correct' => 0],
         );
+        $sorter = ['threshold' => null, 'confusion' => [], 'with_rules' => ['tp' => 0, 'fp' => 0, 'fn' => 0]];
 
         // The funnel: for every non-cache-hit row, how many of the authoritative
         // mechanisms landed on the same heading (1..$authCount, "prevote"), and whether
@@ -140,6 +149,11 @@ class RunScorer
             $expHeading = $row->expected_heading;
             $expService = (bool) $row->expected_is_service;
             $byMech = $item->results->keyBy('mechanism');
+
+            $this->scoreSorter($columns['sorter'], $sorter, $row, $byMech->get('sorter'));
+            if (! $row->hasExpectedCode()) {
+                continue; // a kind-only row (TRASH / GOOD): the sorter is all it is scored for
+            }
 
             foreach (self::MECHANISM_COLUMNS as $col => $mech) {
                 $r = $byMech->get($mech);
@@ -209,7 +223,45 @@ class RunScorer
 
         $funnel = ['total' => $authCount, 'prevote' => $prevote, 'search_by_origin' => $searchByOrigin];
 
-        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'funnel' => $funnel];
+        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'funnel' => $funnel, 'sorter' => $sorter];
+    }
+
+    /**
+     * The sorter's verdict vs the row's kind, scored on what it ACTS on in prod: trash at the
+     * threshold stored with its verdict, otherwise its top class. A top "trash" below the
+     * threshold acts on nothing — 'unsure' (ran, not answered). with_rules = the whole trash
+     * step as prod runs it: a TrashFilter rule fires, or the sorter is sure.
+     *
+     * @param  array{ran:int, answered:int, correct:int}  $column
+     * @param  array{threshold: ?float, confusion: array<string, array<string, int>>, with_rules: array{tp:int, fp:int, fn:int}}  $stats
+     */
+    private function scoreSorter(array &$column, array &$stats, TestDatasetRow $row, ?ClassificationResult $verdict): void
+    {
+        $expected = $row->expected_type;
+        if ($expected === null || $verdict === null) {
+            return;
+        }
+
+        $threshold = (float) data_get($verdict->trace, 'trash_threshold', config('classify.sorter.trash_threshold'));
+        $sure = (float) data_get($verdict->trace, 'probs.trash', 0.0) >= $threshold;
+        $predicted = $sure ? 'trash' : ($verdict->kind === 'trash' ? 'unsure' : (string) $verdict->kind);
+
+        $column['ran']++;
+        $column['answered'] += $predicted === 'unsure' ? 0 : 1;
+        $column['correct'] += $predicted === $expected ? 1 : 0;
+        $stats['threshold'] = $threshold;
+        $stats['confusion'][$expected][$predicted] = ($stats['confusion'][$expected][$predicted] ?? 0) + 1;
+
+        $flagged = $sure || $this->trash->reason((string) $row->source_text) !== null;
+        $key = match (true) {
+            $flagged && $expected === 'trash' => 'tp',
+            $flagged => 'fp',
+            $expected === 'trash' => 'fn',
+            default => null,
+        };
+        if ($key !== null) {
+            $stats['with_rules'][$key]++;
+        }
     }
 
     /**
