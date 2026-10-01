@@ -5,23 +5,27 @@ namespace App\Services\Export;
 use App\Models\ClassificationItem;
 use App\Models\RubricatorNode;
 use App\Services\Classify\DecisionSummary;
+use App\Services\Classify\InvoiceLineHints;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 /**
  * Builds an .xlsx of classification results: the item (good/service) and its
- * assigned classifier code in the adjacent column, plus context — and how the
- * code was found (method) and why this category (reason). Everything is written
- * in the CURRENT UI language only — the item name, the matched code name, the
- * headers and the labels; only the models' own words, quoted in the reason, stay
- * in English.
+ * assigned classifier code in the adjacent column, plus context — the unit on the
+ * invoice lines, how the code was found (method) and why this category (reason).
+ * Everything is written in the CURRENT UI language only — the item name, the
+ * matched code name, the headers and the labels; only the models' own words,
+ * quoted in the reason, stay in English.
  */
 class ClassificationExporter
 {
-    private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 16, 'D' => 10, 'E' => 46, 'F' => 11, 'G' => 14, 'H' => 22, 'I' => 80, 'J' => 24, 'K' => 16];
+    private const WIDTHS = ['A' => 6, 'B' => 46, 'C' => 16, 'D' => 10, 'E' => 14, 'F' => 46, 'G' => 11, 'H' => 14, 'I' => 22, 'J' => 80, 'K' => 24, 'L' => 16];
 
-    public function __construct(private readonly DecisionSummary $summary) {}
+    public function __construct(
+        private readonly DecisionSummary $summary,
+        private readonly InvoiceLineHints $hints,
+    ) {}
 
     /**
      * @param  Collection<int, ClassificationItem>  $rows
@@ -33,9 +37,9 @@ class ClassificationExporter
         $sheet = $ss->getActiveSheet();
         $sheet->setTitle('Classifications');
 
-        $headers = ['#', __('Item'), __('Code'), __('Kind'), __('Matched name'), __('Confidence'), __('Status'), __('Method'), __('Reason'), __('Upload'), __('Date')];
+        $headers = ['#', __('Item'), __('Code'), __('Kind'), __('Unit'), __('Matched name'), __('Confidence'), __('Status'), __('Method'), __('Reason'), __('Upload'), __('Date')];
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:L1')->getFont()->setBold(true);
         // Force the Code column to text so leading zeros (e.g. 0207) survive.
         $sheet->getStyle('C')->getNumberFormat()->setFormatCode('@');
 
@@ -51,6 +55,8 @@ class ClassificationExporter
             ->mapWithKeys(fn ($node) => [(string) $node->code => $node->localizedTitle()]);
 
         $summaries = $this->summary->forItems($rows);
+        // The unit is on the invoice lines, not the item: one name can come in several units.
+        $units = $this->hints->unitsFor($rows->pluck('id'));
 
         $i = 2;
         foreach ($rows->values() as $n => $row) {
@@ -64,13 +70,14 @@ class ClassificationExporter
             $sheet->setCellValueExplicit("B{$i}", $row->localizedSourceText(), DataType::TYPE_STRING);
             $sheet->setCellValueExplicit("C{$i}", (string) ($row->final_code ?? ''), DataType::TYPE_STRING);
             $sheet->setCellValueExplicit("D{$i}", $row->kind ? __($row->kind) : '', DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("E{$i}", (string) $codeName, DataType::TYPE_STRING);
-            $sheet->setCellValue("F{$i}", $confidence !== null ? round((float) $confidence, 3) : null);
-            $sheet->setCellValueExplicit("G{$i}", __(str_replace('_', ' ', (string) $row->resolution)), DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("H{$i}", $summary ? DecisionSummary::label($summary['method']) : '', DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("I{$i}", $summary['reason'] ?? '', DataType::TYPE_STRING);
-            $sheet->setCellValueExplicit("J{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
-            $sheet->setCellValue("K{$i}", optional($row->created_at)->format('Y-m-d H:i'));
+            $sheet->setCellValueExplicit("E{$i}", InvoiceLineHints::formatUnits($units[$row->id] ?? []), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("F{$i}", (string) $codeName, DataType::TYPE_STRING);
+            $sheet->setCellValue("G{$i}", $confidence !== null ? round((float) $confidence, 3) : null);
+            $sheet->setCellValueExplicit("H{$i}", __(str_replace('_', ' ', (string) $row->resolution)), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("I{$i}", $summary ? DecisionSummary::label($summary['method']) : '', DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("J{$i}", $summary['reason'] ?? '', DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("K{$i}", (string) ($labels[$row->batch] ?? ''), DataType::TYPE_STRING);
+            $sheet->setCellValue("L{$i}", optional($row->created_at)->format('Y-m-d H:i'));
             $i++;
         }
 
