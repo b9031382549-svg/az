@@ -210,7 +210,7 @@
           <div class="flex items-center justify-center text-faint">→</div>
           <div class="flex-1 rounded-lg border hair p-3 min-w-0">
             <p class="kicker mb-1">{{ __('Output') }}</p>
-            <p>{{ \App\Services\Classify\TrashFilter::explain($trashRule) }}</p>
+            <p>{{ \App\Services\Classify\TrashFilter::explain($trashRule) }}@if($trashRule === 'sorter' && data_get($trashCheck->trace, 'p') !== null) <span class="text-muted">({{ __('trash') }} {{ number_format((float) data_get($trashCheck->trace, 'p') * 100, 1) }}%)</span>@endif</p>
             <p class="text-xs mt-0.5 {{ $overridden ? 'text-amber' : 'text-muted' }}">{{ $overridden ? __('a reviewer said it is a product → sent to the AI') : __('not classified — no AI was run') }}</p>
           </div>
         </div>
@@ -222,6 +222,30 @@
             <button wire:click="classifyAnyway" wire:confirm="{{ __('Not trash — classify this item with the AI?') }}" class="btn btn-ghost btn-sm">↻ {{ __('Not trash — classify') }}</button>
           </div>
         @endif
+      </li>
+    @endif
+
+    {{-- SORTER — a small model trained on lines people labelled good / service / trash. It reads
+         every name the cache and the rules left: confident trash is settled above (rule
+         'sorter'); its "service" backs Direct's service answer in the AI step below. --}}
+    @if($sorter)
+      @php
+        $sp = (array) data_get($sorter->trace, 'probs', []);
+        $sortLabel = fn ($l) => match ($l) { 'good' => __('good'), 'service' => __('service'), 'trash' => __('trash'), default => (string) $l };
+      @endphp
+      <li class="card p-5">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
+            <span class="font-medium">{{ __('Sorter') }}</span>
+            <span class="text-faint text-xs">{{ __('a good, a service, or no product at all?') }}</span>
+          </div>
+          <span class="hint-head px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($sorter->kind === 'trash' ? 'muted' : 'good') }}" data-hint="sorter">{{ $sortLabel($sorter->kind) }} {{ $pct($sorter->confidence) }}</span>
+        </div>
+        <p class="text-sm">
+          @foreach(['good', 'service', 'trash'] as $l){{ $sortLabel($l) }} <span class="tnum">{{ number_format((float) ($sp[$l] ?? 0) * 100, 1) }}%</span>@if(! $loop->last)<span class="text-faint"> · </span>@endif @endforeach
+        </p>
+        <p class="text-xs text-muted mt-1">{{ __('A model trained on lines labelled by people — an opinion independent of the AI below.') }}</p>
       </li>
     @endif
 
@@ -247,7 +271,7 @@
             <p class="kicker mb-1">{{ __('Output') }}</p>
             @if($consensus['agreed'])
               <p><span class="font-mono">{{ $consensus['heading'] }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($consensus['heading']), 55) }}</span></p>
-              <p class="text-ledger text-xs mt-0.5">{{ __('direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
+              <p class="text-ledger text-xs mt-0.5">{{ $consensus['by_sorter'] ? __('direct said service, confirmed by the sorter') : __('direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
             @else
               <p class="text-muted">{{ __('the mechanisms did not agree on a heading') }}</p>
               <p class="text-amber text-xs mt-0.5">{{ ($resolverRan || $resolverSettled) ? __('diverged → the resolver') : ($item->isResolving() ? __('diverged → the resolver (in progress)') : __('diverged → a human')) }}</p>
@@ -295,7 +319,7 @@
                 </div>
               @endforeach
             </div>
-            @if($consensus['agreed'])
+            @if($consensus['agreed'] && ! $consensus['by_sorter'])
               <p class="text-ledger mt-1.5">{{ __('Direct is in the shortlist → agreed') }}</p>
             @endif
           </div>
@@ -324,7 +348,7 @@
                 @include('livewire.partials.mechanism-trace')
               </div>
             @endforeach
-            <p class="text-xs text-muted">{{ __('Consensus rule: the item resolves when the direct answer appears in the vector top-:k shortlist.', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
+            <p class="text-xs text-muted">{{ __('Consensus rule: the item resolves when the direct answer appears in the vector top-:k shortlist.', ['k' => config('classify.vector.membership_k', 3)]) }} {{ __('A service answer resolves when the sorter also says service.') }}</p>
           </div>
         </details>
       </li>

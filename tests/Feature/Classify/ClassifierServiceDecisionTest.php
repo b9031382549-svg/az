@@ -101,6 +101,9 @@ class ClassifierServiceDecisionTest extends TestCase
         // The vector_first path no longer LLM-re-ranks: matched_code is the nearest
         // candidate, status gates on semantic backing alone, and the LLM is never called.
         config()->set('classify.vector_first.enabled', true);
+        // The plain semantic shortlist these mocks serve — not prod's heading-diverse + lexical one.
+        config()->set('classify.vector_first.heading_diverse', false);
+        config()->set('classify.vector_first.lexical', 0);
         config()->set('classify.min_semantic', 0.5);
 
         $llm = Mockery::mock(OpenRouterClient::class);
@@ -122,6 +125,9 @@ class ClassifierServiceDecisionTest extends TestCase
     public function test_vector_first_needs_review_when_top_1_not_semantically_backed(): void
     {
         config()->set('classify.vector_first.enabled', true);
+        // The plain semantic shortlist these mocks serve — not prod's heading-diverse + lexical one.
+        config()->set('classify.vector_first.heading_diverse', false);
+        config()->set('classify.vector_first.lexical', 0);
         config()->set('classify.min_semantic', 0.5);
 
         $llm = Mockery::mock(OpenRouterClient::class);

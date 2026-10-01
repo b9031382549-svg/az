@@ -55,7 +55,7 @@ class TestRunFinalizer
             return false; // wait until every authoritative mechanism has reported
         }
 
-        $item->update($this->consensus->resolve($results));
+        $item->update($this->consensus->resolve($results, $this->consensus->sorterVerdict($item, $results)));
 
         // Same unanimous write-back prod gets (Consensus::maybePromote()), scoped to THIS
         // dataset's own memory instead of production — AnswerCacheService::promote()

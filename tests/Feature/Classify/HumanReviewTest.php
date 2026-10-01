@@ -79,6 +79,22 @@ class HumanReviewTest extends TestCase
         $this->assertFalse($c->viewData('queue')->pluck('id')->contains($item->id));
     }
 
+    public function test_the_kind_follows_the_confirmed_code(): void
+    {
+        CatalogCode::create(['code' => '9970000000', 'name' => 'services', 'kind' => 'service', 'position' => '9970', 'is_active' => true]);
+        $toService = $this->open('no_match', 'İstehsalçı: GRISHAM SERVICES INC');
+        $toService->update(['kind' => 'good']);
+        $toGood = $this->open('no_match', 'oat flakes 500g');
+        $toGood->update(['kind' => 'service', 'final_code' => '99']);
+
+        $this->acting()->call('selectItem', $toService->id)->call('confirm', '9970');
+        $this->acting()->call('selectItem', $toGood->id)->call('confirm', '1104');
+
+        // A chapter-99 heading is a service; a service corrected to a goods heading is a good.
+        $this->assertSame('service', $toService->fresh()->kind);
+        $this->assertSame('good', $toGood->fresh()->kind);
+    }
+
     public function test_confirming_one_item_auto_confirms_identical_twins(): void
     {
         // Same normalized name → same source_hash (as the pipeline computes it).

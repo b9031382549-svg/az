@@ -787,5 +787,13 @@
     "import failed": "импорт не удался",
     "An .xls file can be up to 25 MB — save bigger files as .xlsx or .csv.": "Файл .xls может быть не больше 25 МБ — большие файлы сохраните как .xlsx или .csv.",
     "The file has more than :max lines.": "В файле больше :max строк.",
-    "Reading the file stopped unexpectedly. Please upload it again.": "Чтение файла неожиданно прервалось. Загрузите его ещё раз."
+    "Reading the file stopped unexpectedly. Please upload it again.": "Чтение файла неожиданно прервалось. Загрузите его ещё раз.",
+    "The sorter, a model trained on lines labelled by people, judged that no product is named.": "Сортировщик — модель, обученная на строках, размеченных людьми, — решил, что товар не назван.",
+    "AI: Direct + sorter": "ИИ: Direct + сортировщик",
+    "Two independent methods agree it is a service: the AI model (Direct) and the sorter, a model trained on lines labelled by people (:pct).": "Два независимых метода согласны, что это услуга: ИИ-модель (Direct) и сортировщик — модель, обученная на строках, размеченных людьми (:pct).",
+    "Sorter": "Сортировщик",
+    "a good, a service, or no product at all?": "товар, услуга или вовсе не товар?",
+    "A model trained on lines labelled by people — an opinion independent of the AI below.": "Модель, обученная на строках, размеченных людьми, — мнение, независимое от ИИ ниже.",
+    "direct said service, confirmed by the sorter": "direct: услуга, подтверждено сортировщиком",
+    "A service answer resolves when the sorter also says service.": "Ответ «услуга» принимается, когда сортировщик тоже говорит «услуга»."
 }

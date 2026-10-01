@@ -23,6 +23,8 @@ class SearchCacheTest extends TestCase
         CatalogCode::create(['code' => '8471300000', 'name' => 'noutbuk', 'name_en' => 'laptops', 'kind' => 'good', 'chapter' => '84', 'position' => '8471', 'subposition' => '847130', 'is_active' => true]);
         config()->set('classify.search_resolver.min_confidence', 0.8);
         config()->set('classify.search_resolver.cache_enabled', true);
+        // The web resolver's own cache is under test — not the ensemble vote that runs first on prod.
+        config()->set('classify.flow.ensemble_resolver', false);
     }
 
     private function item(string $text): ClassificationItem

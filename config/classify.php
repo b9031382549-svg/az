@@ -14,6 +14,25 @@ return [
         'baseline_source' => (string) env('CLASSIFY_CACHE_BASELINE_SOURCE', 'gold'),
     ],
 
+    // Sorter — a small model, served by the `sorter` container (docker/sorter), that reads a
+    // line and says what KIND of line it is: a good, a service, or trash (names no product).
+    // Trained on lines labelled by people, never on this pipeline's own answers, so it is an
+    // independent second opinion. It runs right after the answer cache and the TrashFilter
+    // rules, on every name they leave:
+    //  - p(trash) >= trash_threshold → resolution 'trash' (rule 'sorter'), no AI;
+    //  - Direct answers "service" and the sorter says service → agreed as a service (the
+    //    vector cannot back a service: it ranks catalog goods — see Consensus::resolve).
+    // The threshold is the precision-98 % point on the held-out test split, measured with
+    // the very model file the container serves (research-data/sorter-model, meta.json).
+    // Empty url = off. When the service is down the pipeline simply runs without it.
+    'sorter' => [
+        'url' => (string) env('CLASSIFY_SORTER_URL', 'http://sorter:8000'),
+        'trash_threshold' => (float) env('CLASSIFY_SORTER_TRASH_THRESHOLD', 0.99747),
+        // Requests queue up at the service (one forward pass at a time) when an upload's
+        // portion fans out into many SortItemsJobs — wait for our turn rather than fall open.
+        'timeout' => (int) env('CLASSIFY_SORTER_TIMEOUT', 120),
+    ],
+
     // Held-out benchmark/eval files — repo-relative paths, CSV (must have a 'name'
     // column) or .jsonl (must have a "name" field per line). `cache:seed
     // --exclude-benchmarks` never seeds a name found in any of these, so accuracy

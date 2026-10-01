@@ -98,6 +98,7 @@ final class TrashFilter
             'company' => __('Only a company name — no product is named.', [], $locale),
             'person' => __('Only a person\'s name — no product is named.', [], $locale),
             'paperwork' => __('Only a document reference, date or period — no product is named.', [], $locale),
+            'sorter' => __('The sorter, a model trained on lines labelled by people, judged that no product is named.', [], $locale),
             default => __('Not a product.', [], $locale),
         };
     }
@@ -153,10 +154,23 @@ final class TrashFilter
     public function apply(ClassificationItem $item, bool $absoluteOnly = false): bool
     {
         $rule = $this->reason((string) $item->source_text);
-        if ($rule === null || ! in_array($item->resolution, ['pending', 'trash'], true)) {
+        if ($rule === null || ($absoluteOnly && ! self::isAbsolute($rule))) {
             return false;
         }
-        if ($absoluteOnly && ! self::isAbsolute($rule)) {
+
+        return $this->settle($item, $rule);
+    }
+
+    /**
+     * Resolve an item as trash by $rule — a rule above, or 'sorter' (the Sorter step, with
+     * its probability in $trace). The same guards for both: never an item already decided,
+     * never one a human took out of trash. Returns true when trashed.
+     *
+     * @param  array<string, mixed>  $trace
+     */
+    public function settle(ClassificationItem $item, string $rule, array $trace = []): bool
+    {
+        if (! in_array($item->resolution, ['pending', 'trash'], true)) {
             return false;
         }
         if ($item->results()->where('mechanism', 'trash')->where('status', 'overridden')->exists()) {
@@ -173,7 +187,7 @@ final class TrashFilter
                 'confidence' => null,
                 'candidates' => [],
                 'explanation' => self::explain($rule, 'en'),
-                'trace' => ['rule' => $rule],
+                'trace' => ['rule' => $rule] + $trace,
                 'model' => null,
             ],
         );

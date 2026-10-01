@@ -41,6 +41,14 @@ The app is auth-gated (default login user `admin`).
   of human-labelled trash). Only digits is absolute (beats the cache, no override);
   otherwise a reviewer can send it back ("Not trash — classify" on the decision
   page → trace row `overridden`, never re-trashed).
+- **Sorter:** a small model (XLM-R, fine-tuned on lines labelled by people) that says
+  good / service / trash for a line — served by the `sorter` container
+  (`docker/sorter/server.py`, ONNX int8 on CPU) and called by `SorterClient`. After the
+  cache and the TrashFilter rules, `ClassificationQueue` puts the remaining names on
+  `SortItemsJob` (queued, never inline): each item gets a `sorter` trace row; p(trash) ≥
+  `classify.sorter.trash_threshold` → `trash` (rule `sorter`, same override as the rules).
+  `Consensus::resolve`: Direct "service" + sorter "service" → `agreed` at 99 (the vector
+  ranks goods and cannot back a service). Fail-open: service down → pipeline as before.
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
 - **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;
@@ -141,6 +149,12 @@ The app is auth-gated (default login user `admin`).
   and `RESULTS_API_KEY` all come from env.
 
 ## Gotchas
+
+- The sorter's model files are NOT in git: prod `/opt/az-assets/sorter` (model.onnx +
+  tokenizer.json + meta.json with its sha256), local `research-data/sorter-model/v1`
+  (same sha). `classify.sorter.trash_threshold` is calibrated for THAT file — change them
+  together. The service runs one line per forward pass on purpose: the int8 model
+  quantizes activations per tensor, so a padded batch made a line depend on its neighbours.
 
 - After changing catalog embedding logic or synonyms → re-embed with
   `data:embed-catalog --refresh`.

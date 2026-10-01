@@ -3,6 +3,7 @@
 namespace App\Services\Classify;
 
 use App\Jobs\ClassifyMechanismJob;
+use App\Jobs\SortItemsJob;
 use App\Jobs\TranslateItemJob;
 use App\Models\ClassificationItem;
 use App\Models\ItemTranslation;
@@ -12,8 +13,8 @@ use Illuminate\Support\Facades\Queue;
 // Puts item names on the classification pipeline — the one path shared by the Classify page
 // and invoice uploads: one parent ClassificationItem per unique (batch, name); a verified
 // memory (answer cache) hit resolves it at once, a name that names no product at all is marked
-// 'trash' (TrashFilter), every other name fans out one ClassifyMechanismJob per enabled
-// mechanism; plus one background translation per name.
+// 'trash' (TrashFilter rules, then the Sorter model), every other name fans out one
+// ClassifyMechanismJob per enabled mechanism; plus one background translation per name.
 class ClassificationQueue
 {
     /**
@@ -25,6 +26,7 @@ class ClassificationQueue
     public function __construct(
         private readonly AnswerCacheService $cache,
         private readonly TrashFilter $trash,
+        private readonly Sorter $sorter,
     ) {}
 
     /** Create the items and put them on the pipeline; returns the number of distinct items. */
@@ -79,20 +81,30 @@ class ClassificationQueue
     /**
      * FIRST step: a verified answer in the cache resolves the item immediately — no mechanism
      * jobs, no LLM. SECOND: a cache miss whose name names no product (TrashFilter) is marked
-     * 'trash', again with no AI. Only what is left fans out to the AI pipeline.
+     * 'trash', again with no AI. THIRD: the Sorter model reads what is left (SortItemsJob, on
+     * the queue) — confident trash is settled the same way, every other verdict is stored for
+     * Consensus — and only then does the rest fan out to the AI pipeline.
      *
      * @param  Collection<array-key, ClassificationItem>  $items
      */
     public function dispatch(Collection $items): void
     {
-        $jobs = [];
+        $left = [];
         foreach ($items as $item) {
             // Absolute trash (only digits) wins even over a cached answer.
             if ($this->trash->apply($item, absoluteOnly: true) || $this->cache->apply($item) || $this->trash->apply($item)) {
                 continue;
             }
-            array_push($jobs, ...$this->mechanismJobs($item));
+            $left[] = $item;
         }
+        // On the queue, not inline: neither a page request nor an upload's feed should wait
+        // for a model on the CPU. Without the sorter the names go straight to the AI.
+        $jobs = $this->sorter->enabled()
+            ? array_map(
+                fn (array $chunk) => new SortItemsJob(array_map(fn (ClassificationItem $i) => (int) $i->id, $chunk)),
+                array_chunk($left, SortItemsJob::SIZE),
+            )
+            : $this->jobsFor($left);
         foreach (array_chunk($jobs, self::CHUNK) as $chunk) {
             Queue::bulk($chunk, '', 'default');
         }
@@ -133,6 +145,32 @@ class ClassificationQueue
         }
 
         return true;
+    }
+
+    /**
+     * Put $items on the AI mechanisms — the step after the sorter (SortItemsJob).
+     *
+     * @param  array<int, ClassificationItem>  $items
+     */
+    public function toMechanisms(array $items): void
+    {
+        foreach (array_chunk($this->jobsFor($items), self::CHUNK) as $chunk) {
+            Queue::bulk($chunk, '', 'default');
+        }
+    }
+
+    /**
+     * @param  array<int, ClassificationItem>  $items
+     * @return array<int, ClassifyMechanismJob>
+     */
+    private function jobsFor(array $items): array
+    {
+        $jobs = [];
+        foreach ($items as $item) {
+            array_push($jobs, ...$this->mechanismJobs($item));
+        }
+
+        return $jobs;
     }
 
     /** @return array<int, ClassifyMechanismJob> one job per enabled mechanism */

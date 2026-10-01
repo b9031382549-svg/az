@@ -12,13 +12,15 @@ use Illuminate\Support\Collection;
  *
  * Policy: our answer is the 4-digit HEADING. An item auto-resolves when DIRECT commits an
  * answer AND the VECTOR corroborates it by carrying that heading in its top-K retrieval
- * shortlist (membership — see resolve()). Anything short of that is a `conflict`, handed to
- * the web-search resolver. The broker mechanism is DISABLED (kept for re-enable). There is
+ * shortlist (membership — see resolve()). A SERVICE answer is backed by the sorter instead
+ * (the vector ranks catalog goods and cannot). Anything short of that is a `conflict`, handed
+ * to the web-search resolver. The broker mechanism is DISABLED (kept for re-enable). There is
  * no AI judge in this flow (removed for now).
  *
  * resolution vocabulary:
  *   pending          — not every enabled mechanism has reported yet
- *   agreed           — direct's answer is in the vector top-K (auto, confident)
+ *   agreed           — direct's answer is in the vector top-K, or direct and the sorter
+ *                      both say "service" (auto, confident)
  *   conflict         — direct abstained or its answer is not in the vector top-K
  *   ai_resolved      — a divergent item the SEARCH resolver settled at a 4-digit heading
  *   no_match         — no mechanism produced a code
@@ -85,7 +87,7 @@ class Consensus
             return; // stay 'pending' until every authoritative mechanism reports
         }
 
-        $resolved = $this->resolve($authResults);
+        $resolved = $this->resolve($authResults, $this->sorterVerdict($item, $authResults));
         $item->update($resolved);
 
         $this->maybePromote($item);
@@ -148,12 +150,34 @@ class Consensus
     }
 
     /**
+     * The sorter's verdict for the services rule in resolve(): the stored 'sorter' row; or,
+     * when Direct answered "service", the vector did not back it and no verdict was stored
+     * (the sorter was down as the item passed, or a test run, which has no sorter step),
+     * asked for now. No other case needs the sorter.
+     *
+     * @param  Collection<int, ClassificationResult>  $authResults
+     */
+    public function sorterVerdict(ClassificationItem $item, Collection $authResults): ?ClassificationResult
+    {
+        $row = $item->results()->where('mechanism', 'sorter')->first();
+        $direct = $authResults->firstWhere('mechanism', 'direct');
+        if ($row !== null || $direct === null || (string) $direct->matched_code === ''
+            || ! HeadingMatch::isService($direct->kind, $direct->matched_code)
+            || self::vectorContains($authResults->firstWhere('mechanism', 'vector'), $direct->matched_code, $direct->kind)) {
+            return $row;
+        }
+
+        return app(Sorter::class)->verdict($item);
+    }
+
+    /**
      * Pure reconciliation of a result set into resolution + final code.
      *
-     * @param  Collection<int, ClassificationResult>  $results
+     * @param  Collection<int, ClassificationResult>  $results  the authoritative mechanism rows
+     * @param  ClassificationResult|null  $sorter  the item's 'sorter' row (the Sorter step), if any
      * @return array{resolution: string, final_code: ?string, final_catalog_id: ?int, kind: ?string}
      */
-    public function resolve(Collection $results): array
+    public function resolve(Collection $results, ?ClassificationResult $sorter = null): array
     {
         $none = ['final_code' => null, 'final_catalog_id' => null, 'kind' => null];
 
@@ -184,6 +208,15 @@ class Consensus
                 'final_catalog_id' => null,
                 'kind' => $service ? 'service' : $dKind,
             ];
+        }
+
+        // A SERVICE needs a second, independent opinion too, but the vector cannot give one:
+        // it ranks catalog goods, and a service line almost never brings a chapter-99 leaf
+        // into its top-K (measured on prod: 0.9% of Direct's service answers). The sorter —
+        // trained on lines people labelled good/service/trash, not on this pipeline's answers
+        // — can: Direct "service" + sorter "service" = agreed at the service level.
+        if ($dCode !== null && $dCode !== '' && HeadingMatch::isService($dKind, $dCode) && $sorter?->kind === 'service') {
+            return ['resolution' => 'agreed', 'final_code' => '99', 'final_catalog_id' => null, 'kind' => 'service'];
         }
 
         // Nothing carried any candidate at all → no_match (don't pay for a web search).

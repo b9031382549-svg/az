@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\DB;
  * HOW an item's final answer was reached (method) and WHY that category (reason) — one
  * line each, in the current locale, for the Excel export and the results API. Built only
  * from what the flow already stored (the item, its result rows, the audit trail), along
- * the decision page's stages: memory → trash filter → Direct + vector → ensemble vote →
- * web search → human.
+ * the decision page's stages: memory → trash filter (rules, then the sorter) → Direct +
+ * vector (a service: Direct + sorter) → ensemble vote → web search → human.
  *
  * Model text is quoted as-is (English — every prompt is) and only where it IS an
  * explanation: the web search's and the ensemble's understanding. Direct's own "reason"
@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 final class DecisionSummary
 {
     /** Stable method keys — the API returns these; label() localizes them. */
-    public const METHODS = ['memory', 'trash', 'consensus', 'ensemble', 'web_search', 'ai', 'human', 'in_progress', 'needs_human'];
+    public const METHODS = ['memory', 'trash', 'consensus', 'sorter', 'ensemble', 'web_search', 'ai', 'human', 'in_progress', 'needs_human'];
 
     /** A vector row carries ~20 KB of candidates + trace — read the rows a chunk at a time. */
     private const CHUNK = 500;
@@ -38,6 +38,7 @@ final class DecisionSummary
             'memory' => __('Memory'),
             'trash' => __('Trash filter'),
             'consensus' => __('AI: Direct + vector'),
+            'sorter' => __('AI: Direct + sorter'),
             'ensemble' => __('AI: ensemble vote'),
             'web_search' => __('AI: web search'),
             'ai' => __('AI'),
@@ -90,13 +91,23 @@ final class DecisionSummary
 
         return match (true) {
             in_array($item->resolution, ['confirmed', 'rejected'], true) => $this->human($item, $human),
-            $item->resolution === 'trash' => $this->line('trash', TrashFilter::explain((string) data_get($by->get('trash')?->trace, 'rule', ''))),
+            $item->resolution === 'trash' => $this->trash($by->get('trash')),
             $item->resolution === 'agreed' && $by->has('cache') => $this->memory($by->get('cache')),
             $item->resolution === 'agreed' => $this->consensus($code, $by),
             $item->resolution === 'ai_resolved' => $this->resolver($code, $by),
             $item->resolution === 'pending' => $this->line('in_progress', __('Still being classified.')),
             default => $this->undecided($item, $by),
         };
+    }
+
+    /** @return array{method: string, reason: string} */
+    private function trash(?ClassificationResult $row): array
+    {
+        $rule = (string) data_get($row?->trace, 'rule', '');
+        $p = data_get($row?->trace, 'p');
+
+        // One decimal: the sorter settles only above ~99.7 %, where a rounded "100 %" would overstate it.
+        return $this->line('trash', TrashFilter::explain($rule).($rule === 'sorter' && $p !== null ? ' ('.number_format(100 * (float) $p, 1).'%)' : ''));
     }
 
     /** @return array{method: string, reason: string} */
@@ -141,6 +152,14 @@ final class DecisionSummary
                     'code' => $code, 'pos' => $i + 1, 'k' => $k,
                 ]));
             }
+        }
+
+        // The services rule (Consensus::resolve): Direct said "service" and the sorter agrees.
+        $sorter = $by->get('sorter');
+        if ($sorter?->kind === 'service' && HeadingMatch::isService($direct?->kind, $direct?->matched_code)) {
+            return $this->line('sorter', __('Two independent methods agree it is a service: the AI model (Direct) and the sorter, a model trained on lines labelled by people (:pct).', [
+                'pct' => $this->pct($sorter->confidence),
+            ]));
         }
 
         return $this->line('consensus', __('The AI methods agreed on :code.', ['code' => $code]));
