@@ -91,7 +91,13 @@ The app is auth-gated (default login user `admin`).
   read-only inspection of results + decision traces.
 - **Classifier API** (the client's integration; they host it): `GET /api/version` (any
   token) = our release (`config/api.php` — bump `model.version` when answers can change)
-  + the models the chain is configured to use (`ModelVersion`).
+  + the models the chain is configured to use (`ModelVersion`). `GET /api/health-check`
+  (any token) = `HealthCheck`: liveness only, each probe instant and free (DB, Redis,
+  Horizon workers, sorter /health, Ollama has the embed model, one HNSW lookup, the
+  answer-deciding LLMs still listed by their providers — cached 5 min). It never
+  classifies or embeds: a busy service must not read as down, since the host's monitoring
+  may restart on a 500. A `gpu:` model is looked up with `touch: false` so probes never
+  keep a GPU slot from idling down.
 - **Method + reason:** `DecisionSummary` — per item, which step found the code
   (memory / trash / Direct+vector / ensemble / web search / human) and why, in the
   UI language (model quotes stay English). Feeds the review Excel export

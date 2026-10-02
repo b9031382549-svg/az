@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ResultsApiController;
 use App\Http\Controllers\Api\VersionController;
 use App\Support\ApiAbilities;
@@ -11,6 +12,7 @@ use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 
 // Service endpoints: any valid token.
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/health-check', HealthController::class);
     Route::get('/version', VersionController::class);
 });
 

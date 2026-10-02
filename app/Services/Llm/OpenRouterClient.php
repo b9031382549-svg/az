@@ -33,14 +33,15 @@ class OpenRouterClient
      * takes effect without a redeploy. A "nebius:" prefix routes the call to
      * Nebius Token Factory (OpenAI-compatible); anything else uses the default
      * OpenRouter connection. All three coexist and are switchable PER STAGE via
-     * config alone, e.g. classify.direct.model = "gpu:tuned".
+     * config alone, e.g. classify.direct.model = "gpu:tuned". $touch = false looks the
+     * provider up without counting a use of the GPU server (health checks).
      *
      * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string}
      */
-    private function resolveProvider(string $model): array
+    public function resolveProvider(string $model, bool $touch = true): array
     {
         if (str_starts_with($model, InferenceEndpointResolver::PREFIX)) {
-            $resolved = app(InferenceEndpointResolver::class)->resolve($model);
+            $resolved = app(InferenceEndpointResolver::class)->resolve($model, $touch);
             if ($resolved !== null) {
                 return $resolved;
             }
