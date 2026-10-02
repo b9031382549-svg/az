@@ -125,8 +125,8 @@
       </div>
     </div>
 
-    {{-- Sorter: the KIND of line (good / service / trash) — scored over every row that names
-         one, including kind-only rows (TRASH / GOOD in column B) that no code column sees. --}}
+    {{-- Sorter: the model alone, on the KIND of line (good / service / trash) — scored over
+         every row that names one, including kind-only rows (TRASH / GOOD / SERVICE in column B). --}}
     @if($sorter)
       @php
         $cf = $sorter['confusion'] ?? [];

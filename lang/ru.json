@@ -822,5 +822,7 @@
     "Classify items": "Классифицировать позиции",
     "Read results and decision traces": "Читать результаты и трассировки решений",
     "API docs": "Документация API",
-    "How to call the API": "Как обращаться к API"
+    "How to call the API": "Как обращаться к API",
+    "(or TRASH / SERVICE / GOOD — checked by the kind of line)": "(или TRASH / SERVICE / GOOD — проверяется вид строки)",
+    "Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows": "Фильтр мусора (правила :rules · сортировщик :sorter) — поймал :caught из :rows строк-мусора"
 }

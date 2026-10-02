@@ -11,8 +11,8 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * and expected_is_service are derived here once.
  *
  * Column B may instead hold only the KIND of line — TRASH / SERVICE / GOOD (also in
- * Russian / Azerbaijani) — for scoring the sorter: a TRASH or GOOD row without a code is
- * scored for the sorter alone; SERVICE is the service level, scored everywhere.
+ * Russian / Azerbaijani): such a row runs the whole pipeline like any other and is scored
+ * on the kind it ended as (and by the sorter); SERVICE is the service level, scored everywhere.
  *
  * Sheet selection: workbooks often carry a summary/readme tab as the ACTIVE sheet with
  * the real items on another tab — so we scan EVERY worksheet and keep the one that

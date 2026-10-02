@@ -10,13 +10,18 @@ use App\Models\TestDataset;
 use App\Models\TestRun;
 use App\Services\Classify\AnswerCacheService;
 use App\Services\Classify\Sorter;
+use App\Services\Classify\TrashFilter;
 use Illuminate\Support\Facades\Bus;
 
 /**
- * Launches a dataset test run as the PRODUCTION pipeline: one short mechanism job per
- * (item, mechanism) on the normal 'default' queue, reconciled against the run's chosen
- * mechanism set. No per-run config override and no dedicated queue — the run reads the
- * live prod config exactly like a real classification, so nothing can drift or "leak".
+ * Launches a dataset test run as the PRODUCTION pipeline, in prod's order
+ * (ClassificationQueue::dispatch): only-digits → memory (the dataset's own, when the run
+ * uses it) → the trash rules → the sorter (SortTestItemsJob: sure trash is settled there)
+ * → one short mechanism job per (item, mechanism) on the normal 'default' queue,
+ * reconciled against the run's chosen mechanism set. Every row takes this path, those that
+ * carry only a kind (TRASH / GOOD / SERVICE) too. No per-run config override and no
+ * dedicated queue — the run reads the live prod config exactly like a real classification,
+ * so nothing can drift or "leak".
  *
  * `config` is snapshotted only as a RECORD (what models/flags this run used) for reading
  * an A/B comparison later — it is never applied.
@@ -26,6 +31,7 @@ class TestRunner
     public function __construct(
         private readonly AnswerCacheService $cache,
         private readonly Sorter $sorter,
+        private readonly TrashFilter $trash,
     ) {}
 
     /**
@@ -56,9 +62,8 @@ class TestRunner
         $useCache = $run->mechanisms['cache'];
         $enabled = $run->mechanisms['enabled'];
 
-        $jobs = [];
-        $all = [];       // every item gets the sorter's verdict (the run's "Sorter" column)
-        $kindOnly = [];  // rows that name only a kind (TRASH / GOOD): nothing but the sorter scores them
+        $all = [];   // every item gets the sorter's verdict (the run's "Sorter" column)
+        $flow = [];  // those memory and the rules leave — prod's next step is the sorter
         foreach ($dataset->scorableRows()->orderBy('id')->get() as $row) {
             $item = ClassificationItem::create([
                 'batch' => $run->batch,
@@ -72,33 +77,29 @@ class TestRunner
                 'source_hash' => hash('sha256', $run->batch.'|row|'.$row->id),
                 'resolution' => 'pending',
             ]);
-
             $all[] = $item->id;
-            if (! $row->hasExpectedCode()) {
-                $kindOnly[] = $item->id; // no code to score — no memory, no AI spent on it
 
+            // Prod's order: only digits beats everything, then memory (dataset-scoped
+            // short-circuit when the run uses it), then the trash rules. Each is terminal.
+            if ($this->trash->apply($item, absoluteOnly: true)
+                || ($useCache && $this->cache->apply($item, $run->test_dataset_id))
+                || $this->trash->apply($item)) {
                 continue;
             }
-
-            // memory-on: dataset-scoped cache short-circuit, exactly like prod's cache-first step.
-            if ($useCache && $this->cache->apply($item, $run->test_dataset_id)) {
-                continue; // hit → terminal, no mechanism jobs
-            }
-            foreach ($enabled as $mech) {
-                $jobs[] = new ClassifyTestItemMechanismJob($item->id, $mech);
-            }
+            $flow[] = $item->id;
         }
 
+        $jobs = [];
         if ($this->sorter->enabled()) {
             foreach (array_chunk($all, SortTestItemsJob::SIZE) as $chunk) {
-                $jobs[] = new SortTestItemsJob($chunk, array_values(array_intersect($chunk, $kindOnly)));
+                $jobs[] = new SortTestItemsJob($chunk, array_values(array_intersect($chunk, $flow)));
             }
         } else {
-            SortTestItemsJob::settleKindOnly($kindOnly); // no sorter: nothing will ever look at them
+            $jobs = ClassifyTestItemMechanismJob::for($flow, $enabled); // no sorter: straight to the AI, as prod
         }
 
         if ($jobs === []) {
-            ScoreRunJob::dispatch($run->id); // all cache hits (or nothing to run) — score now
+            ScoreRunJob::dispatch($run->id); // memory / the rules answered everything (or nothing to run) — score now
 
             return $run;
         }
