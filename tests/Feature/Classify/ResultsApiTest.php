@@ -3,6 +3,8 @@
 namespace Tests\Feature\Classify;
 
 use App\Models\ClassificationItem;
+use App\Models\User;
+use App\Support\ApiAbilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -10,12 +12,14 @@ class ResultsApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private string $key = 'test-api-key';
+    /** @var array<string, string> a Bearer token with the `results` ability */
+    private array $auth;
 
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('services.results_api.key', $this->key);
+        $token = User::factory()->create()->createToken('tooling', [ApiAbilities::RESULTS])->plainTextToken;
+        $this->auth = ['Authorization' => 'Bearer '.$token];
         config()->set('classify.search_resolver.enabled', false); // a conflict is then terminal
     }
 
@@ -31,18 +35,32 @@ class ResultsApiTest extends TestCase
         return $item;
     }
 
-    public function test_requires_a_valid_key(): void
+    public function test_requires_a_valid_token(): void
     {
         $item = $this->seedItem();
         $this->getJson("/api/results/{$item->id}")->assertStatus(401);
-        $this->getJson("/api/results/{$item->id}", ['X-Api-Key' => 'wrong'])->assertStatus(401);
+        $this->getJson("/api/results/{$item->id}", ['Authorization' => 'Bearer 1|wrong'])->assertStatus(401);
+    }
+
+    public function test_a_token_without_the_results_ability_is_forbidden(): void
+    {
+        $item = $this->seedItem();
+        $token = User::factory()->create()->createToken('classify only', [ApiAbilities::CLASSIFY])->plainTextToken;
+
+        $this->getJson("/api/results/{$item->id}", ['Authorization' => 'Bearer '.$token])->assertStatus(403);
+    }
+
+    public function test_the_old_static_key_header_no_longer_opens_it(): void
+    {
+        $item = $this->seedItem();
+        $this->getJson("/api/results/{$item->id}", ['X-Api-Key' => 'test-api-key'])->assertStatus(401);
     }
 
     public function test_result_returns_item_with_traces(): void
     {
         $item = $this->seedItem();
 
-        $this->getJson("/api/results/{$item->id}", ['X-Api-Key' => $this->key])
+        $this->getJson("/api/results/{$item->id}", $this->auth)
             ->assertOk()
             ->assertJsonPath('id', $item->id)
             ->assertJsonPath('resolution', 'conflict')
@@ -53,18 +71,12 @@ class ResultsApiTest extends TestCase
             ->assertJsonPath('results.0.trace.gate.status', 'needs_review');
     }
 
-    public function test_result_accepts_bearer_token(): void
-    {
-        $item = $this->seedItem();
-        $this->getJson("/api/results/{$item->id}", ['Authorization' => 'Bearer '.$this->key])->assertOk();
-    }
-
     public function test_upload_lists_items(): void
     {
         $this->seedItem('up1');
         $this->seedItem('up1');
 
-        $this->getJson('/api/uploads/up1', ['X-Api-Key' => $this->key])
+        $this->getJson('/api/uploads/up1', $this->auth)
             ->assertOk()
             ->assertJsonPath('batch', 'up1')
             ->assertJsonPath('total', 2)
@@ -75,13 +87,6 @@ class ResultsApiTest extends TestCase
 
     public function test_unknown_item_is_404(): void
     {
-        $this->getJson('/api/results/999999', ['X-Api-Key' => $this->key])->assertStatus(404);
-    }
-
-    public function test_disabled_when_key_unset(): void
-    {
-        config()->set('services.results_api.key', '');
-        $item = $this->seedItem();
-        $this->getJson("/api/results/{$item->id}", ['X-Api-Key' => ''])->assertStatus(401);
+        $this->getJson('/api/results/999999', $this->auth)->assertStatus(404);
     }
 }

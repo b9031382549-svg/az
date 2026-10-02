@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
  * Read-only JSON API over classification results — one item (with every
  * mechanism's full decision trace) or all items of an upload (batch uuid).
  * Each item also says how its answer was found and why (method + reason, the
- * same lines as the Excel export). Guarded by ApiKeyAuth.
+ * same lines as the Excel export). Needs a token with the `results` ability.
  */
 class ResultsApiController extends Controller
 {

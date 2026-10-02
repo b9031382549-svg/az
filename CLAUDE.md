@@ -83,9 +83,12 @@ The app is auth-gated (default login user `admin`).
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,
   `ItemTranslation`, `SetLocale` middleware (en/az/ru display).
-- **Results API:** `routes/api.php` → `Api/ResultsApiController`, guarded by
-  `ApiKeyAuth` (`RESULTS_API_KEY`) — read-only inspection of results + decision
-  traces.
+- **API tokens:** Laravel Sanctum, token-only (`config/sanctum.php` guard `[]` — no
+  session auth on the API). Issued and revoked on Settings → API tokens (`ApiTokens`),
+  shown once; abilities in `App\Support\ApiAbilities`. Every `/api` route needs
+  `Authorization: Bearer <token>` plus its ability (missing → 403).
+- **Results API:** `routes/api.php` → `Api/ResultsApiController` (ability `results`) —
+  read-only inspection of results + decision traces.
 - **Method + reason:** `DecisionSummary` — per item, which step found the code
   (memory / trash / Direct+vector / ensemble / web search / human) and why, in the
   UI language (model quotes stay English). Feeds the review Excel export
@@ -150,8 +153,8 @@ The app is auth-gated (default login user `admin`).
 
 - `.env` is **never committed** (`.env.prod.example` documents the prod keys). Real
   prod env lives only on the server; never bake secrets into images.
-- Sessions/cache in Postgres; queue in Redis; OpenRouter key, Ollama URL, DB creds
-  and `RESULTS_API_KEY` all come from env.
+- Sessions/cache in Postgres; queue in Redis; OpenRouter key, Ollama URL and DB creds
+  all come from env. API tokens live in the DB (`personal_access_tokens`, hashed).
 
 ## Gotchas
 
