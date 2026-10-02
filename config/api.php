@@ -16,4 +16,11 @@ return [
         'trained_at' => '2026-10-01',
     ],
 
+    // POST /api/classify — one request is one batch on the shared classification pipeline.
+    'classify' => [
+        'max_items' => 100000,
+        // Same cap as an invoice line's item name (InvoiceLinesImporter).
+        'max_name_length' => 5000,
+    ],
+
 ];

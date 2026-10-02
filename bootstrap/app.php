@@ -21,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
             RequestContext::class,
             SetLocale::class,
         ]);
+
+        // POST /api/classify answers every name exactly as it was sent, so its body is left
+        // as is: no trimming, no "" → null.
+        $asSent = fn (Request $request) => $request->is('api/classify');
+        $middleware->trimStrings(except: [$asSent]);
+        $middleware->convertEmptyStringsToNull(except: [$asSent]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
