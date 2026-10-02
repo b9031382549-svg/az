@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Api\ClassifyAnswers;
 use App\Services\Api\ClassifyRequests;
 use App\Support\Audit;
 use Illuminate\Http\JsonResponse;
@@ -11,7 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * POST /api/classify accepts up to 100k items and answers at once with the request id;
- * GET /api/classify/{id} says where the request is. Needs a token with the `classify` ability.
+ * GET /api/classify/{id} says where the request is and gives the answers so far, per name.
+ * Needs a token with the `classify` ability.
  */
 class ClassifyController extends Controller
 {
@@ -34,13 +36,21 @@ class ClassifyController extends Controller
         return response()->json($this->requests->status($batch), 202, ['Location' => url('/api/classify/'.$batch->key)]);
     }
 
-    public function show(string $id): JsonResponse
+    /** Where the request is, and its answers a page at a time (?offset=0&limit=1000). */
+    public function show(Request $request, string $id, ClassifyAnswers $answers): JsonResponse
     {
         $batch = $this->requests->find($id);
         if ($batch === null) {
             return response()->json(['message' => 'No such request.'], 404);
         }
 
-        return response()->json($this->requests->status($batch));
+        $limit = max(1, min((int) config('api.classify.max_page_size'), (int) $request->query('limit', (string) config('api.classify.page_size'))));
+        $offset = max(0, (int) $request->query('offset', '0'));
+
+        return response()->json($this->requests->status($batch) + [
+            'offset' => $offset,
+            'limit' => $limit,
+            'classified_items' => $answers->page($batch->key, $offset, $limit),
+        ]);
     }
 }

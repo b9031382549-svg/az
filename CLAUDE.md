@@ -105,7 +105,12 @@ The app is auth-gated (default login user `admin`).
   feeding chain (`BackgroundInvoiceUploads::feed`, status `imported`). `api_request_names`
   keeps every distinct name exactly as sent (TrimStrings/ConvertEmptyStringsToNull are
   skipped for this route) → its item. `GET /api/classify/{id}`: accepted → processing →
-  done (every item has `answered_at`) | failed.
+  done (every item has `answered_at`) | failed, plus `classified_items` a page at a time
+  (`offset`/`limit`) from `ClassifyAnswers`: per name `category` (final_code; null for
+  trash / no answer), `kind`, `status` (pending / answered / needs_review), `method` +
+  `reason` (`DecisionSummary`) and `similarity` = measured precision of that method
+  (`config/api.php` `similarity`; a web-search answer is split grounded / ungrounded by
+  the same bar memory promotion uses). Not a vector cosine.
 - **Method + reason:** `DecisionSummary` — per item, which step found the code
   (memory / trash / Direct+vector / ensemble / web search / human) and why, in the
   UI language (model quotes stay English). Feeds the review Excel export
