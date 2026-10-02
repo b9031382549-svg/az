@@ -3,8 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\ClassificationItem;
+use App\Models\TestRun;
 use App\Services\Classify\Sorter;
-use App\Services\Classify\TrashFilter;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,10 +14,12 @@ use Illuminate\Queue\SerializesModels;
 use Throwable;
 
 /**
- * The sorter's verdicts for a few test-run items — the run's "Sorter" column. Verdicts only:
- * a test run settles no code-scored row by them (it runs no trash step). Rows that carry
- * only a kind (TRASH / GOOD, no code) run nothing else, so they are settled here — trash when
- * the sorter is sure, as prod would; otherwise no_match — and the run can finish.
+ * A test run's sorter step, as prod runs it (SortItemsJob): the items still in the pipeline
+ * (memory and the trash rules did not answer them) are settled as trash when the sorter is
+ * sure; the rest go on to the run's AI mechanisms, enlisted into THIS batch so the scorer
+ * waits for them too. Every other item still gets a verdict — the run's "Sorter" column
+ * scores the model on every row. A sorter that is down settles nothing: the items go to
+ * the AI, as in prod.
  */
 class SortTestItemsJob implements ShouldQueue
 {
@@ -33,9 +35,9 @@ class SortTestItemsJob implements ShouldQueue
 
     /**
      * @param  array<int, int>  $itemIds  every item to sort
-     * @param  array<int, int>  $kindOnly  those of them no other step looks at (no code expected)
+     * @param  array<int, int>  $flow  those of them still in the pipeline (memory / the rules did not answer them)
      */
-    public function __construct(public array $itemIds, public array $kindOnly = []) {}
+    public function __construct(public array $itemIds, public array $flow = []) {}
 
     public function handle(Sorter $sorter): void
     {
@@ -43,37 +45,37 @@ class SortTestItemsJob implements ShouldQueue
             return;
         }
 
-        $sorter->screen(ClassificationItem::whereIn('id', $this->itemIds)->orderBy('id')->get()->all(), settleTrash: false);
-        self::settleKindOnly($this->kindOnly);
+        $items = ClassificationItem::whereIn('id', $this->itemIds)->orderBy('id')->get();
+        $inFlow = fn (ClassificationItem $i) => in_array($i->id, $this->flow, true);
+
+        $sorter->screen($items->reject($inFlow)->values()->all(), settleTrash: false);   // a verdict only
+        $rest = $sorter->screen($items->filter($inFlow)->where('resolution', 'pending')->values()->all());
+
+        // On the success path, before this job's completion is recorded — so the batch's
+        // finally (the scorer) cannot fire before the mechanisms it enlists.
+        $run = $items->isNotEmpty() ? TestRun::find($items->first()->test_run_id) : null;
+        $jobs = ClassifyTestItemMechanismJob::for(
+            array_map(fn (ClassificationItem $i) => $i->id, $rest),
+            (array) ($run?->mechanisms['enabled'] ?? []),
+        );
+        if ($jobs !== []) {
+            $this->batch()?->add($jobs);
+        }
     }
 
     public function failed(?Throwable $e): void
     {
-        // Never strand a run: settle what only the sorter would have settled, then let the
-        // (guarded, idempotent) scorer try again.
-        self::settleKindOnly($this->kindOnly);
+        // A hard kill (timeout / OOM). Laravel may already have counted this job as done for
+        // the batch, so nothing is added to it now (that could fire the scorer twice). The
+        // items it held never reach the AI: they end without an answer, so the run can finish,
+        // and the (guarded, idempotent) scorer is asked again.
+        foreach (ClassificationItem::whereIn('id', $this->flow)->where('resolution', 'pending')->get() as $item) {
+            $item->update(['resolution' => 'no_match']);
+            ClassificationItem::markAnswered($item->id);
+        }
         $runId = ClassificationItem::whereIn('id', $this->itemIds)->value('test_run_id');
         if ($runId !== null) {
             ScoreRunJob::dispatch((int) $runId);
-        }
-    }
-
-    /** @param  array<int, int>  $ids */
-    public static function settleKindOnly(array $ids): void
-    {
-        if ($ids === []) {
-            return;
-        }
-        $trash = app(TrashFilter::class);
-        foreach (ClassificationItem::whereIn('id', $ids)->where('resolution', 'pending')->with('results')->get() as $item) {
-            $verdict = $item->results->firstWhere('mechanism', 'sorter');
-            $p = (float) data_get($verdict?->trace, 'probs.trash', 0.0);
-            $threshold = (float) data_get($verdict?->trace, 'trash_threshold', config('classify.sorter.trash_threshold'));
-            if ($verdict !== null && $p >= $threshold && $trash->settle($item, 'sorter', ['p' => round($p, 6)])) {
-                continue;
-            }
-            $item->update(['resolution' => 'no_match']);
-            ClassificationItem::markAnswered($item->id);
         }
     }
 }

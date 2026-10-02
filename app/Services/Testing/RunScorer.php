@@ -18,13 +18,18 @@ use Illuminate\Support\Facades\DB;
  *
  * Denominators FLOAT by design (we replicate the prod short path): a mechanism's
  * `ran` counts only the rows where it actually executed — memory runs on all rows,
- * vector/broker/direct only on cache-misses, search only on conflicts. To measure a
- * mechanism over ALL rows, run with memory off (then every row reaches the mechanism
- * stage). Everything is scored at the 4-digit heading via the shared HeadingMatch.
+ * vector/broker/direct only on rows memory and the trash step left, search only on
+ * conflicts. To measure a mechanism over ALL rows, run with memory off (then every row
+ * the trash step keeps reaches the mechanism stage). Everything is scored at the 4-digit
+ * heading via the shared HeadingMatch.
  *
- * The SORTER is scored on the KIND of line (good / service / trash) over every row that
- * names one — including rows that carry only a kind (TRASH / GOOD), which the code
- * columns ignore.
+ * The trash step (rules + sorter, as in prod) takes a line out before the AI: a row with
+ * a code that it removes is a miss in "overall", exactly as prod would leave it without a
+ * code. A row that carries only a kind (TRASH / GOOD / SERVICE) runs the same pipeline;
+ * "overall" asks only whether it ended as that kind, and the code columns ignore it.
+ *
+ * The SORTER is scored on its own, on the KIND of line (good / service / trash), over
+ * every row that names one.
  */
 class RunScorer
 {
@@ -104,7 +109,7 @@ class RunScorer
     }
 
     /**
-     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}, sorter: array{threshold: ?float, confusion: array<string, array<string, int>>, with_rules: array{tp:int, fp:int, fn:int}}}
+     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}, sorter: array{threshold: ?float, confusion: array<string, array<string, int>>, with_rules: array{tp:int, fp:int, fn:int}}, trash: array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int}}
      */
     public function score(TestRun $run): array
     {
@@ -122,6 +127,9 @@ class RunScorer
             ['ran' => 0, 'answered' => 0, 'correct' => 0],
         );
         $sorter = ['threshold' => null, 'confusion' => [], 'with_rules' => ['tp' => 0, 'fp' => 0, 'fn' => 0]];
+        // What the trash step (rules + sorter) took out before the AI, and how many of those
+        // rows really are trash; `trash_rows` = every row whose expected kind is trash.
+        $trashStep = ['removed' => 0, 'right' => 0, 'by_rules' => 0, 'by_sorter' => 0, 'trash_rows' => 0];
 
         // The funnel: for every non-cache-hit row, how many of the authoritative
         // mechanisms landed on the same heading (1..$authCount, "prevote"), and whether
@@ -151,8 +159,13 @@ class RunScorer
             $byMech = $item->results->keyBy('mechanism');
 
             $this->scoreSorter($columns['sorter'], $sorter, $row, $byMech->get('sorter'));
+            $this->scoreTrashStep($trashStep, $row, $item);
             if (! $row->hasExpectedCode()) {
-                continue; // a kind-only row (TRASH / GOOD): the sorter is all it is scored for
+                // A kind-only row (TRASH / GOOD / SERVICE): it ran the whole pipeline; all
+                // "overall" asks is whether it ended as that kind.
+                $this->tallyKind($columns['overall'], $item, (string) $row->expected_type);
+
+                continue;
             }
 
             foreach (self::MECHANISM_COLUMNS as $col => $mech) {
@@ -223,7 +236,47 @@ class RunScorer
 
         $funnel = ['total' => $authCount, 'prevote' => $prevote, 'search_by_origin' => $searchByOrigin];
 
-        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'funnel' => $funnel, 'sorter' => $sorter];
+        return ['columns' => $columns, 'total' => $rows->count(), 'tokens' => $this->tokens($run), 'funnel' => $funnel, 'sorter' => $sorter, 'trash' => $trashStep];
+    }
+
+    /** The kind a run's item ended as: trash, a service, a good — or null (no answer). */
+    public static function endedAs(ClassificationItem $item): ?string
+    {
+        if ($item->resolution === 'trash') {
+            return 'trash';
+        }
+        if ((string) $item->final_code === '') {
+            return null;
+        }
+
+        return HeadingMatch::isService($item->kind, $item->final_code) ? 'service' : 'good';
+    }
+
+    /**
+     * @param  array{ran:int, answered:int, correct:int}  $bucket
+     */
+    private function tallyKind(array &$bucket, ClassificationItem $item, string $expected): void
+    {
+        $ended = self::endedAs($item);
+        $bucket['ran']++;
+        $bucket['answered'] += $ended !== null ? 1 : 0;
+        $bucket['correct'] += $ended === $expected ? 1 : 0;
+    }
+
+    /**
+     * @param  array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int}  $step
+     */
+    private function scoreTrashStep(array &$step, TestDatasetRow $row, ClassificationItem $item): void
+    {
+        $isTrash = $row->expected_type === 'trash';
+        $step['trash_rows'] += $isTrash ? 1 : 0;
+        if ($item->resolution !== 'trash') {
+            return;
+        }
+        $step['removed']++;
+        $step['right'] += $isTrash ? 1 : 0;
+        $rule = data_get($item->results->firstWhere('mechanism', 'trash')?->trace, 'rule');
+        $step[$rule === 'sorter' ? 'by_sorter' : 'by_rules']++;
     }
 
     /**

@@ -31,7 +31,7 @@
         @error('name') <p class="text-sm text-stamp mt-1">{{ $message }}</p> @enderror
       </div>
       <div>
-        <label class="field-label">{{ __('File — column A: item name, column B: correct code') }} <span class="text-faint font-normal">{{ __('(or TRASH / SERVICE / GOOD — to score the sorter)') }}</span></label>
+        <label class="field-label">{{ __('File — column A: item name, column B: correct code') }} <span class="text-faint font-normal">{{ __('(or TRASH / SERVICE / GOOD — checked by the kind of line)') }}</span></label>
         <input type="file" wire:model="file" accept=".xlsx,.xls,.csv" class="text-sm">
         @error('file') <p class="text-sm text-stamp mt-1">{{ $message }}</p> @enderror
       </div>

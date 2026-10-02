@@ -40,6 +40,25 @@ class ClassifyTestItemMechanismJob implements ShouldQueue
 
     public function __construct(public int $itemId, public string $mechanism) {}
 
+    /**
+     * One job per (item, mechanism) — the run's AI stage for the items the trash step left.
+     *
+     * @param  array<int, int>  $itemIds
+     * @param  array<int, string>  $mechanisms
+     * @return array<int, self>
+     */
+    public static function for(array $itemIds, array $mechanisms): array
+    {
+        $jobs = [];
+        foreach ($itemIds as $id) {
+            foreach ($mechanisms as $mech) {
+                $jobs[] = new self((int) $id, $mech);
+            }
+        }
+
+        return $jobs;
+    }
+
     public function handle(TestRunFinalizer $finalizer): void
     {
         if ($this->batch()?->cancelled()) {

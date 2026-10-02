@@ -56,7 +56,7 @@ class TestingRun extends Component
             'complete' => $complete,
             'pct' => $total > 0 ? (int) round(min(100, $done / $total * 100)) : 0,
             'accuracy' => $accuracy,
-            'funnelRows' => $this->funnelRows($this->run->accuracy['funnel'] ?? null, $accuracy),
+            'funnelRows' => $this->funnelRows($this->run->accuracy['funnel'] ?? null, $accuracy, $this->run->accuracy['trash'] ?? null),
             'sorter' => $sorter,
             'durationSeconds' => $durationSeconds,
             'tokens' => (int) $tokens,
@@ -75,11 +75,15 @@ class TestingRun extends Component
      * a run scored before the unanimity change, where bare-majority conflicts never
      * reached the web search, so that origin tier is permanently empty for that run.
      *
+     * The trash step (rules + sorter) follows memory in step 1 for runs scored with it: what it
+     * took out before the AI, "correct" = how many of those rows really are trash.
+     *
      * @param  array{total:int, prevote: array<int, array{ran:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, correct:int, promoted:int}>}|null  $funnel
      * @param  array<string, array{ran:int, correct:int}>  $accuracy
+     * @param  array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int}|null  $trash
      * @return array<int, array{step:string, label:string, bucket: array{ran:int, correct:int}|null, promoted:?int}>|null
      */
-    private function funnelRows(?array $funnel, array $accuracy): ?array
+    private function funnelRows(?array $funnel, array $accuracy, ?array $trash = null): ?array
     {
         if ($funnel === null) {
             return null;
@@ -88,6 +92,16 @@ class TestingRun extends Component
         $rows = [
             ['step' => '1', 'label' => __('Memory'), 'bucket' => $accuracy['memory'] ?? null, 'promoted' => null],
         ];
+        if ($trash !== null) {
+            $rows[] = [
+                'step' => '1',
+                'label' => __('Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows', [
+                    'rules' => $trash['by_rules'], 'sorter' => $trash['by_sorter'], 'caught' => $trash['right'], 'rows' => $trash['trash_rows'],
+                ]),
+                'bucket' => ['ran' => $trash['removed'], 'answered' => $trash['removed'], 'correct' => $trash['right']],
+                'promoted' => null,
+            ];
+        }
 
         foreach (['vector' => __('Vector'), 'broker' => __('Broker'), 'direct' => __('Direct')] as $col => $label) {
             $rows[] = ['step' => '2', 'label' => $label, 'bucket' => $accuracy[$col] ?? null, 'promoted' => null];
@@ -153,12 +167,17 @@ class TestingRun extends Component
             $sorterCell = $this->sorterCell($byMech->get('sorter'), $row);
 
             if (! $row->hasExpectedCode()) {
-                // A kind-only row (TRASH / GOOD): only the sorter looked at it.
+                // A kind-only row (TRASH / GOOD / SERVICE): scored on the kind it ended as.
+                $ended = $item ? RunScorer::endedAs($item) : null;
+
                 return [
                     'name' => $row->source_text,
                     'expected' => mb_strtoupper((string) $row->expected_type),
                     'item_id' => $item?->id,
-                    'cells' => ['sorter' => $sorterCell],
+                    'cells' => ['sorter' => $sorterCell, 'overall' => $item ? [
+                        'heading' => $ended === null ? '—' : ($ended === 'good' ? (HeadingMatch::heading($item->final_code) ?? __('good')) : ($ended === 'service' ? 'SVC' : __('trash'))),
+                        'ok' => $ended === $row->expected_type,
+                    ] : null],
                 ];
             }
 
@@ -183,7 +202,10 @@ class TestingRun extends Component
                 $cells['majority'] = null;
             }
 
-            $cells['overall'] = $item ? $this->cell($item->final_code, $item->kind, $row) : null;
+            // A row the trash step took out is a miss, as prod would leave it without a code.
+            $cells['overall'] = $item ? ($item->resolution === 'trash'
+                ? ['heading' => __('trash'), 'ok' => false]
+                : $this->cell($item->final_code, $item->kind, $row)) : null;
 
             return [
                 'name' => $row->source_text,

@@ -822,5 +822,7 @@
     "Classify items": "Mövqeləri təsnif etmək",
     "Read results and decision traces": "Nəticələri və qərar izlərini oxumaq",
     "API docs": "API sənədləri",
-    "How to call the API": "API-yə necə müraciət etmək"
+    "How to call the API": "API-yə necə müraciət etmək",
+    "(or TRASH / SERVICE / GOOD — checked by the kind of line)": "(və ya TRASH / SERVICE / GOOD — sətrin növü yoxlanılır)",
+    "Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows": "Zibil filtri (qaydalar :rules · çeşidləyici :sorter) — :rows zibil sətrindən :caught tutuldu"
 }
