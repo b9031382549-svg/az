@@ -122,7 +122,8 @@ class NlSqlService
             $assistant = $this->replayAssistant($turn);
 
             // Skip turns with no question or nothing to build on (e.g. a past
-            // error), so every user turn keeps its matching assistant reply.
+            // error, or SQL today's guard rejects), so every user turn keeps its
+            // matching assistant reply.
             if ($q === '' || $assistant === null) {
                 continue;
             }
@@ -139,7 +140,8 @@ class NlSqlService
     /**
      * Re-create what the assistant answered on a past turn, in the same JSON
      * shape it must reply with, so the model can reference or extend its own
-     * prior SQL. Null when the turn carried neither SQL nor an answer.
+     * prior SQL. Null when the turn carried neither SQL nor an answer, or its
+     * SQL fails today's guard.
      *
      * @param  array<string, mixed>  $turn
      */
@@ -159,7 +161,26 @@ class NlSqlService
             return null;
         }
 
+        // SQL written before a schema change (FROM e_invoices, before the chat moved to the
+        // invoice_lines view) is an example the model copies — every new query then fails the
+        // guard. Failed turns never enter the context, so such stale turns would stay "the
+        // latest" for good: drop them here.
+        if (isset($fields['sql']) && ! $this->passesGuard($fields['sql'])) {
+            return null;
+        }
+
         return json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    private function passesGuard(string $sql): bool
+    {
+        try {
+            (new SqlGuard($this->schema->allowedTables()))->sanitize($sql);
+        } catch (SqlGuardException) {
+            return false;
+        }
+
+        return true;
     }
 
     private function systemPrompt(): string
@@ -184,9 +205,11 @@ class NlSqlService
         - If the question does NOT need the data — small talk, what you can do, or
           the current date/time — set "sql" to null and put a short, direct reply
           in "answer" (for date questions use the current date from CONTEXT).
+        - A question about WHAT is loaded — which invoices, files or uploads, how
+          many, for which period — DOES need the data: query it, never reply that
+          you have no information. upload_name / uploaded_at tell which upload a
+          line came from (e.g. list the uploads with their line and invoice counts).
         - Use only the tables and columns listed above. Do not invent columns.
-          Earlier turns may mention an old table name (e_invoices) — always use
-          invoice_lines.
         - One row of invoice_lines is one invoice LINE (a goods/service position).
           Rows of the older invoice-list format are whole invoices stored as a
           single line with item_name NULL.
