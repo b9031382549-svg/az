@@ -163,7 +163,8 @@ services:
 
   # Sorter (docker/sorter): good / service / trash for an invoice line, from a model trained on
   # lines labelled by people (config/classify.php → sorter). The model is NOT in git: it lives
-  # in /opt/az-assets/sorter (model.onnx + tokenizer.json + meta.json, sha256 in meta.json).
+  # in /opt/az-assets/sorter-v2 (model.onnx + tokenizer.json + meta.json, sha256 in meta.json;
+  # v1 stays in /opt/az-assets/sorter for a rollback).
   # Reachable only as http://sorter:8000 on the compose net. The pipeline runs without it when
   # it is down (fail-open), so nothing depends_on it.
   sorter:
@@ -171,7 +172,7 @@ services:
       context: ./docker/sorter
     image: az_prod_sorter
     volumes:
-      - /opt/az-assets/sorter:/models/sorter:ro
+      - /opt/az-assets/sorter-v2:/models/sorter:ro
     environment:
       # 2 of the box's 4 vCPU at most — Ollama, Postgres and the PHP workers share them.
       SORTER_THREADS: "2"

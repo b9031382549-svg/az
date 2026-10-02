@@ -209,11 +209,11 @@ Accept: application/json
 
 ```json
 {
-  "model_version": "1.0.0",
-  "trained_at": "2026-10-01",
+  "model_version": "1.1.0",
+  "trained_at": "2026-10-02",
   "api_version": "1.0",
   "components": {
-    "sorter": "sorter-v1",
+    "sorter": "sorter-v2",
     "embedder": "bge-ft-v3",
     "direct": "gpu:tuned",
     "direct_fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",

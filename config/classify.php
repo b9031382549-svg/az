@@ -22,14 +22,15 @@ return [
     //  - p(trash) >= trash_threshold → resolution 'trash' (rule 'sorter'), no AI;
     //  - Direct answers "service" and the sorter says service → agreed as a service (the
     //    vector cannot back a service: it ranks catalog goods — see Consensus::resolve).
-    // The threshold is the precision-98 % point on the held-out test split, measured with
-    // the very model file the container serves (research-data/sorter-model, meta.json).
+    // The threshold is the lowest p(trash) with precision >= 98 % on held-out lines, both
+    // whole and cut at 20 characters (uploads truncate names), measured with the very model
+    // file the container serves (research-data/sorter-model/v2, meta.json).
     // Empty url = off. When the service is down the pipeline simply runs without it.
     'sorter' => [
         'url' => (string) env('CLASSIFY_SORTER_URL', 'http://sorter:8000'),
         // The model file trash_threshold is calibrated for (its meta.json name) — what
         // GET /api/version reports. Change the three together.
-        'model' => (string) env('CLASSIFY_SORTER_MODEL', 'sorter-v1'),
+        'model' => (string) env('CLASSIFY_SORTER_MODEL', 'sorter-v2'),
         'trash_threshold' => (float) env('CLASSIFY_SORTER_TRASH_THRESHOLD', 0.99747),
         // Requests queue up at the service (one forward pass at a time) when an upload's
         // portion fans out into many SortItemsJobs — wait for our turn rather than fall open.

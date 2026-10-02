@@ -1,0 +1,2439 @@
+{
+ "_about": "Gold / memory rows whose label the 2026-10-02 trash convention changed (sorter dataset-v2 reviews + TrashFilter hits): a line naming only a document, period, code, person, firm, institution or place is trash. now=trash|good -> the row is removed; now=service -> it becomes a service. Source: research-data/sorter-model/dataset-v2/gold_fix.csv.",
+ "answer_cache": [
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "19.03.2020-ci il tarixli 176/20 nömrəli  müqaviləyə əsasən",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "0011 saylı 11.01.2018-ci il tarixli məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "0018/SH nömrəli 18.01.2019-cu il tarixli məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "01.01.2022-ci ildən 01.02.2022-ci ilə qədər olan dövr üçün",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "0050saylı 27.07.2021-ci il tarixli məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "007-FKS-01 sayli hesab",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "01,09,2022-ci il tarixli 03/EL/01092022 N-li Xidmət göstərilməsinə dair Müqaviləyə əsasən görülmüş işlər",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "0172/I saylı 22.01.2018-ci tarixli məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "02.03.2020 tarixli 1095/1 nömrəli məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "02.08.2019-cu il tarixli 3390/I nömrəli  məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "02.11.17 tarixli 2662/I məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "03.08.2021-ci il tarixdə təqdim edilmiş mal",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "04.11.2019\t4073/I məktub",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "07 fevral",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "091-FKS-07 sayli hesab",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "10 BA 735 JCB",
+   "is_service": false,
+   "heading": "8429",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "146-AIS-12 sayli hesab",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "16126/00198371 AKT",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "18-20 MAY",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "CULFA R-N DARIDAĞ ARSENLİ SU MM",
+   "is_service": false,
+   "heading": "2201",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "1 nömrəli tam orta məktəb",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "2019 x.h",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "2022-ci ilin 4 ayı üçün",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "auto:consensus",
+   "name": "KAPITAL KART EDV",
+   "is_service": false,
+   "heading": "8523",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Yanvar ayi ucun odenish",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "auto:consensus",
+   "name": "GrandMart 67 Nasosnu",
+   "is_service": false,
+   "heading": "8413",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "GrandMart 56 M5 Nərimanov",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "BM 09 Yasamal 2",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "auto:consensus",
+   "name": "11.11.2021 tarixli, ACCB/2114NA nömrəli  müqavilənin, 13.12.2021 tarixli, 1444 NA nömrəli QRP-sinə əsasən göstərilmiş xidmət haqqı",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "auto:consensus",
+   "name": "11 sayli qosma Sabuncu R Mastaga q.",
+   "is_service": false,
+   "heading": "3401",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "confirmed",
+   "name": "İstehsalçı:GRISHAM SERVICES INC\"",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Hesab no 2025/2198",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "confirmed",
+   "name": "Mal (əmtəə) adı",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "İKİ market uzre fevrall ayi uzre",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "yanvbar  ayi muqavile esasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Muqavile MP 004/20-007 ESASINDA noyabr",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Elave 7 uzre Yasamal r. S.Mehdiyev kuc 559-560  13 yanvardan terminal legv edilib",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "fevral ayi uzre muqavile esasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "fevral ayi uzre muqavile e sasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "may ayi uzre qaliq",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Muqavile MP 004/20-007 ESASINDA AFF Xirdalan mart ayi 12 martdan",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "-2021 noyabr  ayi etibaren Muqavile MD-004/21-007-1(1309 ID terminaldaki deyisiklik nezere alinir)",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "yanvar yai muqavile esasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "mart ayi uzre muqavile esasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Avqust ve iyul ayi uzre qaliq",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "5 baqqal -2021 dekabr ayi etibaren Muqavile MD-004/21-007-1",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "9 sayli qosma Yasamal  r S Mehtiyev kkuc 559-560  (11.01.2021 tarixinden legv )",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "5786 Megastore - Ağcabədi şəh., Tofiq İsmayılov küç.",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "4486 Grandmart - Sabunçu ray., Maştağa qəs., Heybət Heybətov küç. 70",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Grandmart Zabrat mart aprel may",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "noyabr  ayi uzre muqavile N 0684/2019",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Muqavile MP 004/20-007 ESASINDA mart   ayi 39terminal",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "May ayi uzre muqavile esasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "1 sayli elave esasinda-yanvar ayi 1)Samil Ezizbeyov-elave razilasma 2 Xetai r.M.H kuc 75",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Aprel ayi uzre muqavile esasinda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Müqavile esasinda fevral ayi",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "avqust ayi uzre elave n10-1)ID 4097 2)ID 4612 3)4749",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Grandmart Novxanı (Köhnə Fresco ) mart aprel may",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Dekabr ayi uzre",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "fevral ayi uzre muqavile esaisnda",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "Muqavile MP 004/20-007 ESASINDA sentyabr ayi 41terminal",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "oktyabr ayi ayi uzre muqavile T/0300/2021 12MARKET UZRE",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "auto:consensus",
+   "name": "Sərbəst Satış",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "auto:consensus",
+   "name": "Uroloji USM",
+   "is_service": false,
+   "heading": "9018",
+   "now": "service"
+  },
+  {
+   "scope": 0,
+   "source": "ai_resolved_grounded",
+   "name": "AYLIQ ÖDƏNİŞ",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "1 rüb ücün",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "1 SAYLI NOTARİUS",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "27.08.2021      qəbz №          10735",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "28.02.2015-ci il tarixli 04/15 sayli müqavilə-Əlavə2 əsasən 2023-ci ilin Fevral ve Mart ayı üçün xidmət haqqı",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "__________ 2-lik",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "30.12.2021 tarixli QRP",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "4324485 4324894 4325375 4340250 4341636 5331993 5332055 5382510 5947932 5955315 ADDAN ADA KECİRMƏ",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "7,8,9 dekabr",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "8474809080 k[mwr",
+   "is_service": false,
+   "heading": "8474",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "90PJ369 90PJ370 90PJ371 90PJ381 90PJ857 90PJ380 90PJ378 90PJ379 90PJ382 90PL421 90PJ542 90PJ541 90PJ417 90PJ418 90PJ314",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Abbasov Xətai Natiq oğlunun \"TBC KREDİT BANK OLMAYAN KREDİT TƏŞKİLATI\" MƏHDUD MƏSULİYYƏTLİ CƏMİYYƏTİnə kredit borcunun qaytarılması ilə göstərilən Mediasiya Xidmət Haqqı",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Ahıllar evi",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Aksesuarların alınması",
+   "is_service": true,
+   "heading": null,
+   "now": "good"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Akt No-301",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "ANAR MEHDIYEV",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "apel 2022",
+   "is_service": false,
+   "heading": "0808",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "ARŞIN TEKSTİL",
+   "is_service": false,
+   "heading": "5407",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "askooil",
+   "is_service": false,
+   "heading": "2710",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Aslanzadə Aytən",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Atelier Rebul Dəniz Mall",
+   "is_service": false,
+   "heading": "3303",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Atelier Rebul Park Bulvar",
+   "is_service": false,
+   "heading": "3303",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "avqustdan qalıq",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "AZ İNT TELEKOM MMC",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "BABAYEV ZAUR QURBANƏLİ",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "BAK 4433",
+   "is_service": false,
+   "heading": "3925",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Bakı şəhəri 17 saylı Notariat Kontorunun 8i-6556 saylı, 20.10.2022-ci il tarixli icra vərəqəsinə əsasən, İsmixanova Saniyət Mihyəddin qızına məxsus Sabunçu rayonu, Ramana qəsəbəsi, 12-ci mədən küçəsi, ev 48 ünvanında yerləşən 10 nömrəli mənzilin hərrac işi üzrə hərrac xidməti və hərrac xərcləri",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "BBK3247 Zergenpalan",
+   "is_service": false,
+   "heading": "9403",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "BBK6073 Manqal restoran",
+   "is_service": false,
+   "heading": "7321",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Bizim market Radio Zavod Nargile",
+   "is_service": false,
+   "heading": "9614",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Cərimələr",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Choy Bingfung 26.11-30.11.2019",
+   "is_service": false,
+   "heading": "1211",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "CİNEMA PLAZA",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Coffee`n Joy 01,07,2022-14,07,2022",
+   "is_service": false,
+   "heading": "2101",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Duz fabriki (Qaradağ terminalı)",
+   "is_service": false,
+   "heading": "2501",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Elçin Quba Qusar Xaçmaz 07.05.2022",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "emilpetrol",
+   "is_service": false,
+   "heading": "2710",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Expert Team",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Ələgə mərkəzi üzrə",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "ƏLİYEV FAMİN RÜFƏT",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Əliyev İbrahim İsgəndər oğlunun Nax.Bank ASC-yə olan kredit borcunun qaytarılması ilə əlaqəli göstərilən Madiasiya Xidmət Haqqı ödənilir",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "fssaltd",
+   "is_service": false,
+   "heading": "2501",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "GBC fevral 2020",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "GBC jun",
+   "is_service": false,
+   "heading": "8472",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Gəncə 6 saylı NTB -2020 II yarımillik",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "GFF Order №:4500005340",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "GİLAN KONSERV LƏNKƏRAN",
+   "is_service": false,
+   "heading": "2005",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Grandmart 67 Nasosnu",
+   "is_service": false,
+   "heading": "8413",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "GUNESHLI 3 PARFUMERİYA",
+   "is_service": false,
+   "heading": "3303",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "HACIYEV ATABALA NƏRBALA",
+   "is_service": false,
+   "heading": "0810",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "İnv. möv.: 33, 94, 95, 105, 106, 108-110, 159, 168, 205-213, 215, 217, 218, 221, 223, 224, 229, 231-233, 235, 237, 239, 240, 242, 244-246, 249-251, 253-260, 262, 263, 283, 293, 313. (neft sənayesində istifadə üçün) Qara metallardan vintlər - 599 ədəd. Part no: 91293, 18108, WPC-1068, 93596, 93036, 93055, 1070, 1030, 3848, 14505, 1029, 1030, 1063, 1070, 5442, 18108, 18116, 93011, 93016, 93036, 93047, 93058, 93103, 93163, 93623, 93249, 93265, 93280, 93281, 93305, 93392, 93596, 93627, 93834, 414105, WPC-1061, WPC-1068, 93997, 93797, 413725, 18147, 93040, 93054, 93055, 93166, 93168, 93628, 93629, 417727, 418218, WPC-3047, WPC-3045, 416563. Screwdriver Parallel tip (3 0 x 75) SCR SKT GRB CP M3x6 LG MS068-01 SCR SKT GRB CP M4x6 LG MS068-01 SCR SKT CAP HD M4x8 LG MS068-01 SCR SKT CAP HD M6x8 LG MS068-01 SCR SKT GRB CP M6x6 LG MS068-01 Screw Plug Axle, (Arm Roller) SCR SLT CSK HD M3x6 LG MS068-01 SCR SKT GRB CP M6x6 LG MS068-01 SCR SKT GRB CP M6x8 LG MS068-01 SCR SKT CAP HD M6x8 LG MS068-01 SCREW CSK HD M6 MOD Adjusting screw gib long Screw Locking/Drive Axial Torque Limiter SCR SKT GRB CP M5x5 LG MS068-01 SCR SKT GRB CP M4x5 LG MS068-01 SCR SKT GRB CP M4x6 LG MS068-01 SCR SKT GRB CP M3x5 LG MS068-01 SCR SLT CSK HD M3x4 LG MS068-01 SCR SKT CAP HD M6x16 LG MS068-01 SCR SKT CSK HD M6x10 LG MS068-57 SCR SKT CAP HD M4X16 LG MS068-01 SCR SKT GRB CP M8x10 LG MS068-01 SCR SKT GRB CP M4x4 LG MS068-01 SCR SKT CAP HD M4x6 LG MS068-01 SCR SKT CAP HD M3x6 LG MS068-01 SCR SKT CAP HD M2.5x10 LG MS068-01 Screw Csk Hd Torx M4(F)x08mmLG (MS-1184) SCR SKT GRB CP M3x6 LG MS068-01 SCR SKT CAP HD M4x6 LG MS068-50 SCR SKT GRB DG M4X6 LG MS068-01 TENSION BOLT TENSION BOLT ADJUSTING SCREW GIB SCR SKT CAP HD M4x40 LG MS068-01 SCR SKT CAP HD M4x25 LG MS068-01 SCR SKT CAP HD M10X40 LG MS068-01 Screw Locking Bumper Collar SCR SKT CAP HD M3x05mmLG MS068-01 SCR SKT CAP HD M4x12 LG MS068-01 SCR SKT CAP HD M4x8 LG MS068-01 SCR SKT CAP HD M3x3 LG MS068-01 SCR SKT CAP HD M5x10 LG MS068-01 SCR SKT CAP HD M5x10 LG MS068-50 SCR SKT CAP HD M5x20 LG MS068-64 SCREW SKT CAP HD M6 X 8 MODIFIED LOW HD SCREW M3 X 4 CHEESEHEAD MODIFIED ASSY TORQUE LIMITER SHAFT Assy head locking.",
+   "is_service": false,
+   "heading": "7318",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "iyul-avqust 2022-X/H",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "İyun2023",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Kargofly",
+   "is_service": false,
+   "heading": "3808",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Kart sobesi",
+   "is_service": false,
+   "heading": "8516",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "KMMM Səməd Vurğun -133",
+   "is_service": false,
+   "heading": "4901",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "KRYZHNAIA NATALI",
+   "is_service": false,
+   "heading": "0810",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Le Kebab",
+   "is_service": false,
+   "heading": "1602",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "LM309/04-2018  - LM355/06-2019-R",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "mart2022-yanvar 2023",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Masazır ASM",
+   "is_service": false,
+   "heading": "9019",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "may yi uun iare",
+   "is_service": false,
+   "heading": "1901",
+   "now": "service"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "MBS 2511 Elektra Hall",
+   "is_service": false,
+   "heading": "8518",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Mehdiyev Əbdülrəhman Əli oğlunun Nax.Bank ASC-yə olan kredit borcunun qaytarılması ilə bağlı göstərilən Mediasiya xidmət haqqı",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "merdpetrol",
+   "is_service": false,
+   "heading": "2710",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "MS Oil 18,06,2022-11,07,2022",
+   "is_service": false,
+   "heading": "2710",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "MUG.ESASEN III-2021",
+   "is_service": false,
+   "heading": "6912",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Müqaviilə əsasında",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Nadinskaya Mariya Yuryevna (07.02-10.02.2019)",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Nar Hotel",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "NAX.MR.DUZDAQ TUNEL",
+   "is_service": false,
+   "heading": "2501",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "“NORM”  MMC",
+   "is_service": false,
+   "heading": "2523",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "noyabr2019",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Nüydü kənd o/m",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "OLED MMC",
+   "is_service": false,
+   "heading": "8524",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "OMS_21001872296_Sep Azgold_436",
+   "is_service": true,
+   "heading": null,
+   "now": "good"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "OMS_21003076621_Zəng_61270",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "\"Order №:4500004870\"\t\"Dims L*W*H:120*100*127\"\t\"Truck:05ABE877/01ACN285\"\t\"Gross weight:405\"",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "PAYSİS",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "QABILLI ELEKTRİK STANSİYASI",
+   "is_service": false,
+   "heading": "8502",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "qaimə oktyabr",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Qarayara İB",
+   "is_service": false,
+   "heading": "0303",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Qarayara TD",
+   "is_service": false,
+   "heading": "2710",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Qəşəm Cəfərov & Kənan Məmmədli",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Qızılavar kən o/m",
+   "is_service": false,
+   "heading": "0302",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Qunitskiy Lev 05.11-09.11.19",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "RADİOTEZLİKLƏR İDARƏSİ",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "rbt  ( avgust 2017)",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Şahqaya yatağı",
+   "is_service": false,
+   "heading": "9403",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Sera Pro Group",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "S.MEHDIYEV PARFUMERIYA",
+   "is_service": false,
+   "heading": "3303",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "( s/n 963704607 )",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "SRTM\"LƏNKƏRANBALIQÇISI\"",
+   "is_service": false,
+   "heading": "0302",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Təzə Bazar - Radio baza stansiyası",
+   "is_service": false,
+   "heading": "8517",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "the jazz klub və fairmount gold lounge",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "TOBATERRA QSC",
+   "is_service": false,
+   "heading": "2402",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Tural Gəncə Tovuz 20.07.2022",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Uğur Musayev.Test-birdəfəlik ödəniş",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Ulduz Paintball",
+   "is_service": false,
+   "heading": "9506",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Vüqar Ağdaş Nemətabad kənd 13.08.2022",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Vüqar firması",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Yanar dağ DTM TQ",
+   "is_service": false,
+   "heading": "2710",
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "Yanvar ayi ucun odenish",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": -1,
+   "source": "gold",
+   "name": "ZİRAAT BANK",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "27.08.2021      qəbz №          10735",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "8474809080 k[mwr",
+   "is_service": false,
+   "heading": "8474",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "BBK6073 Manqal restoran",
+   "is_service": false,
+   "heading": "7321",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "Coffee`n Joy 01,07,2022-14,07,2022",
+   "is_service": false,
+   "heading": "2101",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "ƏLİYEV FAMİN RÜFƏT",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "KRYZHNAIA NATALI",
+   "is_service": false,
+   "heading": "0810",
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "mart2022-yanvar 2023",
+   "is_service": true,
+   "heading": null,
+   "now": "trash"
+  },
+  {
+   "scope": 0,
+   "source": "gold",
+   "name": "Masazır ASM",
+   "is_service": false,
+   "heading": "9019",
+   "now": "trash"
+  }
+ ],
+ "gold_labels": [
+  {
+   "tier": "multi-family",
+   "name": "0011 saylı 11.01.2018-ci il tarixli məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "02.03.2020 tarixli 1095/1 nömrəli məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "007-FKS-01 sayli hesab",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "LM309/04-2018  - LM355/06-2019-R",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "02.11.17 tarixli 2662/I məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "0050saylı 27.07.2021-ci il tarixli məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "02.08.2019-cu il tarixli 3390/I nömrəli  məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "07 fevral",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "2019 x.h",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "01.01.2022-ci ildən 01.02.2022-ci ilə qədər olan dövr üçün",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "04.11.2019\t4073/I məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "( s/n 963704607 )",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "0172/I saylı 22.01.2018-ci tarixli məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "03.08.2021-ci il tarixdə təqdim edilmiş mal",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "16126/00198371 AKT",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "\"Order №:4500004870\"\t\"Dims L*W*H:120*100*127\"\t\"Truck:05ABE877/01ACN285\"\t\"Gross weight:405\"",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "1 SAYLI NOTARİUS",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "18-20 MAY",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "7,8,9 dekabr",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "mart2022-yanvar 2023",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Vüqar Ağdaş Nemətabad kənd 13.08.2022",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "BAK 4433",
+   "code": null,
+   "heading": "3925",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "PAYSİS",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "iyul-avqust 2022-X/H",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "28.02.2015-ci il tarixli 04/15 sayli müqavilə-Əlavə2 əsasən 2023-ci ilin Fevral ve Mart ayı üçün xidmət haqqı",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Tural Gəncə Tovuz 20.07.2022",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "27.08.2021      qəbz №          10735",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Gəncə 6 saylı NTB -2020 II yarımillik",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "091-FKS-07 sayli hesab",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "BABAYEV ZAUR QURBANƏLİ",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Vüqar firması",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Qunitskiy Lev 05.11-09.11.19",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Qəşəm Cəfərov & Kənan Məmmədli",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "RADİOTEZLİKLƏR İDARƏSİ",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Sera Pro Group",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "AZ İNT TELEKOM MMC",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "1 nömrəli tam orta məktəb",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Ələgə mərkəzi üzrə",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "ANAR MEHDIYEV",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "1 rüb ücün",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "90PJ369 90PJ370 90PJ371 90PJ381 90PJ857 90PJ380 90PJ378 90PJ379 90PJ382 90PL421 90PJ542 90PJ541 90PJ417 90PJ418 90PJ314",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "0018/SH nömrəli 18.01.2019-cu il tarixli məktub",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "ƏLİYEV FAMİN RÜFƏT",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Nüydü kənd o/m",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "146-AIS-12 sayli hesab",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "GFF Order №:4500005340",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Müqaviilə əsasında",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Aslanzadə Aytən",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "the jazz klub və fairmount gold lounge",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "CİNEMA PLAZA",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "19.03.2020-ci il tarixli 176/20 nömrəli  müqaviləyə əsasən",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Akt No-301",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Yanvar ayi ucun odenish",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "2022-ci ilin 4 ayı üçün",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "qaimə oktyabr",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "rbt  ( avgust 2017)",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "avqustdan qalıq",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Expert Team",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Ahıllar evi",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "noyabr2019",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Nadinskaya Mariya Yuryevna (07.02-10.02.2019)",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "__________ 2-lik",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "ZİRAAT BANK",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "İyun2023",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "30.12.2021 tarixli QRP",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Linkoil (Binəqədi), 2018/12",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "“NORM”  MMC",
+   "code": null,
+   "heading": "2523",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "GBC fevral 2020",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "OMS_21001872296_Sep Azgold_436",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "good"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Cərimələr",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "4324485 4324894 4325375 4340250 4341636 5331993 5332055 5382510 5947932 5955315 ADDAN ADA KECİRMƏ",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Elçin Quba Qusar Xaçmaz 07.05.2022",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Nar Hotel",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Aksesuarların alınması",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "good"
+  },
+  {
+   "tier": "multi-family",
+   "name": "OMS_21003076621_Zəng_61270",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Mehdiyev Əbdülrəhman Əli oğlunun Nax.Bank ASC-yə olan kredit borcunun qaytarılması ilə bağlı göstərilən Mediasiya xidmət haqqı",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Əliyev İbrahim İsgəndər oğlunun Nax.Bank ASC-yə olan kredit borcunun qaytarılması ilə əlaqəli göstərilən Madiasiya Xidmət Haqqı ödənilir",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "01,09,2022-ci il tarixli 03/EL/01092022 N-li Xidmət göstərilməsinə dair Müqaviləyə əsasən görülmüş işlər",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Bakı şəhəri 17 saylı Notariat Kontorunun 8i-6556 saylı, 20.10.2022-ci il tarixli icra vərəqəsinə əsasən, İsmixanova Saniyət Mihyəddin qızına məxsus Sabunçu rayonu, Ramana qəsəbəsi, 12-ci mədən küçəsi, ev 48 ünvanında yerləşən 10 nömrəli mənzilin hərrac işi üzrə hərrac xidməti və hərrac xərcləri",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Abbasov Xətai Natiq oğlunun \"TBC KREDİT BANK OLMAYAN KREDİT TƏŞKİLATI\" MƏHDUD MƏSULİYYƏTLİ CƏMİYYƏTİnə kredit borcunun qaytarılması ilə göstərilən Mediasiya Xidmət Haqqı",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Uğur Musayev.Test-birdəfəlik ödəniş",
+   "code": null,
+   "heading": null,
+   "is_service": true,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "BRİTİSH AMERCAN TOBACOO",
+   "code": null,
+   "heading": "2402",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "fssaltd",
+   "code": null,
+   "heading": "2501",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Bizim market Radio Zavod Nargile",
+   "code": null,
+   "heading": "9614",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "OLED MMC",
+   "code": null,
+   "heading": "8524",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Qızılavar kən o/m",
+   "code": null,
+   "heading": "0302",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "SRTM\"LƏNKƏRANBALIQÇISI\"",
+   "code": null,
+   "heading": "0302",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "ARŞIN TEKSTİL",
+   "code": null,
+   "heading": "5407",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "GBC jun",
+   "code": null,
+   "heading": "8472",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Qarayara İB",
+   "code": null,
+   "heading": "0303",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "QABILLI ELEKTRİK STANSİYASI",
+   "code": null,
+   "heading": "8502",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "BBK6073 Manqal restoran",
+   "code": null,
+   "heading": "7321",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Masazır ASM",
+   "code": null,
+   "heading": "9019",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "8474809080 k[mwr",
+   "code": null,
+   "heading": "8474",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "MUG.ESASEN III-2021",
+   "code": null,
+   "heading": "6912",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "KMMM Səməd Vurğun -133",
+   "code": null,
+   "heading": "4901",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "apel 2022",
+   "code": null,
+   "heading": "0808",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Ulduz Paintball",
+   "code": null,
+   "heading": "9506",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "MBS 2511 Elektra Hall",
+   "code": null,
+   "heading": "8518",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Kart sobesi",
+   "code": null,
+   "heading": "8516",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "KRYZHNAIA NATALI",
+   "code": null,
+   "heading": "0810",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "HACIYEV ATABALA NƏRBALA",
+   "code": null,
+   "heading": "0810",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "10 BA 735 JCB",
+   "code": null,
+   "heading": "8429",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "İnv. möv.: 33, 94, 95, 105, 106, 108-110, 159, 168, 205-213, 215, 217, 218, 221, 223, 224, 229, 231-233, 235, 237, 239, 240, 242, 244-246, 249-251, 253-260, 262, 263, 283, 293, 313. (neft sənayesində istifadə üçün) Qara metallardan vintlər - 599 ədəd. Part no: 91293, 18108, WPC-1068, 93596, 93036, 93055, 1070, 1030, 3848, 14505, 1029, 1030, 1063, 1070, 5442, 18108, 18116, 93011, 93016, 93036, 93047, 93058, 93103, 93163, 93623, 93249, 93265, 93280, 93281, 93305, 93392, 93596, 93627, 93834, 414105, WPC-1061, WPC-1068, 93997, 93797, 413725, 18147, 93040, 93054, 93055, 93166, 93168, 93628, 93629, 417727, 418218, WPC-3047, WPC-3045, 416563. Screwdriver Parallel tip (3 0 x 75) SCR SKT GRB CP M3x6 LG MS068-01 SCR SKT GRB CP M4x6 LG MS068-01 SCR SKT CAP HD M4x8 LG MS068-01 SCR SKT CAP HD M6x8 LG MS068-01 SCR SKT GRB CP M6x6 LG MS068-01 Screw Plug Axle, (Arm Roller) SCR SLT CSK HD M3x6 LG MS068-01 SCR SKT GRB CP M6x6 LG MS068-01 SCR SKT GRB CP M6x8 LG MS068-01 SCR SKT CAP HD M6x8 LG MS068-01 SCREW CSK HD M6 MOD Adjusting screw gib long Screw Locking/Drive Axial Torque Limiter SCR SKT GRB CP M5x5 LG MS068-01 SCR SKT GRB CP M4x5 LG MS068-01 SCR SKT GRB CP M4x6 LG MS068-01 SCR SKT GRB CP M3x5 LG MS068-01 SCR SLT CSK HD M3x4 LG MS068-01 SCR SKT CAP HD M6x16 LG MS068-01 SCR SKT CSK HD M6x10 LG MS068-57 SCR SKT CAP HD M4X16 LG MS068-01 SCR SKT GRB CP M8x10 LG MS068-01 SCR SKT GRB CP M4x4 LG MS068-01 SCR SKT CAP HD M4x6 LG MS068-01 SCR SKT CAP HD M3x6 LG MS068-01 SCR SKT CAP HD M2.5x10 LG MS068-01 Screw Csk Hd Torx M4(F)x08mmLG (MS-1184) SCR SKT GRB CP M3x6 LG MS068-01 SCR SKT CAP HD M4x6 LG MS068-50 SCR SKT GRB DG M4X6 LG MS068-01 TENSION BOLT TENSION BOLT ADJUSTING SCREW GIB SCR SKT CAP HD M4x40 LG MS068-01 SCR SKT CAP HD M4x25 LG MS068-01 SCR SKT CAP HD M10X40 LG MS068-01 Screw Locking Bumper Collar SCR SKT CAP HD M3x05mmLG MS068-01 SCR SKT CAP HD M4x12 LG MS068-01 SCR SKT CAP HD M4x8 LG MS068-01 SCR SKT CAP HD M3x3 LG MS068-01 SCR SKT CAP HD M5x10 LG MS068-01 SCR SKT CAP HD M5x10 LG MS068-50 SCR SKT CAP HD M5x20 LG MS068-64 SCREW SKT CAP HD M6 X 8 MODIFIED LOW HD SCREW M3 X 4 CHEESEHEAD MODIFIED ASSY TORQUE LIMITER SHAFT Assy head locking.",
+   "code": null,
+   "heading": "7318",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Şahqaya yatağı",
+   "code": null,
+   "heading": "9403",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "BBK3247 Zergenpalan",
+   "code": null,
+   "heading": "9403",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Duz fabriki (Qaradağ terminalı)",
+   "code": null,
+   "heading": "2501",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "NAX.MR.DUZDAQ TUNEL",
+   "code": null,
+   "heading": "2501",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Le Kebab",
+   "code": null,
+   "heading": "1602",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "MS Oil 18,06,2022-11,07,2022",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "merdpetrol",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Yanar dağ DTM TQ",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "askooil",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "emilpetrol",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Qarayara TD",
+   "code": null,
+   "heading": "2710",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Grandmart 67 Nasosnu",
+   "code": null,
+   "heading": "8413",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Coffee`n Joy 01,07,2022-14,07,2022",
+   "code": null,
+   "heading": "2101",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "TOBATERRA QSC",
+   "code": null,
+   "heading": "2402",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "may yi uun iare",
+   "code": null,
+   "heading": "1901",
+   "is_service": false,
+   "now": "service"
+  },
+  {
+   "tier": "multi-family",
+   "name": "GİLAN KONSERV LƏNKƏRAN",
+   "code": null,
+   "heading": "2005",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Choy Bingfung 26.11-30.11.2019",
+   "code": null,
+   "heading": "1211",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Təzə Bazar - Radio baza stansiyası",
+   "code": null,
+   "heading": "8517",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "GUNESHLI 3 PARFUMERİYA",
+   "code": null,
+   "heading": "3303",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Atelier Rebul Park Bulvar",
+   "code": null,
+   "heading": "3303",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "S.MEHDIYEV PARFUMERIYA",
+   "code": null,
+   "heading": "3303",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "CULFA R-N DARIDAĞ ARSENLİ SU MM",
+   "code": null,
+   "heading": "2201",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Atelier Rebul Dəniz Mall",
+   "code": null,
+   "heading": "3303",
+   "is_service": false,
+   "now": "trash"
+  },
+  {
+   "tier": "multi-family",
+   "name": "Kargofly",
+   "code": null,
+   "heading": "3808",
+   "is_service": false,
+   "now": "trash"
+  }
+ ]
+}

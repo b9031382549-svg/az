@@ -187,10 +187,11 @@ The app is auth-gated (default login user `admin`).
 
 ## Gotchas
 
-- The sorter's model files are NOT in git: prod `/opt/az-assets/sorter` (model.onnx +
-  tokenizer.json + meta.json with its sha256), local `research-data/sorter-model/v1`
-  (same sha). `classify.sorter.trash_threshold` is calibrated for THAT file — change them
-  together. The service runs one line per forward pass on purpose: the int8 model
+- The sorter's model files are NOT in git: prod `/opt/az-assets/sorter-v2` (model.onnx +
+  tokenizer.json + meta.json with its sha256; v1 kept in `/opt/az-assets/sorter`), local
+  `research-data/sorter-model/v2` (same sha). `classify.sorter.trash_threshold` and
+  `classify.sorter.model` belong to THAT file — change them together (and bump
+  `config/api.php` `model.version`). The service runs one line per forward pass on purpose: the int8 model
   quantizes activations per tensor, so a padded batch made a line depend on its neighbours.
 
 - After changing catalog embedding logic or synonyms → re-embed with
