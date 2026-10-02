@@ -27,6 +27,9 @@ return [
     // Empty url = off. When the service is down the pipeline simply runs without it.
     'sorter' => [
         'url' => (string) env('CLASSIFY_SORTER_URL', 'http://sorter:8000'),
+        // The model file trash_threshold is calibrated for (its meta.json name) — what
+        // GET /api/version reports. Change the three together.
+        'model' => (string) env('CLASSIFY_SORTER_MODEL', 'sorter-v1'),
         'trash_threshold' => (float) env('CLASSIFY_SORTER_TRASH_THRESHOLD', 0.99747),
         // Requests queue up at the service (one forward pass at a time) when an upload's
         // portion fans out into many SortItemsJobs — wait for our turn rather than fall open.
