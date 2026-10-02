@@ -820,5 +820,7 @@
     "Never": "Heç vaxt",
     "Delete this token? Systems using it lose access at once.": "Bu token silinsin? Ondan istifadə edən sistemlər girişi dərhal itirəcək.",
     "Classify items": "Mövqeləri təsnif etmək",
-    "Read results and decision traces": "Nəticələri və qərar izlərini oxumaq"
+    "Read results and decision traces": "Nəticələri və qərar izlərini oxumaq",
+    "API docs": "API sənədləri",
+    "How to call the API": "API-yə necə müraciət etmək"
 }

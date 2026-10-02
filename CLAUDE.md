@@ -90,7 +90,9 @@ The app is auth-gated (default login user `admin`).
 - **Results API:** `routes/api.php` → `Api/ResultsApiController` (ability `results`) —
   read-only inspection of results + decision traces.
 - **Classifier API** (the client's integration; they host it; client docs in Russian:
-  `API.md` — keep it in sync with the endpoints): `GET /api/version` (any
+  `API.md`, and the in-app page `/api-docs` (`PageController::apiDocs` →
+  `pages/api-docs.blade.php`, limits/fields/similarity/version read live from config) —
+  keep both in sync with the endpoints): `GET /api/version` (any
   token) = our release (`config/api.php` — bump `model.version` when answers can change)
   + the models the chain is configured to use (`ModelVersion`). `GET /api/health-check`
   (any token) = `HealthCheck`: liveness only, each probe instant and free (DB, Redis,

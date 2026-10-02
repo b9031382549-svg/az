@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/gpu-servers', GpuServers::class)->name('gpu-servers');
 
     Route::get('/settings', [PageController::class, 'settings'])->name('settings');
+    Route::get('/api-docs', [PageController::class, 'apiDocs'])->name('api-docs');
     Route::post('/locale', [LocaleController::class, 'update'])->name('locale.set');
 
     // Audit / activity log — reachable by URL only (not in the nav).

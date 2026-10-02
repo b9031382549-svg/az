@@ -820,5 +820,7 @@
     "Never": "Ни разу",
     "Delete this token? Systems using it lose access at once.": "Удалить токен? Системы, которые им пользуются, сразу потеряют доступ.",
     "Classify items": "Классифицировать позиции",
-    "Read results and decision traces": "Читать результаты и трассировки решений"
+    "Read results and decision traces": "Читать результаты и трассировки решений",
+    "API docs": "Документация API",
+    "How to call the API": "Как обращаться к API"
 }
