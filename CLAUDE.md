@@ -89,7 +89,8 @@ The app is auth-gated (default login user `admin`).
   `Authorization: Bearer <token>` plus its ability (missing → 403).
 - **Results API:** `routes/api.php` → `Api/ResultsApiController` (ability `results`) —
   read-only inspection of results + decision traces.
-- **Classifier API** (the client's integration; they host it): `GET /api/version` (any
+- **Classifier API** (the client's integration; they host it; client docs in Russian:
+  `API.md` — keep it in sync with the endpoints): `GET /api/version` (any
   token) = our release (`config/api.php` — bump `model.version` when answers can change)
   + the models the chain is configured to use (`ModelVersion`). `GET /api/health-check`
   (any token) = `HealthCheck`: liveness only, each probe instant and free (DB, Redis,
