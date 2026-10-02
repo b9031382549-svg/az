@@ -27,9 +27,12 @@ class InferenceEndpointResolver
      * handles nebius:/OpenRouter). Always returns a provider array for a gpu: model —
      * either the active server or the Token Factory fallback — so a gpu: call never dead-ends.
      *
+     * $touch = false resolves without counting it as a use of the server — for a health check,
+     * which must not keep a GPU slot from idling down.
+     *
      * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string}|null
      */
-    public function resolve(string $model): ?array
+    public function resolve(string $model, bool $touch = true): ?array
     {
         if (! str_starts_with($model, self::PREFIX)) {
             return null;
@@ -39,7 +42,9 @@ class InferenceEndpointResolver
         $server = GpuServer::active();
 
         if ($server !== null && $server->isServing()) {
-            $server->markRequested(); // feed the idle-autostop clock (throttled, cheap)
+            if ($touch) {
+                $server->markRequested(); // feed the idle-autostop clock (throttled, cheap)
+            }
 
             return [
                 'name' => 'GPU:'.$server->slot,
