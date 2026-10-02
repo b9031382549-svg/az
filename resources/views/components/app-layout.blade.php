@@ -56,7 +56,9 @@
       <a href="{{ route('gpu-servers') }}" class="{{ $nav('gpu-servers*') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="15" height="5" rx="1.2"/><rect x="2.5" y="11" width="15" height="5" rx="1.2"/><path d="M5 6.5h.01M5 13.5h.01"/></svg>{{ __('GPU servers') }}</a>
 
-      <a href="{{ route('settings') }}" class="{{ $nav('settings') }} mt-2">
+      <a href="{{ route('api-docs') }}" class="{{ $nav('api-docs') }} mt-2">
+        <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6l-4 4 4 4M13 6l4 4-4 4M11.2 4l-2.4 12"/></svg>{{ __('API docs') }}</a>
+      <a href="{{ route('settings') }}" class="{{ $nav('settings') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.6"/><path d="M10 1.5v2M10 16.5v2M3.5 3.5l1.4 1.4M15.1 15.1l1.4 1.4M1.5 10h2M16.5 10h2M3.5 16.5l1.4-1.4M15.1 4.9l1.4-1.4"/></svg>{{ __('Settings') }}</a>
     </nav>
     <div class="p-4 border-t hair">

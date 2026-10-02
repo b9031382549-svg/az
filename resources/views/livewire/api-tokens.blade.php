@@ -1,6 +1,7 @@
 <div class="card p-6 mt-5">
   <h2 class="font-display text-xl mb-1">{{ __('API tokens') }}</h2>
-  <p class="text-muted text-sm mb-5">{{ __('For outside systems that call the API. A token is shown once, right after it is created — copy it then.') }}</p>
+  <p class="text-muted text-sm mb-1">{{ __('For outside systems that call the API. A token is shown once, right after it is created — copy it then.') }}</p>
+  <a href="{{ route('api-docs') }}" class="link-under text-sm inline-block mb-5">{{ __('How to call the API') }} →</a>
 
   @if($plainToken)
     <div class="card-flat p-4 mb-5" x-data="{ copied: false }">
