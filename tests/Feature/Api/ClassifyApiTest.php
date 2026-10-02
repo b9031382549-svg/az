@@ -6,6 +6,7 @@ use App\Jobs\FeedUploadClassificationJob;
 use App\Jobs\IngestApiRequestJob;
 use App\Models\ApiRequestName;
 use App\Models\ClassificationItem;
+use App\Models\EInvoice;
 use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\Api\ClassifyRequests;
@@ -140,6 +141,59 @@ class ClassifyApiTest extends TestCase
 
         $this->assertSame(2, ApiRequestName::where('batch', $id)->count());
         $this->assertSame(2, ClassificationItem::where('batch', $id)->count());
+    }
+
+    public function test_lines_with_invoice_fields_go_to_e_invoices_like_a_sablon_upload(): void
+    {
+        $id = $this->postJson('/api/classify', ['items' => [
+            ['name' => 'Su 0.5L', 'unit' => 'ədəd', 'quantity' => '12', 'series' => 'MT', 'number' => '1001',
+                'invoice_date' => '01.09.2026', 'total_amount' => '1 234,50', 'supplier_tin' => 1234567890, 'price' => 99],
+            ['name' => 'Su 0.5L', 'unit' => ' blok ', 'series' => 'MT', 'number' => '1002'],
+            ['name' => 'Çörək'],
+        ]], $this->auth)->assertStatus(202)->json('request_id');
+
+        $this->ingest($id);
+
+        $item = ApiRequestName::where('batch', $id)->where('name', 'Su 0.5L')->sole();
+        $lines = EInvoice::where('import_batch', $id)->orderBy('id')->get();
+        $this->assertCount(2, $lines); // the name-only line has no invoice to keep
+        $this->assertSame(
+            ['Su 0.5L', 'ədəd', 12.0, 'MT|1001', '2026-09-01', 1234.5, '1234567890', $item->classification_item_id],
+            [$lines[0]->item_name, $lines[0]->unit, (float) $lines[0]->quantity, $lines[0]->invoice_key, (string) $lines[0]->invoice_date?->format('Y-m-d'), (float) $lines[0]->total_amount, $lines[0]->supplier_tin, $lines[0]->classification_item_id],
+        );
+        $this->assertSame(['ədəd', 'blok'], $item->units); // every unit its lines carried, as sent (trimmed)
+        $this->assertNull(ApiRequestName::where('batch', $id)->where('name', 'Çörək')->sole()->units);
+
+        $meta = ImportBatch::where('key', $id)->sole()->meta;
+        $this->assertSame([2, 0], [$meta['invoice_lines'], $meta['skipped_lines']]);
+    }
+
+    public function test_an_invoice_another_upload_loaded_is_not_written_twice_but_its_names_are_answered(): void
+    {
+        EInvoice::create(['item_name' => 'Su', 'series' => 'MT', 'number' => '1001', 'invoice_key' => 'MT|1001', 'import_batch' => 'an-earlier-upload']);
+        $id = $this->postJson('/api/classify', ['items' => [['name' => 'Su', 'series' => 'MT', 'number' => '1001']]], $this->auth)
+            ->assertStatus(202)->json('request_id');
+
+        $this->ingest($id);
+
+        $this->assertSame(0, EInvoice::where('import_batch', $id)->count());
+        $this->assertSame(1, ImportBatch::where('key', $id)->sole()->meta['skipped_lines']);
+        $this->assertSame(1, ApiRequestName::where('batch', $id)->count());
+        $this->assertSame(1, ClassificationItem::where('batch', $id)->count());
+    }
+
+    public function test_a_rerun_does_not_double_the_invoice_lines(): void
+    {
+        $id = $this->postJson('/api/classify', ['items' => [['name' => 'Su', 'unit' => 'litr', 'series' => 'MT', 'number' => '7']]], $this->auth)
+            ->assertStatus(202)->json('request_id');
+        $body = File::get($this->dir.'/api-'.$id.'.ndjson');
+        $this->ingest($id);
+        ImportBatch::where('key', $id)->update(['status' => ClassifyRequests::ACCEPTED]);
+        File::put($this->dir.'/api-'.$id.'.ndjson', $body);
+
+        $this->ingest($id);
+
+        $this->assertSame(1, EInvoice::where('import_batch', $id)->count());
     }
 
     public function test_status_goes_from_accepted_to_processing_to_done(): void

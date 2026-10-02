@@ -12,6 +12,11 @@ class ApiRequestName extends Model
 
     protected $guarded = ['id'];
 
+    protected function casts(): array
+    {
+        return ['units' => 'array'];
+    }
+
     /** @return BelongsTo<ClassificationItem, $this> */
     public function item(): BelongsTo
     {

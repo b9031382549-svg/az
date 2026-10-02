@@ -78,6 +78,12 @@ class InvoiceLinesImporter
         private readonly int $maxLines = self::MAX_LINES,
     ) {}
 
+    /** @return array<int, string> the e_invoices columns a line can fill */
+    public static function columns(): array
+    {
+        return array_keys(self::HEADERS);
+    }
+
     /** Is this header row the line-level export? It needs the item name AND an invoice column. */
     public static function matches(array $header): bool
     {
@@ -347,6 +353,26 @@ class InvoiceLinesImporter
 
             return $line;
         };
+    }
+
+    /**
+     * The same line as lineMapper() builds, from values keyed by e_invoices column — for lines
+     * that arrive as JSON (POST /api/classify) rather than as sheet rows.
+     *
+     * @param  array<string, mixed>  $fields
+     * @return array<string, mixed>
+     */
+    public function lineFromFields(array $fields, int $rowNo): array
+    {
+        $line = ['row_no' => $rowNo];
+        foreach (array_keys(self::HEADERS) as $column) {
+            $line[$column] = $this->normalize($column, $fields[$column] ?? null);
+        }
+        $line['invoice_key'] = ($line['series'] !== null && $line['number'] !== null)
+            ? $line['series'].'|'.$line['number']
+            : null;
+
+        return $line;
     }
 
     private function normalize(string $column, mixed $value): mixed

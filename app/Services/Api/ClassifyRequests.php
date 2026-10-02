@@ -6,10 +6,13 @@ use App\Jobs\FeedUploadClassificationJob;
 use App\Jobs\IngestApiRequestJob;
 use App\Models\ApiRequestName;
 use App\Models\ClassificationItem;
+use App\Models\EInvoice;
 use App\Models\ImportBatch;
 use App\Models\ItemTranslation;
 use App\Services\Classify\ClassificationQueue;
 use App\Services\Import\BackgroundInvoiceUploads;
+use App\Services\Import\InvoiceLinesImporter;
+use Generator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -31,10 +34,13 @@ class ClassifyRequests
     /** import_batches.status while the saved body waits for its worker. */
     public const ACCEPTED = 'accepted';
 
-    /** Distinct names per createItems() call. */
+    /** Distinct names per createItems() call, and invoice lines per writeLines() call. */
     private const CHUNK = 1000;
 
-    public function __construct(private readonly ClassificationQueue $queue) {}
+    public function __construct(
+        private readonly ClassificationQueue $queue,
+        private readonly InvoiceLinesImporter $lines,
+    ) {}
 
     /**
      * What is wrong with the items, field => message (the first few only) — empty when every
@@ -67,10 +73,18 @@ class ClassifyRequests
     {
         $key = (string) Str::uuid();
 
+        // Besides the name, a line may carry any Şablon field under its e_invoices column name.
+        $fields = array_values(array_diff(InvoiceLinesImporter::columns(), ['item_name']));
         File::ensureDirectoryExists($this->directory());
         $fh = fopen($this->path($key), 'wb');
         foreach ($items as $item) {
-            fwrite($fh, json_encode(['name' => (string) $item['name']], JSON_UNESCAPED_UNICODE)."\n");
+            $line = ['name' => (string) $item['name']];
+            foreach ($fields as $field) {
+                if (isset($item[$field]) && is_scalar($item[$field])) {
+                    $line[$field] = $item[$field];
+                }
+            }
+            fwrite($fh, json_encode($line, JSON_UNESCAPED_UNICODE)."\n");
         }
         fclose($fh);
 
@@ -108,23 +122,26 @@ class ClassifyRequests
                 return;
             }
 
-            $names = $this->distinctNames($key);
-            // A re-run starts the name list over; items are upserted, so nothing doubles.
+            [$names, $units] = $this->scan($key);
+            // A re-run starts over; items are upserted, so nothing doubles.
             ApiRequestName::where('batch', $key)->delete();
+            EInvoice::where('import_batch', $key)->delete();
             foreach (array_chunk($names, self::CHUNK) as $chunk) {
                 $created = $this->queue->createItems(array_map('trim', $chunk), $key);
                 ApiRequestName::insert(array_map(fn (string $name) => [
                     'batch' => $key,
                     'name' => $name,
                     'classification_item_id' => $created[ItemTranslation::hashFor($name)]->id,
+                    'units' => isset($units[$name]) ? json_encode(array_map('strval', array_keys($units[$name])), JSON_UNESCAPED_UNICODE) : null,
                 ], $chunk));
             }
+            $written = $this->writeInvoiceLines($key);
 
             $items = ClassificationItem::where('batch', $key)->count();
             $batch->update([
                 'status' => BackgroundInvoiceUploads::IMPORTED,
                 'item_count' => $items,
-                'meta' => ['names' => count($names)] + ($batch->meta ?? []),
+                'meta' => ['names' => count($names), 'invoice_lines' => $written['imported'], 'skipped_lines' => $written['skipped']] + ($batch->meta ?? []),
             ]);
             @unlink($this->path($key));
         } finally {
@@ -184,23 +201,78 @@ class ClassifyRequests
     }
 
     /**
-     * The distinct names of the saved body exactly as sent, in the order first seen.
+     * One pass over the saved body: the distinct names exactly as sent, in the order first
+     * seen, and per name the distinct units of measure its lines carried (trimmed, like the
+     * Şablon import keeps them).
      *
-     * @return array<int, string>
+     * @return array{0: array<int, string>, 1: array<array-key, array<array-key, true>>}
      */
-    private function distinctNames(string $key): array
+    private function scan(string $key): array
     {
-        $seen = [];
-        $fh = fopen($this->path($key), 'rb');
-        while (($raw = fgets($fh)) !== false) {
-            if (($raw = trim($raw)) !== '') {
-                $seen[(string) json_decode($raw, true, flags: JSON_THROW_ON_ERROR)['name']] = true;
+        $names = [];
+        $units = [];
+        foreach ($this->savedLines($key) as $line) {
+            $name = (string) $line['name'];
+            $names[$name] = true;
+            $unit = trim((string) ($line['unit'] ?? ''));
+            if ($unit !== '') {
+                $units[$name][mb_substr($unit, 0, 64)] = true;
             }
         }
-        fclose($fh);
 
         // A digits-only name becomes an int array key — cast back (lossless for canonical ints).
-        return array_map('strval', array_keys($seen));
+        return [array_map('strval', array_keys($names)), $units];
+    }
+
+    /**
+     * Lines that carry invoice fields go into e_invoices exactly like a Şablon upload's, so the
+     * Invoices page and the chat see them. An invoice another upload already loaded is skipped
+     * (its names are answered all the same); a name-only line has no invoice to keep.
+     *
+     * @return array{imported: int, skipped: int}
+     */
+    private function writeInvoiceLines(string $key): array
+    {
+        $written = ['imported' => 0, 'skipped' => 0];
+        $portion = [];
+        $flush = function () use (&$portion, &$written, $key): void {
+            if ($portion === []) {
+                return;
+            }
+            $result = $this->lines->writeLines($portion, $key, skipDuplicates: true);
+            $written['imported'] += $result['imported'];
+            $written['skipped'] += $result['skipped'];
+            $portion = [];
+        };
+
+        $row = 0;
+        foreach ($this->savedLines($key) as $line) {
+            $row++;
+            if (count($line) > 1) { // more than the name
+                $portion[] = $this->lines->lineFromFields(['item_name' => $line['name']] + $line, $row);
+                if (count($portion) >= self::CHUNK) {
+                    $flush();
+                }
+            }
+        }
+        $flush();
+
+        return $written;
+    }
+
+    /** @return Generator<int, array<string, mixed>> the saved body, line by line */
+    private function savedLines(string $key): Generator
+    {
+        $fh = fopen($this->path($key), 'rb');
+        try {
+            while (($raw = fgets($fh)) !== false) {
+                if (($raw = trim($raw)) !== '') {
+                    yield json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
+                }
+            }
+        } finally {
+            fclose($fh);
+        }
     }
 
     private function directory(): string
