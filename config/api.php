@@ -21,6 +21,29 @@ return [
         'max_items' => 100000,
         // Same cap as an invoice line's item name (InvoiceLinesImporter).
         'max_name_length' => 5000,
+        // GET /api/classify/{id} returns the answers a page at a time.
+        'page_size' => 1000,
+        'max_page_size' => 2000,
+    ],
+
+    // An answer's `similarity`: how often answers found the same way (DecisionSummary's
+    // method) are right — our measured precision at the 4-digit heading, NOT a vector
+    // cosine. Starting values, re-measure on held-out data after a model change:
+    // consensus = Direct's heading in the vector top-3 (93.5% held-out); web search 93–96%
+    // when grounded (its heading among the mechanisms' candidates and confident enough —
+    // classify.search_resolver.grounded_min_confidence), 34–58% when not; trash from the
+    // rules and the sorter ≈98%. ensemble, sorter (Direct + sorter agree on a service) and
+    // ai are not measured yet — cautious guesses.
+    'similarity' => [
+        'human' => 0.99,
+        'memory' => 0.97,
+        'trash' => 0.98,
+        'consensus' => 0.93,
+        'sorter' => 0.9,
+        'web_search' => 0.95,
+        'web_search_ungrounded' => 0.45,
+        'ensemble' => 0.7,
+        'ai' => 0.5,
     ],
 
 ];
