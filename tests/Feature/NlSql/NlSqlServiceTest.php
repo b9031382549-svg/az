@@ -44,8 +44,8 @@ class NlSqlServiceTest extends TestCase
             });
 
         $schema = Mockery::mock(SchemaContext::class);
-        $schema->shouldReceive('describe')->andReturn('Table e_invoices:');
-        $schema->shouldReceive('allowedTables')->andReturn(['e_invoices']);
+        $schema->shouldReceive('describe')->andReturn('Table invoice_lines:');
+        $schema->shouldReceive('allowedTables')->andReturn(['invoice_lines']);
 
         (new NlSqlService($llm, $schema))->ask($question, $history);
 
@@ -64,7 +64,7 @@ class NlSqlServiceTest extends TestCase
     {
         $history = [[
             'q' => 'top 5 suppliers by turnover',
-            'sql' => 'SELECT seller_name, sum(total_amount) AS turnover FROM e_invoices GROUP BY 1 ORDER BY 2 DESC LIMIT 5',
+            'sql' => 'SELECT supplier_name, sum(total_amount) AS turnover FROM invoice_lines GROUP BY 1 ORDER BY 2 DESC LIMIT 5',
             'answer' => null,
             'explanation' => 'The five suppliers with the highest turnover.',
         ]];
@@ -78,7 +78,36 @@ class NlSqlServiceTest extends TestCase
 
         // The assistant turn replays the prior SQL in the model's own JSON shape.
         $this->assertStringContainsString('"sql"', $messages[2]['content']);
-        $this->assertStringContainsString('SELECT seller_name', $messages[2]['content']);
+        $this->assertStringContainsString('SELECT supplier_name', $messages[2]['content']);
+    }
+
+    public function test_a_past_turn_whose_sql_todays_guard_rejects_is_not_replayed(): void
+    {
+        $history = [
+            // Asked before the chat moved to the invoice_lines view — replayed, the model
+            // copied FROM e_invoices into every new query.
+            ['q' => 'turnover by month', 'sql' => "SELECT date_trunc('month', invoice_date) AS month, sum(total_amount) AS turnover FROM e_invoices GROUP BY 1", 'answer' => null, 'explanation' => 'e'],
+            ['q' => 'top suppliers', 'sql' => 'SELECT supplier_name, sum(total_amount) AS turnover FROM invoice_lines GROUP BY 1 ORDER BY 2 DESC LIMIT 5', 'answer' => null, 'explanation' => 'e'],
+        ];
+
+        $messages = $this->messagesFor('which invoices are loaded?', $history);
+
+        $this->assertSame(['system', 'user', 'assistant', 'user'], array_column($messages, 'role'));
+        $this->assertSame('top suppliers', $messages[1]['content']);
+        // Nothing the model sees — a replayed turn or the rules — names the old table.
+        foreach ($messages as $m) {
+            $this->assertStringNotContainsString('e_invoices', $m['content']);
+        }
+    }
+
+    public function test_the_prompt_sends_what_is_loaded_questions_to_the_data(): void
+    {
+        // Without this rule "which invoices are loaded?" read as small talk: the model
+        // replied it had no information instead of querying the uploads.
+        $system = $this->messagesFor('which invoices are loaded?', [])[0]['content'];
+
+        $this->assertStringContainsString('WHAT is loaded', $system);
+        $this->assertStringContainsString('upload_name', $system);
     }
 
     public function test_turns_with_no_sql_and_no_answer_are_skipped(): void
