@@ -19,6 +19,8 @@
     </div>
   </div>
 
+  <livewire:api-tokens />
+
   <div class="card-flat p-5 mt-5 flex items-center justify-between">
     <div>
       <p class="font-medium">{{ __('Session') }}</p>

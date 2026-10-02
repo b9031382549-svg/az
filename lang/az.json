@@ -805,5 +805,20 @@
     "precision · recall :r": "dəqiqlik · tamlıq :r",
     "Expected ↓ · sorter said →": "Gözlənilən ↓ · çeşidləyici dedi →",
     "\"unsure\": its top class is trash, but below the threshold — in production it then acts on nothing. \"Rules + sorter\" is the whole trash step: a rule fires, or the sorter is sure.": "«əmin deyil»: ən yüksək sinif yararsızdır, lakin həddən aşağıdır — prod-da bu halda heç nə edilmir. «Qaydalar + çeşidləyici» bütün yararsız addımıdır: qayda işləyir və ya çeşidləyici əmindir.",
-    "(or TRASH / SERVICE / GOOD — to score the sorter)": "(və ya TRASH / SERVICE / GOOD — çeşidləyicini qiymətləndirmək üçün)"
+    "(or TRASH / SERVICE / GOOD — to score the sorter)": "(və ya TRASH / SERVICE / GOOD — çeşidləyicini qiymətləndirmək üçün)",
+    "API tokens": "API tokenləri",
+    "For outside systems that call the API. A token is shown once, right after it is created — copy it then.": "API-yə müraciət edən xarici sistemlər üçün. Token yalnız bir dəfə — yaradılan kimi göstərilir, onu elə o zaman kopyalayın.",
+    "Copy the token now — it will not be shown again.": "Tokeni indi kopyalayın — o, bir daha göstərilməyəcək.",
+    "Copy": "Kopyala",
+    "Copied": "Kopyalandı",
+    "Token name": "Tokenin adı",
+    "e.g. the client integration": "məs., müştəri inteqrasiyası",
+    "Allowed": "İcazələr",
+    "Create token": "Token yarat",
+    "No tokens yet.": "Hələ token yoxdur.",
+    "Last used": "Son istifadə",
+    "Never": "Heç vaxt",
+    "Delete this token? Systems using it lose access at once.": "Bu token silinsin? Ondan istifadə edən sistemlər girişi dərhal itirəcək.",
+    "Classify items": "Mövqeləri təsnif etmək",
+    "Read results and decision traces": "Nəticələri və qərar izlərini oxumaq"
 }

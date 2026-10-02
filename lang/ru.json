@@ -805,5 +805,20 @@
     "precision · recall :r": "точность · полнота :r",
     "Expected ↓ · sorter said →": "Ожидалось ↓ · сортировщик сказал →",
     "\"unsure\": its top class is trash, but below the threshold — in production it then acts on nothing. \"Rules + sorter\" is the whole trash step: a rule fires, or the sorter is sure.": "«не уверен»: верхний класс — мусор, но ниже порога; на проде тогда ничего не делается. «Правила + сортировщик» — весь шаг мусора: сработало правило или сортировщик уверен.",
-    "(or TRASH / SERVICE / GOOD — to score the sorter)": "(или TRASH / SERVICE / GOOD — для оценки сортировщика)"
+    "(or TRASH / SERVICE / GOOD — to score the sorter)": "(или TRASH / SERVICE / GOOD — для оценки сортировщика)",
+    "API tokens": "API-токены",
+    "For outside systems that call the API. A token is shown once, right after it is created — copy it then.": "Для внешних систем, которые обращаются к API. Токен показывается один раз — сразу после создания, тогда его и скопируйте.",
+    "Copy the token now — it will not be shown again.": "Скопируйте токен сейчас — больше он показан не будет.",
+    "Copy": "Копировать",
+    "Copied": "Скопировано",
+    "Token name": "Название токена",
+    "e.g. the client integration": "например, интеграция клиента",
+    "Allowed": "Права",
+    "Create token": "Создать токен",
+    "No tokens yet.": "Токенов пока нет.",
+    "Last used": "Последнее использование",
+    "Never": "Ни разу",
+    "Delete this token? Systems using it lose access at once.": "Удалить токен? Системы, которые им пользуются, сразу потеряют доступ.",
+    "Classify items": "Классифицировать позиции",
+    "Read results and decision traces": "Читать результаты и трассировки решений"
 }
