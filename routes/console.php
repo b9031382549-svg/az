@@ -4,6 +4,7 @@ use App\Jobs\GpuActionJob;
 use App\Jobs\TendInvoiceUploadsJob;
 use App\Models\FinetuneRun;
 use App\Models\GpuServer;
+use App\Services\Api\ClassifyRequests;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -24,6 +25,10 @@ Schedule::command('classify:reap-search-resolves')->everyFifteenMinutes()->witho
 // fail a read that died, remove previews nobody imported. Queued on the WORKER — the scheduler
 // container has no uploads volume.
 Schedule::job(new TendInvoiceUploadsJob)->everyFiveMinutes();
+
+// POST /api/classify: re-dispatch a request whose ingest job was lost. Its feeding chain is
+// already looked after by TendInvoiceUploadsJob (same import_batches status).
+Schedule::call(fn () => app(ClassifyRequests::class)->tend())->name('api-classify-tend')->everyFiveMinutes();
 
 // Drive the A/B GPU state machine unattended. The tick runs as a QUEUED job on the WORKER —
 // the nebius CLI + SSH key are mounted only there (the scheduler container has neither), so it

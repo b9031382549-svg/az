@@ -98,6 +98,14 @@ The app is auth-gated (default login user `admin`).
   classifies or embeds: a busy service must not read as down, since the host's monitoring
   may restart on a 500. A `gpu:` model is looked up with `touch: false` so probes never
   keep a GPU slot from idling down.
+  `POST /api/classify` (ability `classify`, ≤100k items, only `name` required) =
+  `ClassifyRequests`: one request = one `ImportBatch` (source `api`). The request only
+  validates, saves the body to the uploads volume and answers 202 + `request_id`;
+  `IngestApiRequestJob` (worker) creates the items and hands the batch to the shared
+  feeding chain (`BackgroundInvoiceUploads::feed`, status `imported`). `api_request_names`
+  keeps every distinct name exactly as sent (TrimStrings/ConvertEmptyStringsToNull are
+  skipped for this route) → its item. `GET /api/classify/{id}`: accepted → processing →
+  done (every item has `answered_at`) | failed.
 - **Method + reason:** `DecisionSummary` — per item, which step found the code
   (memory / trash / Direct+vector / ensemble / web search / human) and why, in the
   UI language (model quotes stay English). Feeds the review Excel export

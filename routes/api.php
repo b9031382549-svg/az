@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ClassifyController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ResultsApiController;
 use App\Http\Controllers\Api\VersionController;
@@ -14,6 +15,12 @@ use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/health-check', HealthController::class);
     Route::get('/version', VersionController::class);
+});
+
+// The classifier: send items, then ask for the request by its id.
+Route::middleware(['auth:sanctum', CheckAbilities::class.':'.ApiAbilities::CLASSIFY])->group(function () {
+    Route::post('/classify', [ClassifyController::class, 'store']);
+    Route::get('/classify/{id}', [ClassifyController::class, 'show'])->whereUuid('id');
 });
 
 // Read-only results + decision traces.
