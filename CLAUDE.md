@@ -98,16 +98,20 @@ The app is auth-gated (default login user `admin`).
   classifies or embeds: a busy service must not read as down, since the host's monitoring
   may restart on a 500. A `gpu:` model is looked up with `touch: false` so probes never
   keep a GPU slot from idling down.
-  `POST /api/classify` (ability `classify`, ≤100k items, only `name` required) =
+  `POST /api/classify` (ability `classify`, ≤100k items, only `name` required; any
+  Şablon field may ride along under its `e_invoices` column name) =
   `ClassifyRequests`: one request = one `ImportBatch` (source `api`). The request only
   validates, saves the body to the uploads volume and answers 202 + `request_id`;
   `IngestApiRequestJob` (worker) creates the items and hands the batch to the shared
   feeding chain (`BackgroundInvoiceUploads::feed`, status `imported`). `api_request_names`
   keeps every distinct name exactly as sent (TrimStrings/ConvertEmptyStringsToNull are
-  skipped for this route) → its item. `GET /api/classify/{id}`: accepted → processing →
+  skipped for this route) → its item + the units of measure its lines carried. Lines
+  with invoice fields go to `e_invoices` through `InvoiceLinesImporter::writeLines`
+  (`lineFromFields`), exactly like a Şablon upload — invoices another upload loaded are
+  skipped, their names still answered; name-only lines write no invoice row. `GET /api/classify/{id}`: accepted → processing →
   done (every item has `answered_at`) | failed, plus `classified_items` a page at a time
   (`offset`/`limit`) from `ClassifyAnswers`: per name `category` (final_code; null for
-  trash / no answer), `kind`, `status` (pending / answered / needs_review), `method` +
+  trash / no answer), `kind`, `units`, `status` (pending / answered / needs_review), `method` +
   `reason` (`DecisionSummary`) and `similarity` = measured precision of that method
   (`config/api.php` `similarity`; a web-search answer is split grounded / ungrounded by
   the same bar memory promotion uses). Not a vector cosine.

@@ -80,7 +80,7 @@ class ClassifyAnswersApiTest extends TestCase
 
         $a = $this->answers();
 
-        $this->assertSame(['name' => 'X7 NANO BLACK 4 SIQARET YENI', 'category' => '2402', 'similarity' => 0.93, 'kind' => 'good', 'status' => 'answered', 'method' => 'consensus'],
+        $this->assertSame(['name' => 'X7 NANO BLACK 4 SIQARET YENI', 'category' => '2402', 'similarity' => 0.93, 'kind' => 'good', 'units' => [], 'status' => 'answered', 'method' => 'consensus'],
             array_diff_key($a['X7 NANO BLACK 4 SIQARET YENI'], ['reason' => 1]));
         $this->assertSame('2402', $a['x7 nano black 4 siqaret yeni']['category']); // a second spelling of the same item
         $this->assertSame([0.97, 'memory'], [$a['Marlboro Gold']['similarity'], $a['Marlboro Gold']['method']]);
@@ -131,6 +131,18 @@ class ClassifyAnswersApiTest extends TestCase
             array_intersect_key($a['Still going'], array_flip(['category', 'similarity', 'kind', 'status', 'method'])));
         $this->assertSame(['category' => null, 'similarity' => null, 'kind' => null, 'status' => 'needs_review', 'method' => 'needs_human'],
             array_intersect_key($a['Undecided'], array_flip(['category', 'similarity', 'kind', 'status', 'method'])));
+    }
+
+    public function test_returns_the_units_the_lines_carried_for_each_name(): void
+    {
+        $item = $this->item(['Su 0.5L'], ['resolution' => 'pending', 'answered_at' => null]);
+        ApiRequestName::where('classification_item_id', $item->id)->update(['units' => json_encode(['ədəd', 'blok'])]);
+        $this->item(['Çörək'], ['resolution' => 'pending', 'answered_at' => null]);
+
+        $a = $this->answers();
+
+        $this->assertSame(['ədəd', 'blok'], $a['Su 0.5L']['units']);
+        $this->assertSame([], $a['Çörək']['units']);
     }
 
     public function test_pages_through_the_names_in_the_order_they_were_sent(): void

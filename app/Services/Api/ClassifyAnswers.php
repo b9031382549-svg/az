@@ -24,7 +24,7 @@ class ClassifyAnswers
 
     public function __construct(private readonly DecisionSummary $summary) {}
 
-    /** @return array<int, array{name: string, category: ?string, similarity: ?float, kind: ?string, status: string, method: string, reason: string}> */
+    /** @return array<int, array{name: string, category: ?string, similarity: ?float, kind: ?string, units: array<int, string>, status: string, method: string, reason: string}> */
     public function page(string $batch, int $offset, int $limit): array
     {
         $names = ApiRequestName::with('item')
@@ -40,6 +40,7 @@ class ClassifyAnswers
 
         return $names->map(fn (ApiRequestName $name) => $this->entry(
             $name->name,
+            $name->units ?? [],
             $name->item,
             $summaries[$name->item->id],
             isset($grounded[$name->item->id]),
@@ -47,10 +48,11 @@ class ClassifyAnswers
     }
 
     /**
+     * @param  array<int, string>  $units  the units of measure the caller's lines carried for this name
      * @param  array{method: string, reason: string}  $summary
-     * @return array{name: string, category: ?string, similarity: ?float, kind: ?string, status: string, method: string, reason: string}
+     * @return array{name: string, category: ?string, similarity: ?float, kind: ?string, units: array<int, string>, status: string, method: string, reason: string}
      */
-    private function entry(string $name, ClassificationItem $item, array $summary, bool $grounded): array
+    private function entry(string $name, array $units, ClassificationItem $item, array $summary, bool $grounded): array
     {
         $status = match (true) {
             $item->answered_at === null => 'pending',
@@ -65,6 +67,7 @@ class ClassifyAnswers
             'category' => $answered && ! $trash ? $item->final_code : null,
             'similarity' => $answered ? $this->similarity($summary['method'], $grounded) : null,
             'kind' => $answered ? ($trash ? 'trash' : $item->kind) : null,
+            'units' => $units,
             'status' => $status,
             'method' => $summary['method'],
             'reason' => $summary['reason'],
