@@ -90,14 +90,14 @@ services:
     restart: unless-stopped
 
   # Sorter — the same image, model files and settings as prod (docker-compose.prod.yml); the
-  # model dir is local (research-data/sorter-model/v1, not in git — the same sha256 as prod's
-  # /opt/az-assets/sorter). The host port is only for poking it from host tools.
+  # model dir is local (research-data/sorter-model/v2, not in git — the same sha256 as prod's
+  # /opt/az-assets/sorter-v2). The host port is only for poking it from host tools.
   sorter:
     build:
       context: ./docker/sorter
     image: az_sorter
     volumes:
-      - ${SORTER_MODEL_DIR:-./research-data/sorter-model/v1}:/models/sorter:ro
+      - ${SORTER_MODEL_DIR:-./research-data/sorter-model/v2}:/models/sorter:ro
     environment:
       SORTER_THREADS: "2"
     mem_limit: 1536m

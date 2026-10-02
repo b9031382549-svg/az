@@ -9,11 +9,11 @@ return [
     // GET /api/version — which classifier is answering. `version` is OUR release of the
     // classifier as a whole: bump it whenever a model, threshold, prompt or rule that
     // changes answers changes. `trained_at` is the date of the newest model WE trained that
-    // is in use (now sorter-v1, exported 2026-10-01). The third-party models are named in
+    // is in use (now sorter-v2, exported 2026-10-02). The third-party models are named in
     // the response's `components`, read live from the classify/services config.
     'model' => [
-        'version' => '1.0.0',
-        'trained_at' => '2026-10-01',
+        'version' => '1.1.0',
+        'trained_at' => '2026-10-02',
     ],
 
     // POST /api/classify — one request is one batch on the shared classification pipeline.
