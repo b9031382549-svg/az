@@ -209,7 +209,7 @@ Accept: application/json
 
 ```json
 {
-  "model_version": "1.1.0",
+  "model_version": "1.2.0",
   "trained_at": "2026-10-02",
   "api_version": "1.0",
   "components": {
@@ -217,7 +217,8 @@ Accept: application/json
     "embedder": "bge-ft-v3",
     "direct": "gpu:tuned",
     "direct_fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",
-    "web_search": "deepseek/deepseek-v4-flash:online"
+    "web_search": "deepseek/deepseek-v4-flash:online",
+    "web_search_trash_check": "deepseek/deepseek-v4-flash:online"
   }
 }
 ```
