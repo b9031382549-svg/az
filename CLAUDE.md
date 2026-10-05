@@ -58,7 +58,7 @@ The app is auth-gated (default login user `admin`).
   dataset's column B may name only the kind — TRASH / SERVICE / GOOD
   (`test_dataset_rows.expected_type`); such rows run the same pipeline and are scored in
   "Overall" by the kind they ended as, never in the code columns.
-- **Web-search trash check** (`classify.search_resolver.trash_check`, OFF by default): the conflict
+- **Web-search trash check** (`classify.search_resolver.trash_check`, ON since 2026-10-05): the conflict
   resolver's web-grounded understanding step (`SearchResolverService::understand`, needs
   `flow.ensemble_resolver`) may also answer "names no product" (person / company / institution /
   document / address …, prompt kept word for word as measured in

@@ -475,9 +475,10 @@ return [
         // line the sorter takes for a good is never trashed here.
         // Measured 2026-10-05 (research-data/trash-late-stage-2026-10-05): trash caught
         // 33 % → ~60 % of a held-out set, false trash 0 of 300 regular goods, 1 of ~100 hard
-        // ones (short brands, cut names). A Testing run can switch it on for itself alone.
+        // ones (short brands, cut names); confirmed on prod Testing run 29 (99 → 185 of 298
+        // trash rows, 0 goods trashed) and switched on. A Testing run has its own switch.
         'trash_check' => [
-            'enabled' => (bool) env('CLASSIFY_SEARCH_TRASH_CHECK', false),
+            'enabled' => (bool) env('CLASSIFY_SEARCH_TRASH_CHECK', true),
             'min_sorter_trash' => (float) env('CLASSIFY_SEARCH_TRASH_MIN_SORTER', 0.2),
         ],
     ],

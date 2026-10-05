@@ -109,7 +109,7 @@ class RunScorer
     }
 
     /**
-     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}, sorter: array{threshold: ?float, confusion: array<string, array<string, int>>, with_rules: array{tp:int, fp:int, fn:int}}, trash: array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int}}
+     * @return array{columns: array<string, array{ran:int, answered:int, correct:int}>, total:int, tokens:int, funnel: array{total:int, prevote: array<int, array{ran:int, answered:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, answered:int, correct:int, promoted:int}>}, sorter: array{threshold: ?float, confusion: array<string, array<string, int>>, with_rules: array{tp:int, fp:int, fn:int}}, trash: array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int, search: array{removed:int, right:int}}}
      */
     public function score(TestRun $run): array
     {

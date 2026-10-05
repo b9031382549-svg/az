@@ -12,7 +12,7 @@ return [
     // is in use (now sorter-v2, exported 2026-10-02). The third-party models are named in
     // the response's `components`, read live from the classify/services config.
     'model' => [
-        'version' => '1.1.0',
+        'version' => '1.2.0',
         'trained_at' => '2026-10-02',
     ],
 
