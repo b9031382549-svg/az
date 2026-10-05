@@ -34,5 +34,11 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <!-- No sorter service in tests; the sorter tests point it at an Http::fake URL. -->
         <env name="CLASSIFY_SORTER_URL" value=""/>
+        <!-- A local .env copied from prod turns the web-search resolver on; with the sync queue a
+             test that reaches a conflict would then make a real, paid web call. Tests that need
+             the resolver switch it on themselves. -->
+        <env name="CLASSIFY_SEARCH_RESOLVER_ENABLED" value="false"/>
+        <env name="CLASSIFY_FLOW_ENSEMBLE_RESOLVER" value="false"/>
+        <env name="CLASSIFY_SEARCH_TRASH_CHECK" value="false"/>
     </php>
 </phpunit>
