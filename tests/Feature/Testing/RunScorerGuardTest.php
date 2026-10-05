@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Testing;
 
+use App\Jobs\ClassifyTestSearchJob;
 use App\Models\ClassificationItem;
 use App\Models\TestDataset;
 use App\Models\TestDatasetRow;
 use App\Models\TestRun;
 use App\Services\Testing\RunScorer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -48,6 +50,21 @@ class RunScorerGuardTest extends TestCase
 
         $c->results()->create(['mechanism' => 'search', 'matched_code' => '0402', 'kind' => 'good', 'status' => 'auto_confirmed']);
         app(RunScorer::class)->finalize($run);
+        $this->assertSame('done', $run->fresh()->status);
+    }
+
+    public function test_a_search_job_that_failed_does_not_strand_the_run(): void
+    {
+        [$run, $rows] = $this->run2();
+        $this->item($run, $rows[0], 'agreed', '0901');
+        // The search was claimed, then its job was killed (timeout) before writing a row.
+        $c = $this->item($run, $rows[1], 'conflict');
+        $c->update(['search_resolved_at' => now()]);
+
+        (new ClassifyTestSearchJob($c->id))->failed(new RuntimeException('timed out'));   // sync queue: scores at once
+
+        $this->assertSame('no_match', $c->results()->where('mechanism', 'search')->value('status'));
+        $this->assertSame('conflict', $c->fresh()->resolution);   // a human decides, as for any unavailable search
         $this->assertSame('done', $run->fresh()->status);
     }
 
