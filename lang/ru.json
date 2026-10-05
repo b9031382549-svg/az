@@ -824,5 +824,18 @@
     "API docs": "Документация API",
     "How to call the API": "Как обращаться к API",
     "(or TRASH / SERVICE / GOOD — checked by the kind of line)": "(или TRASH / SERVICE / GOOD — проверяется вид строки)",
-    "Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows": "Фильтр мусора (правила :rules · сортировщик :sorter) — поймал :caught из :rows строк-мусора"
+    "Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows": "Фильтр мусора (правила :rules · сортировщик :sorter) — поймал :caught из :rows строк-мусора",
+    "The web search found that the line names no product, and the sorter agreed.": "Веб-поиск установил, что в строке не назван товар, и сортировщик с этим согласен.",
+    "a document reference": "ссылка на документ",
+    "a date or period": "дата или период",
+    "a person's name": "имя человека",
+    "a company": "компания",
+    "an institution": "учреждение",
+    "an address or place": "адрес или место",
+    "a vehicle plate": "госномер",
+    "a placeholder word": "слово-заглушка",
+    "meaningless characters": "бессмысленный набор символов",
+    "no code was forced on it": "код не навязан",
+    "Web search: no product named": "Веб-поиск: товар не назван",
+    "Web search: no product named — caught :caught of :rows trash rows": "Веб-поиск: товар не назван — поймал :caught из :rows строк-мусора"
 }

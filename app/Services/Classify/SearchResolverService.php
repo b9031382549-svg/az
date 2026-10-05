@@ -6,6 +6,7 @@ use App\Models\CatalogCode;
 use App\Models\ClassificationItem;
 use App\Models\ClassificationResult;
 use App\Models\RubricatorNode;
+use App\Models\TestRun;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
 use Throwable;
@@ -21,11 +22,38 @@ use Throwable;
  */
 class SearchResolverService
 {
+    /**
+     * The understanding prompt with the "names no product" answer (search_resolver.trash_check).
+     * Kept word for word as measured on 2026-10-05 (research-data/trash-late-stage-2026-10-05,
+     * variant_v2.php): "person" and "company" are narrow on purpose — a glued, misspelled or
+     * bare brand of goods read as a person or a firm was the measured failure.
+     */
+    private const UNDERSTAND_WITH_TRASH_PROMPT = 'You identify ONE line item from an AZERBAIJANI e-invoice (customs import context). Nearly every line names an ordinary physical tradable GOOD (sometimes a service) — read it that way first. The text is a terse invoice line: transliterated Azerbaijani or Russian, with abbreviations, units and typos.
+RULES:
+- Read tokens as Azerbaijani/Russian COMMERCIAL/COMMODITY words; transliterate FIRST. Examples: "kislord"=oxygen gas; "tut"=mulberry; "med"/"bal"=honey; "celik dubel"=steel wall plug/anchor; "zewa"=paper-hygiene brand (toilet paper/napkins); "kondes"=air conditioner.
+- If a token collides with a brand, game, company, drug or media title, PREFER the physical-goods reading.
+- When you look it up, treat it as an Azerbaijani import commodity (mentally append "Azerbaijan idxal gomruk"); do NOT accept a foreign game/app/company result.
+- Use units and packaging as evidence: kg/l/m/qr/ed/rulon mean a physical good; note material.
+- A brand, model or product name you cannot identify still names a product: keep "names_product": true and prefix identity with "uncertain:". The same holds for a glued or misspelled brand ("kentnano" = Kent Nano cigarettes, "marlbrogold" = Marlboro Gold, "nescafegold" = Nescafe Gold) and for a bare brand of goods — cigarettes, drinks, food, cosmetics, perfume, clothing or a fashion house (e.g. "Calvin Klein", "Mavi"): these name products, NOT companies or people.
+- ONLY when the line names NO good and NO service at all, set "names_product": false and give "none_reason":
+  document — only a document / contract / invoice / receipt / letter reference or number;
+  period — only a date or period;
+  person — a human\'s FULL name: a first name with a surname, or initials with a surname ("Rəşid Sadıqov", "A.Məmmədov"). A single word is never "person";
+  company — an organisation recognisable as one: a legal form (MMC, QSC, ASC, LLC, LTD, İB, ООО, Inc, Group, Holding) or an organisation word (bank, sığorta, şirkət, firma, inşaat, development) — never a bare brand of goods;
+  institution — a school, kindergarten, hospital, museum, hotel, mall, market, pharmacy, restaurant, ministry, fund, office or another named place of an organisation;
+  address — an address, street, district, village or other place name;
+  plate — a vehicle registration plate;
+  placeholder — a lone generic or filler word that names no product ("Test", "наименование", "məhsul", "müvafiq");
+  garbage — no readable word at all, only random keys or symbols ("asdfgh", "----", "x1x1"). An unfamiliar or glued word is NOT garbage: split it into words ("kentnano" → "kent nano") and read it as a brand; if it still means nothing to you, it is an unidentified product (names_product true, identity "uncertain: ...").
+Output strict JSON only: {"names_product":true,"none_reason":null,"identity":"<head-noun/type + material/function>","az_reading":"<a second, differently-phrased one-line reading>","synonyms":["<4-6 alt-names / analogous goods / category terms an HS catalog would use>"]}';
+
     public function __construct(
         private readonly OpenRouterClient $llm,
         private readonly SearchCache $cache,
         private readonly AnswerCacheService $memory,
         private readonly CatalogRetriever $retriever,
+        private readonly TrashFilter $trash,
+        private readonly Sorter $sorter,
     ) {}
 
     /**
@@ -47,7 +75,14 @@ class SearchResolverService
         // vote is a self-consistency abstain that falls through to the web resolver. In shadow
         // mode the verdict is recorded but the web answer is still served.
         if (config('classify.flow.ensemble_resolver')) {
-            $ens = $this->ensemble($item, $text);
+            $u = $this->understand($text, $this->trashCheckEnabled($item));
+            // The understanding may find that the line names no product at all (a person, a
+            // firm, a document reference…): with the sorter's backing it becomes trash here,
+            // no code is forced on it and no further paid call is made.
+            if ($u !== null && ! $u['names_product'] && $this->settleNoProduct($item, $u)) {
+                return;
+            }
+            $ens = $u !== null && $u['identity'] !== '' ? $this->ensemble($item, $text, $u) : null;
             if ($ens !== null) {
                 $this->traceEnsemble($item, $ens);
                 $agreed = in_array($ens['agreement'], ['unanimous', 'majority'], true) && $ens['answer'] !== null;
@@ -123,19 +158,58 @@ class SearchResolverService
     }
 
     /**
+     * Is the "names no product" check on for this item? A live item follows the config; a
+     * Testing run decides for itself (its 'trash_check' switch), so the check can be
+     * measured on a run before production turns it on.
+     */
+    private function trashCheckEnabled(ClassificationItem $item): bool
+    {
+        $default = (bool) config('classify.search_resolver.trash_check.enabled', false);
+        if ($item->test_run_id === null) {
+            return $default;
+        }
+
+        return (bool) (TestRun::find($item->test_run_id)?->mechanisms['trash_check'] ?? $default);
+    }
+
+    /**
+     * The understanding says the line names no product: settle it as trash (rule 'search'),
+     * but only when the sorter leans that way too — the LLM alone took glued or bare brands
+     * for people and firms. TrashFilter::settle() keeps the usual guards: never an item a
+     * reviewer took out of trash. Returns true when settled.
+     *
+     * @param  array{identity: string, none_reason: ?string}  $u
+     */
+    private function settleNoProduct(ClassificationItem $item, array $u): bool
+    {
+        $p = data_get($this->sorter->verdict($item)?->trace, 'probs.trash');
+        if ($p === null || (float) $p < (float) config('classify.search_resolver.trash_check.min_sorter_trash', 0.2)) {
+            return false;
+        }
+
+        return $this->trash->settle($item, 'search', [
+            'reason' => $u['none_reason'],
+            'p' => round((float) $p, 6),
+            'understanding' => $u['identity'] !== '' ? $u['identity'] : null,
+            'model' => (string) config('classify.flow.ensemble.understand_model', 'deepseek/deepseek-v4-flash:online'),
+        ]);
+    }
+
+    /**
      * Flow v2 — the self-consistency ensemble. Runs the grounded chooser over three
      * paraphrases (raw text / brief identity / brief az_reading) against the vector
      * mechanism's shortlist and votes. Returns the verdict, or null when it cannot run
      * (no vector shortlist, or fewer than two distinct groundings for a meaningful vote).
      *
+     * @param  array{identity: string, az_reading: string, synonyms: array<int, string>, names_product: bool, none_reason: ?string}|null  $u  the caller's understanding, if any
      * @return array{answer: ?string, kind: string, agreement: string, picks: array<int, string>, groundings: array<int, string>, shortlist: array<int, string>}|null
      */
-    private function ensemble(ClassificationItem $item, string $text): ?array
+    private function ensemble(ClassificationItem $item, string $text, ?array $u = null): ?array
     {
         // 1) WEB-grounded understanding — the search-free upstream brief hallucinates terse
         //    AZ tokens ("çelik dübel" → "steel needle"), so the resolver does its own
         //    web-backed identification here. This is the crux; without it the rest is noise.
-        $u = $this->understand($text);
+        $u ??= $this->understand($text);
         if ($u === null) {
             return null; // could not understand → leave it to the web resolver below
         }
@@ -209,11 +283,15 @@ class SearchResolverService
      * `:online` model with an AZ-customs prompt (transliterate first, prefer the physical
      * good over any brand collision) — the understanding that made the offline gains real.
      *
-     * @return array{identity: string, az_reading: string, synonyms: array<int, string>}|null
+     * With $trashCheck the prompt may also answer "this line names no product"
+     * (names_product false + none_reason, identity may then be empty); without it the
+     * prompt is the one that assumes every line is a good, and names_product is always true.
+     *
+     * @return array{identity: string, az_reading: string, synonyms: array<int, string>, names_product: bool, none_reason: ?string}|null
      */
-    private function understand(string $text): ?array
+    private function understand(string $text, bool $trashCheck = false): ?array
     {
-        $sys = 'You identify ONE line item from an AZERBAIJANI CUSTOMS IMPORT declaration. Every item is an ordinary physical tradable GOOD imported into Azerbaijan by a commercial company — NEVER a video game, movie, book, song, mobile app, software, company or web service. The text is a terse invoice line: transliterated Azerbaijani or Russian, with abbreviations, units and typos.
+        $sys = $trashCheck ? self::UNDERSTAND_WITH_TRASH_PROMPT : 'You identify ONE line item from an AZERBAIJANI CUSTOMS IMPORT declaration. Every item is an ordinary physical tradable GOOD imported into Azerbaijan by a commercial company — NEVER a video game, movie, book, song, mobile app, software, company or web service. The text is a terse invoice line: transliterated Azerbaijani or Russian, with abbreviations, units and typos.
 RULES:
 - Read tokens as Azerbaijani/Russian COMMERCIAL/COMMODITY words; transliterate FIRST. Examples: "kislord"=oxygen gas; "tut"=mulberry; "med"/"bal"=honey; "celik dubel"=steel wall plug/anchor; "zewa"=paper-hygiene brand (toilet paper/napkins); "kondes"=air conditioner.
 - If a token collides with a brand, game, company, drug or media title, PREFER the physical-goods reading.
@@ -235,7 +313,9 @@ Output strict JSON only: {"identity":"<head-noun/type + material/function>","az_
                 return null;
             }
             $identity = trim((string) ($j['identity'] ?? ''));
-            if ($identity === '') {
+            // Only the trash-check prompt can say a line names no product.
+            $namesProduct = ! $trashCheck || ! in_array($j['names_product'] ?? true, [false, 'false', 0], true);
+            if ($identity === '' && $namesProduct) {
                 return null;
             }
             $syns = [];
@@ -250,6 +330,8 @@ Output strict JSON only: {"identity":"<head-noun/type + material/function>","az_
                 'identity' => $identity,
                 'az_reading' => trim((string) ($j['az_reading'] ?? '')),
                 'synonyms' => array_slice($syns, 0, 6),
+                'names_product' => $namesProduct,
+                'none_reason' => $namesProduct ? null : TrashFilter::noneReason($j['none_reason'] ?? null),
             ];
         } catch (Throwable) {
             return null;

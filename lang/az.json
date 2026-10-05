@@ -824,5 +824,18 @@
     "API docs": "API sənədləri",
     "How to call the API": "API-yə necə müraciət etmək",
     "(or TRASH / SERVICE / GOOD — checked by the kind of line)": "(və ya TRASH / SERVICE / GOOD — sətrin növü yoxlanılır)",
-    "Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows": "Zibil filtri (qaydalar :rules · çeşidləyici :sorter) — :rows zibil sətrindən :caught tutuldu"
+    "Trash filter (rules :rules · sorter :sorter) — caught :caught of :rows trash rows": "Zibil filtri (qaydalar :rules · çeşidləyici :sorter) — :rows zibil sətrindən :caught tutuldu",
+    "The web search found that the line names no product, and the sorter agreed.": "Vebdə axtarış sətirdə məhsul adı olmadığını müəyyən etdi, çeşidləyici də bununla razıdır.",
+    "a document reference": "sənədə istinad",
+    "a date or period": "tarix və ya dövr",
+    "a person's name": "şəxsin adı",
+    "a company": "şirkət",
+    "an institution": "müəssisə",
+    "an address or place": "ünvan və ya yer",
+    "a vehicle plate": "dövlət nömrə nişanı",
+    "a placeholder word": "yer tutan söz",
+    "meaningless characters": "mənasız simvollar",
+    "no code was forced on it": "ona kod məcburi verilmədi",
+    "Web search: no product named": "Vebdə axtarış: məhsul adı yoxdur",
+    "Web search: no product named — caught :caught of :rows trash rows": "Vebdə axtarış: məhsul adı yoxdur — :rows zibil sətrindən :caught tutuldu"
 }

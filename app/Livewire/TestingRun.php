@@ -80,7 +80,7 @@ class TestingRun extends Component
      *
      * @param  array{total:int, prevote: array<int, array{ran:int, correct:int, promoted:int}>, search_by_origin: array<int, array{ran:int, correct:int, promoted:int}>}|null  $funnel
      * @param  array<string, array{ran:int, correct:int}>  $accuracy
-     * @param  array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int}|null  $trash
+     * @param  array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int, search?: array{removed:int, right:int}}|null  $trash
      * @return array<int, array{step:string, label:string, bucket: array{ran:int, correct:int}|null, promoted:?int}>|null
      */
     private function funnelRows(?array $funnel, array $accuracy, ?array $trash = null): ?array
@@ -121,6 +121,19 @@ class TestingRun extends Component
         }
 
         $rows[] = ['step' => '3', 'label' => __('Web search'), 'bucket' => $accuracy['search'] ?? null, 'promoted' => null];
+        // What the web search found to name no product (search_resolver.trash_check) — runs
+        // scored before that check have no 'search' block.
+        $bySearch = $trash['search'] ?? null;
+        if ($bySearch !== null && (int) $bySearch['removed'] > 0) {
+            $rows[] = [
+                'step' => '3',
+                'label' => __('Web search: no product named — caught :caught of :rows trash rows', [
+                    'caught' => $bySearch['right'], 'rows' => $trash['trash_rows'],
+                ]),
+                'bucket' => ['ran' => $bySearch['removed'], 'answered' => $bySearch['removed'], 'correct' => $bySearch['right']],
+                'promoted' => null,
+            ];
+        }
         foreach ($funnel['search_by_origin'] as $n => $bucket) {
             if ((int) $bucket['ran'] === 0) {
                 // A run scored before the unanimity change: bare-majority conflicts never

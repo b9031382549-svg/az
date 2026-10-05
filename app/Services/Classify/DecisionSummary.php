@@ -105,9 +105,14 @@ final class DecisionSummary
     {
         $rule = (string) data_get($row?->trace, 'rule', '');
         $p = data_get($row?->trace, 'p');
+        $reason = data_get($row?->trace, 'reason');
 
         // One decimal: the sorter settles only above ~99.7 %, where a rounded "100 %" would overstate it.
-        return $this->line('trash', TrashFilter::explain($rule).($rule === 'sorter' && $p !== null ? ' ('.number_format(100 * (float) $p, 1).'%)' : ''));
+        return $this->line('trash', TrashFilter::explain($rule).match (true) {
+            $rule === 'sorter' && $p !== null => ' ('.number_format(100 * (float) $p, 1).'%)',
+            $rule === 'search' && $reason !== null => ' ('.TrashFilter::reasonLabel((string) $reason).')',
+            default => '',
+        });
     }
 
     /** @return array{method: string, reason: string} */

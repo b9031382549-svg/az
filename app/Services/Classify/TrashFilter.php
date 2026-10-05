@@ -35,6 +35,12 @@ final class TrashFilter
     public const ABSOLUTE = ['no_letters'];
 
     /**
+     * Why the web-search step (rule 'search') found that a line names no product — the
+     * vocabulary of its understanding prompt (SearchResolverService), kept in the trace.
+     */
+    public const NONE_REASONS = ['document', 'period', 'person', 'company', 'institution', 'address', 'plate', 'placeholder', 'garbage'];
+
+    /**
      * Paperwork stems (folded) that name a document, not a product — each may carry any run
      * of the suffixes below ("müqaviləyə" = muqavile+ye, "tarixinədək" = tarix+ine+dek).
      */
@@ -99,6 +105,7 @@ final class TrashFilter
             'person' => __('Only a person\'s name — no product is named.', [], $locale),
             'paperwork' => __('Only a document reference, date or period — no product is named.', [], $locale),
             'sorter' => __('The sorter, a model trained on lines labelled by people, judged that no product is named.', [], $locale),
+            'search' => __('The web search found that the line names no product, and the sorter agreed.', [], $locale),
             default => __('Not a product.', [], $locale),
         };
     }
@@ -106,6 +113,32 @@ final class TrashFilter
     public static function isAbsolute(string $rule): bool
     {
         return in_array($rule, self::ABSOLUTE, true);
+    }
+
+    /** A model's none_reason in the NONE_REASONS vocabulary, or null when it is not one of them. */
+    public static function noneReason(mixed $raw): ?string
+    {
+        $reason = strtolower(trim((string) $raw));
+        $reason = $reason === 'place' ? 'address' : $reason;
+
+        return in_array($reason, self::NONE_REASONS, true) ? $reason : null;
+    }
+
+    /** What the line is instead of a product (a NONE_REASONS key) — in $locale (null = the current one). */
+    public static function reasonLabel(string $reason, ?string $locale = null): string
+    {
+        return match ($reason) {
+            'document' => __('a document reference', [], $locale),
+            'period' => __('a date or period', [], $locale),
+            'person' => __('a person\'s name', [], $locale),
+            'company' => __('a company', [], $locale),
+            'institution' => __('an institution', [], $locale),
+            'address' => __('an address or place', [], $locale),
+            'plate' => __('a vehicle plate', [], $locale),
+            'placeholder' => __('a placeholder word', [], $locale),
+            'garbage' => __('meaningless characters', [], $locale),
+            default => $reason,
+        };
     }
 
     /** Which rule marks $text as trash, or null when it may name a product. */
@@ -162,15 +195,17 @@ final class TrashFilter
     }
 
     /**
-     * Resolve an item as trash by $rule — a rule above, or 'sorter' (the Sorter step, with
-     * its probability in $trace). The same guards for both: never an item already decided,
-     * never one a human took out of trash. Returns true when trashed.
+     * Resolve an item as trash by $rule — a rule above, 'sorter' (the Sorter step, with its
+     * probability in $trace) or 'search' (the web-search step, on an item the mechanisms
+     * left in conflict). The same guards for all: never an item already decided, never one
+     * a human took out of trash. Returns true when trashed.
      *
      * @param  array<string, mixed>  $trace
      */
     public function settle(ClassificationItem $item, string $rule, array $trace = []): bool
     {
-        if (! in_array($item->resolution, ['pending', 'trash'], true)) {
+        $open = $rule === 'search' ? ['pending', 'trash', 'conflict'] : ['pending', 'trash'];
+        if (! in_array($item->resolution, $open, true)) {
             return false;
         }
         if ($item->results()->where('mechanism', 'trash')->where('status', 'overridden')->exists()) {

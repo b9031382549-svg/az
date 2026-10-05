@@ -310,6 +310,31 @@ class ClassificationDecisionTest extends TestCase
         Queue::assertPushed(ClassifyMechanismJob::class, 2);
     }
 
+    public function test_a_line_the_web_search_set_aside_shows_it_after_the_ai(): void
+    {
+        $item = ClassificationItem::create([
+            'batch' => 'b', 'source_text' => 'Abbaslı Nigar Qurban qızı',
+            'source_hash' => bin2hex(random_bytes(32)), 'resolution' => 'trash', 'answered_at' => now(),
+        ]);
+        $item->results()->create(['mechanism' => 'direct', 'status' => 'no_match', 'explanation' => 'a person']);
+        $item->results()->create(['mechanism' => 'trash', 'status' => 'trash', 'trace' => ['rule' => 'search', 'reason' => 'person', 'p' => 0.9956]]);
+
+        $html = Livewire::actingAs(User::factory()->create())
+            ->test(ClassificationDecision::class, ['item' => $item])
+            ->assertOk()
+            ->assertSee('The web search found that the line names no product, and the sorter agreed.')
+            ->assertSee("a person's name")
+            ->assertSee('diverged → the resolver')
+            ->assertSee('no code was forced on it')
+            ->assertSee('Not trash — classify')
+            ->assertDontSee('not classified — no AI was run')
+            ->html();
+
+        // Shown after the AI stage, where it happened — not as the pre-AI trash filter.
+        $this->assertGreaterThan(strpos($html, 'AI search'), strpos($html, 'no code was forced on it'));
+        $this->assertStringNotContainsString('passed to the trash filter', $html);
+    }
+
     public function test_an_only_digits_item_offers_no_override(): void
     {
         $item = ClassificationItem::create([

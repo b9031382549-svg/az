@@ -129,7 +129,10 @@ class RunScorer
         $sorter = ['threshold' => null, 'confusion' => [], 'with_rules' => ['tp' => 0, 'fp' => 0, 'fn' => 0]];
         // What the trash step (rules + sorter) took out before the AI, and how many of those
         // rows really are trash; `trash_rows` = every row whose expected kind is trash.
-        $trashStep = ['removed' => 0, 'right' => 0, 'by_rules' => 0, 'by_sorter' => 0, 'trash_rows' => 0];
+        // 'search' = the same for what the web search later found to name no product
+        // (search_resolver.trash_check).
+        $trashStep = ['removed' => 0, 'right' => 0, 'by_rules' => 0, 'by_sorter' => 0, 'trash_rows' => 0,
+            'search' => ['removed' => 0, 'right' => 0]];
 
         // The funnel: for every non-cache-hit row, how many of the authoritative
         // mechanisms landed on the same heading (1..$authCount, "prevote"), and whether
@@ -264,7 +267,7 @@ class RunScorer
     }
 
     /**
-     * @param  array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int}  $step
+     * @param  array{removed:int, right:int, by_rules:int, by_sorter:int, trash_rows:int, search: array{removed:int, right:int}}  $step
      */
     private function scoreTrashStep(array &$step, TestDatasetRow $row, ClassificationItem $item): void
     {
@@ -273,9 +276,15 @@ class RunScorer
         if ($item->resolution !== 'trash') {
             return;
         }
+        $rule = data_get($item->results->firstWhere('mechanism', 'trash')?->trace, 'rule');
+        if ($rule === 'search') {
+            $step['search']['removed']++;
+            $step['search']['right'] += $isTrash ? 1 : 0;
+
+            return;
+        }
         $step['removed']++;
         $step['right'] += $isTrash ? 1 : 0;
-        $rule = data_get($item->results->firstWhere('mechanism', 'trash')?->trace, 'rule');
         $step[$rule === 'sorter' ? 'by_sorter' : 'by_rules']++;
     }
 

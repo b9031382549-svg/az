@@ -166,7 +166,7 @@ class SorterTestingTest extends TestCase
         $score = app(RunScorer::class)->score($run);
 
         $this->assertSame(['ran' => 7, 'answered' => 5, 'correct' => 4], $score['columns']['overall']);   // a coded row taken out has no code; for a kind-only row "trash" is an answer
-        $this->assertSame(['removed' => 3, 'right' => 1, 'by_rules' => 1, 'by_sorter' => 2, 'trash_rows' => 2], $score['trash']);
+        $this->assertSame(['removed' => 3, 'right' => 1, 'by_rules' => 1, 'by_sorter' => 2, 'trash_rows' => 2, 'search' => ['removed' => 0, 'right' => 0]], $score['trash']);
         $this->assertSame(1, $score['columns']['vector']['ran']);   // only coded rows the mechanisms saw
     }
 

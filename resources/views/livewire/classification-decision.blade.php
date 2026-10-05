@@ -177,7 +177,7 @@
             <p><span class="font-mono">{{ $cache->matched_code }}</span> <span class="text-muted">{{ \Illuminate\Support\Str::limit($anyName($cache->matched_code), 60) }}</span></p>
             <p class="text-ledger text-xs mt-0.5">{{ __('found — answered from the cache, no AI needed') }}</p>
           @else
-            <p class="text-muted">{{ $trashCheck ? __('not found → passed to the trash filter') : __('not found → passed to the AI') }}</p>
+            <p class="text-muted">{{ $trashCheck && $trashRule !== 'search' ? __('not found → passed to the trash filter') : __('not found → passed to the AI') }}</p>
           @endif
         </div>
       </div>
@@ -193,41 +193,12 @@
       @endif
     </li>
 
-    {{-- ② TRASH FILTER — only when the name tripped a rule: a line that names no product (only
-         paperwork, a date, a number, a plate, a company) is settled here with no AI. A reviewer
-         who sees a product in it sends it to the AI; the row then reads "overridden". --}}
-    @if($trashCheck)
-      @php $overridden = $trashCheck->status === 'overridden'; @endphp
-      <li class="card p-5">
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <div class="flex items-center gap-2.5">
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-line/40 text-xs font-semibold">{{ ++$stage }}</span>
-            <span class="font-medium">{{ __('Trash filter') }}</span>
-            <span class="text-faint text-xs">{{ __('does the name name a product at all?') }}</span>
-          </div>
-          <span class="hint-head px-2 py-0.5 rounded-md text-xs font-medium {{ $pill($overridden ? 'warn' : 'muted') }}" data-hint="{{ $overridden ? 'trash:overridden' : 'trash' }}">{{ $overridden ? __('overridden by a reviewer') : __('trash') }}</span>
-        </div>
-        <div class="flex flex-col sm:flex-row gap-2 text-sm">
-          <div class="flex-1 rounded-lg border hair p-3 min-w-0">
-            <p class="kicker mb-1">{{ __('Input') }}</p>
-            <p class="break-words">{{ $item->source_text }}</p>
-          </div>
-          <div class="flex items-center justify-center text-faint">→</div>
-          <div class="flex-1 rounded-lg border hair p-3 min-w-0">
-            <p class="kicker mb-1">{{ __('Output') }}</p>
-            <p>{{ \App\Services\Classify\TrashFilter::explain($trashRule) }}@if($trashRule === 'sorter' && data_get($trashCheck->trace, 'p') !== null) <span class="text-muted">({{ __('trash') }} {{ number_format((float) data_get($trashCheck->trace, 'p') * 100, 1) }}%)</span>@endif</p>
-            <p class="text-xs mt-0.5 {{ $overridden ? 'text-amber' : 'text-muted' }}">{{ $overridden ? __('a reviewer said it is a product → sent to the AI') : __('not classified — no AI was run') }}</p>
-          </div>
-        </div>
-        @if(! $overridden && $item->resolution === 'trash' && \App\Services\Classify\TrashFilter::isAbsolute($trashRule))
-          <p class="mt-3 text-xs text-muted">{{ __('A name of only digits is always trash — it is never sent to the AI.') }}</p>
-        @elseif(! $overridden && $item->resolution === 'trash')
-          <div class="mt-3 flex items-center justify-between gap-3 flex-wrap">
-            <p class="text-xs text-muted">{{ __('If this line does name a product or a service, send it to the AI.') }}</p>
-            <button wire:click="classifyAnyway" wire:confirm="{{ __('Not trash — classify this item with the AI?') }}" class="btn btn-ghost btn-sm">↻ {{ __('Not trash — classify') }}</button>
-          </div>
-        @endif
-      </li>
+    {{-- ② TRASH FILTER — only when the name tripped a rule or the sorter was sure: a line that
+         names no product (only paperwork, a date, a number, a plate, a company) is settled here
+         with no AI. A reviewer who sees a product in it sends it to the AI; the row then reads
+         "overridden". A trash verdict of the web search is shown after the AI, where it happened. --}}
+    @if($trashCheck && $trashRule !== 'search')
+      @include('livewire.partials.decision-trash', ['stageNo' => ++$stage])
     @endif
 
     {{-- SORTER — a small model trained on lines people labelled good / service / trash. It reads
@@ -279,7 +250,7 @@
               <p class="text-ledger text-xs mt-0.5">{{ $consensus['by_sorter'] ? __('direct said service, confirmed by the sorter') : __('direct, in the vector top-:k', ['k' => config('classify.vector.membership_k', 3)]) }}</p>
             @else
               <p class="text-muted">{{ __('the mechanisms did not agree on a heading') }}</p>
-              <p class="text-amber text-xs mt-0.5">{{ ($resolverRan || $resolverSettled) ? __('diverged → the resolver') : ($item->isResolving() ? __('diverged → the resolver (in progress)') : __('diverged → a human')) }}</p>
+              <p class="text-amber text-xs mt-0.5">{{ ($resolverRan || $resolverSettled || $trashRule === 'search') ? __('diverged → the resolver') : ($item->isResolving() ? __('diverged → the resolver (in progress)') : __('diverged → a human')) }}</p>
             @endif
           </div>
         </div>
@@ -357,6 +328,12 @@
           </div>
         </details>
       </li>
+    @endif
+
+    {{-- WEB SEARCH: NO PRODUCT — the resolver's understanding found that the line names no
+         product and the sorter agreed: settled as trash after the AI, no code forced on it. --}}
+    @if($trashCheck && $trashRule === 'search')
+      @include('livewire.partials.decision-trash', ['stageNo' => ++$stage])
     @endif
 
     {{-- ④ ENSEMBLE — the first resolver step after a divergence: a self-consistency vote

@@ -466,5 +466,19 @@ return [
         // and test runs. Only confident, catalog-valid answers are cached; a prompt_version
         // bump or `search-cache:clear` invalidates. See App\Services\Classify\SearchCache.
         'cache_enabled' => (bool) env('CLASSIFY_SEARCH_CACHE_ENABLED', true),
+
+        // The resolver's web-grounded "what is it" step (flow.ensemble_resolver) may also
+        // answer "this line names no product" — a person, a firm, an institution, a document
+        // reference, an address… The line then becomes trash (rule 'search', the same "not
+        // trash" override as the rules), no code is forced on it and no further paid call is
+        // made. Only when the sorter leans that way too: p(trash) >= min_sorter_trash, so a
+        // line the sorter takes for a good is never trashed here.
+        // Measured 2026-10-05 (research-data/trash-late-stage-2026-10-05): trash caught
+        // 33 % → ~60 % of a held-out set, false trash 0 of 300 regular goods, 1 of ~100 hard
+        // ones (short brands, cut names). A Testing run can switch it on for itself alone.
+        'trash_check' => [
+            'enabled' => (bool) env('CLASSIFY_SEARCH_TRASH_CHECK', false),
+            'min_sorter_trash' => (float) env('CLASSIFY_SEARCH_TRASH_MIN_SORTER', 0.2),
+        ],
     ],
 ];

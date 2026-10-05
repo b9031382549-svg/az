@@ -15,7 +15,7 @@
     @error('description') <p class="text-sm text-stamp mt-1">{{ $message }}</p> @enderror
     <div class="mt-4 flex flex-wrap items-center gap-4">
       <span class="kicker">{{ __('Mechanisms') }}</span>
-      @foreach([['useVector', __('Vector')], ['useBroker', __('Broker')], ['useDirect', __('Direct')], ['useSearch', __('Web search')], ['useMemory', __('Memory')]] as [$prop, $label])
+      @foreach([['useVector', __('Vector')], ['useBroker', __('Broker')], ['useDirect', __('Direct')], ['useSearch', __('Web search')], ['useTrashCheck', __('Web search: no product named')], ['useMemory', __('Memory')]] as [$prop, $label])
         <label class="flex items-center gap-1.5 text-sm">
           {{-- Memory is .live so ticking it reveals the memory panel below --}}
           <input type="checkbox" wire:model{{ $prop === 'useMemory' ? '.live' : '' }}="{{ $prop }}"> {{ $label }}
