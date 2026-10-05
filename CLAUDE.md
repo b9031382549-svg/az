@@ -58,6 +58,15 @@ The app is auth-gated (default login user `admin`).
   dataset's column B may name only the kind — TRASH / SERVICE / GOOD
   (`test_dataset_rows.expected_type`); such rows run the same pipeline and are scored in
   "Overall" by the kind they ended as, never in the code columns.
+- **Web-search trash check** (`classify.search_resolver.trash_check`, OFF by default): the conflict
+  resolver's web-grounded understanding step (`SearchResolverService::understand`, needs
+  `flow.ensemble_resolver`) may also answer "names no product" (person / company / institution /
+  document / address …, prompt kept word for word as measured in
+  `research-data/trash-late-stage-2026-10-05`). With the sorter's p(trash) ≥ `min_sorter_trash`
+  the item becomes `trash` (rule `search`, same "not trash" override), no code is forced on it and
+  no further paid call is made; off → the old prompt, byte for byte. A Testing run has its own
+  switch (`mechanisms.trash_check`, the "Web search: no product named" box), and its funnel shows
+  what the search caught apart from the rules + sorter step.
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
 - **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;

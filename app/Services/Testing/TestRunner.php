@@ -35,7 +35,7 @@ class TestRunner
     ) {}
 
     /**
-     * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool}  $mechanisms
+     * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool, trash_check?:bool}  $mechanisms
      * @param  array{model?:string, expand_model?:string, base_url?:string, api_key?:string}  $override
      *                                                                                                   optional external model endpoint (e.g. a fine-tuned
      *                                                                                                   model on a rented GPU). Empty → mirror prod. Unlike `config`
@@ -114,8 +114,8 @@ class TestRunner
     }
 
     /**
-     * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool}  $m
-     * @return array{enabled:array<int,string>, shadow:array<int,string>, cache:bool, search:bool}
+     * @param  array{enabled:array<int,string>, shadow?:array<int,string>, cache?:bool, search?:bool, trash_check?:bool}  $m
+     * @return array{enabled:array<int,string>, shadow:array<int,string>, cache:bool, search:bool, trash_check:bool}
      */
     private function normalizeMechanisms(array $m): array
     {
@@ -124,6 +124,8 @@ class TestRunner
             'shadow' => array_values((array) ($m['shadow'] ?? [])),
             'cache' => (bool) ($m['cache'] ?? false),
             'search' => (bool) ($m['search'] ?? false),
+            // The web search's "names no product" check (SearchResolverService reads it per run).
+            'trash_check' => (bool) ($m['trash_check'] ?? config('classify.search_resolver.trash_check.enabled', false)),
         ];
     }
 

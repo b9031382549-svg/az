@@ -33,6 +33,10 @@ class ModelVersion
             // A "gpu:" model runs on our own GPU slot; with no slot up, it falls back to this one.
             'direct_fallback' => str_starts_with($direct, 'gpu:') ? (string) config('services.nebius.fallback_model') : '',
             'web_search' => config('classify.search_resolver.enabled') ? (string) config('classify.search_resolver.model') : '',
+            // The web search's understanding step also sets aside lines that name no product.
+            'web_search_trash_check' => config('classify.search_resolver.enabled') && config('classify.flow.ensemble_resolver')
+                && config('classify.search_resolver.trash_check.enabled')
+                ? (string) config('classify.flow.ensemble.understand_model') : '',
         ], fn (string $model) => $model !== '');
     }
 }

@@ -33,6 +33,9 @@ class TestingDataset extends Component
 
     public bool $useSearch = true;
 
+    /** The web search may also find that a line names no product (search_resolver.trash_check). */
+    public bool $useTrashCheck = false;
+
     /** Selected done-run to seed this dataset's memory from (flywheel replay). */
     public string $seedRunId = '';
 
@@ -56,6 +59,7 @@ class TestingDataset extends Component
         $this->useDirect = in_array('direct', $enabled, true);
         $this->useMemory = (bool) ($m['cache'] ?? false);
         $this->useSearch = (bool) ($m['search'] ?? true);
+        $this->useTrashCheck = (bool) ($m['trash_check'] ?? config('classify.search_resolver.trash_check.enabled', false));
     }
 
     public function launch(TestRunner $runner): void
@@ -114,6 +118,7 @@ class TestingDataset extends Component
             'shadow' => [],
             'cache' => $this->useMemory,
             'search' => $this->useSearch,
+            'trash_check' => $this->useTrashCheck,
         ];
     }
 
