@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,6 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 // declared code, unit and quantity, and links to the classification of that name.
 class EInvoice extends Model
 {
+    /**
+     * Where a line's classification stands — the chat's ai_status (invoice_lines view), as the
+     * Invoices page filters by it and the line export writes it.
+     */
+    public const STATUSES = ['classified', 'needs_review', 'in_progress', 'trash', 'rejected'];
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -32,6 +39,43 @@ class EInvoice extends Model
     public function classificationItem(): BelongsTo
     {
         return $this->belongsTo(ClassificationItem::class);
+    }
+
+    /**
+     * The Invoices page's filters, shared with the line export: a text search over the item, the
+     * VÖENs and names, series, number and declared code; one upload; one classification status.
+     */
+    public function scopeFiltered(Builder $query, string $term = '', string $upload = '', string $status = ''): Builder
+    {
+        $term = trim($term);
+        // ILIKE on Postgres, LIKE on sqlite (tests) — both case-insensitive for the search.
+        $likeOp = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+        return $query
+            ->when($upload !== '', fn (Builder $q) => $q->where('import_batch', $upload))
+            ->when($term !== '', function (Builder $q) use ($term, $likeOp) {
+                $like = '%'.$term.'%';
+                $q->where(fn (Builder $w) => $w
+                    ->where('supplier_tin', $likeOp, $like)
+                    ->orWhere('recipient_tin', $likeOp, $like)
+                    ->orWhere('number', $likeOp, $like)
+                    ->orWhere('series', $likeOp, $like)
+                    ->orWhere('item_name', $likeOp, $like)
+                    ->orWhere('declared_code', $likeOp, $like)
+                    ->orWhere('supplier_name', $likeOp, $like)
+                    ->orWhere('recipient_name', $likeOp, $like));
+            })
+            ->when(in_array($status, self::STATUSES, true), fn (Builder $q) => $q->whereHas('classificationItem', function (Builder $item) use ($status) {
+                match ($status) {
+                    'classified' => $item->whereIn('resolution', ['agreed', 'ai_resolved', 'confirmed']),
+                    // Still with the automation: not started yet, or a conflict the web search has not answered.
+                    'in_progress' => $item->where(fn (Builder $w) => $w->where('resolution', 'pending')->orWhere(fn (Builder $r) => $r->resolving())),
+                    // Everything the automation left open — the same ELSE the chat's view has.
+                    'needs_review' => $item->whereNotIn('resolution', ['agreed', 'ai_resolved', 'confirmed', 'rejected', 'trash', 'pending'])
+                        ->whereNot(fn (Builder $r) => $r->resolving()),
+                    default => $item->where('resolution', $status),
+                };
+            }));
     }
 
     /**

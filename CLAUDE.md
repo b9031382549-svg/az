@@ -143,6 +143,16 @@ The app is auth-gated (default login user `admin`).
   (memory / trash / Direct+vector / ensemble / web search / human) and why, in the
   UI language (model quotes stay English). Feeds the review Excel export
   (`ReviewExportController` → `ClassificationExporter`) and the Results API.
+- **Line export:** `InvoiceLinesExporter` (OpenSpout, constant memory) behind
+  `/invoices/export` (`InvoiceExportController`; filters q / upload / status =
+  `EInvoice::filtered()`, the same as the Invoices page). One row per invoice
+  LINE: the Şablon columns as they came in, then our code, category, good/service,
+  status, method (`DecisionSummary::methodsFor`, light result rows), reliability
+  (`AnswerReliability`, shared with the Classifier API's `similarity`), whether it
+  matches the declared code (a service = any 99xx), upload, decision link.
+  `uploads.export_part_lines` (100k) lines per file: an .xlsx goes out only once
+  zipped (100k ≈ 25 s with the DB, 700k ≈ 230 s) and nginx allows 120 s, so a
+  bigger selection downloads in parts (`?part=N`).
 - **UI:** Livewire components (`Classify`, `ReviewQueue`, `ClassificationDecision`,
   `Invoices`, `AskAi`, `Catalog`, `UploadInvoices`, `Logs`, `ReportProblem`).
 

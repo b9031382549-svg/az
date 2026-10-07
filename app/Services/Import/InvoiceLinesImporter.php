@@ -88,6 +88,9 @@ class InvoiceLinesImporter
         'zero_rated_vat_amount', 'vat_amount', 'road_tax', 'total_amount',
     ];
 
+    /** The columns that hold numbers — the amounts and the quantity (the line export writes them as such). */
+    public const NUMERIC_COLUMNS = [...self::DECIMAL_COLS, 'quantity'];
+
     /** Identifiers Excel may have turned into numbers — must come back as digit strings. */
     private const IDENTIFIER_COLS = ['supplier_tin', 'recipient_tin', 'series', 'number', 'declared_code'];
 

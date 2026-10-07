@@ -378,6 +378,11 @@
       @endif
       <div class="flex justify-center gap-2 mt-6">
         <a href="{{ route('invoices', ($report['batch'] ?? null) ? ['upload' => $report['batch']] : []) }}" class="btn btn-ink btn-sm">{{ __('Open in table') }}</a>
+        @if(($report['batch'] ?? null) && ($report['imported'] ?? 0) > 0)
+          {{-- Past one file's worth of lines, the Invoices page offers the parts. --}}
+          <a href="{{ ($report['imported'] ?? 0) <= $exportPartLines ? route('invoices.export', ['upload' => $report['batch']]) : route('invoices', ['upload' => $report['batch']]) }}"
+             class="btn btn-ghost btn-sm">⤓ {{ __('Download Excel') }}</a>
+        @endif
         <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('Upload more') }}</button>
       </div>
     </div>
@@ -423,6 +428,10 @@
                   @endif
                 </td>
                 <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                  @if($u->lines > 0 && $u->status !== 'importing')
+                    <a href="{{ $u->lines <= $exportPartLines ? route('invoices.export', ['upload' => $u->key]) : route('invoices', ['upload' => $u->key]) }}"
+                       class="btn btn-ghost btn-sm" title="{{ __('Lines of this upload with our answer per line') }}">⤓ Excel</a>
+                  @endif
                   @if($u->status === 'importing')
                     <span class="text-faint text-xs">{{ __('importing…') }}</span>
                   @else

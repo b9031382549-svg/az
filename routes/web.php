@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InvoiceExportController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ReviewExportController;
@@ -37,6 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/', fn () => redirect()->route('overview'));
     Route::get('/overview', [DashboardController::class, 'index'])->name('overview');
     Route::get('/invoices', Invoices::class)->name('invoices');
+    Route::get('/invoices/export', InvoiceExportController::class)->name('invoices.export');
     Route::get('/ask', AskAi::class)->name('ask');
     Route::get('/upload', UploadInvoices::class)->name('upload');
     Route::get('/upload/template', UploadTemplateController::class)->name('upload.template');
