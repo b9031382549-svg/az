@@ -36,6 +36,14 @@ class ClassifyDispatchTest extends TestCase
         Queue::assertPushed(TranslateItemJob::class, 2);
     }
 
+    public function test_files_are_sent_to_the_upload_page(): void
+    {
+        Livewire::actingAs(User::factory()->create())
+            ->test(Classify::class)
+            ->assertSee(route('upload'))
+            ->assertDontSeeHtml('type="file"');
+    }
+
     public function test_two_enabled_mechanisms_dispatch_two_jobs_per_item(): void
     {
         Queue::fake();

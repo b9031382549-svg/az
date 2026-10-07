@@ -837,5 +837,17 @@
     "meaningless characters": "бессмысленный набор символов",
     "no code was forced on it": "код не навязан",
     "Web search: no product named": "Веб-поиск: товар не назван",
-    "Web search: no product named — caught :caught of :rows trash rows": "Веб-поиск: товар не назван — поймал :caught из :rows строк-мусора"
+    "Web search: no product named — caught :caught of :rows trash rows": "Веб-поиск: товар не назван — поймал :caught из :rows строк-мусора",
+    "List of item names": "Список наименований",
+    "Three layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; a <b>list of item names</b> — a “Malın adı” column (or “Məhsulun adı”, “Mal (əmtəə) adı”), or just one column of names; the items of both are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.": "Формат определяется автоматически: <b>построчная выгрузка (Şablon)</b> — одна строка на позицию накладной с названием товара; <b>список наименований</b> — столбец «Malın adı» (или «Məhsulun adı», «Mal (əmtəə) adı») либо просто один столбец с названиями; позиции из обоих <b>сразу отправляются на классификацию</b>; и <b>список накладных</b> из 15 стандартных столбцов (№, ИНН поставщика/получателя, даты, серия, номер, столбцы сумм НДС и итого). Большие файлы читаются и импортируются <b>в фоне</b> — страницу можно закрыть.",
+    "Download the template": "Скачать шаблон",
+    "only the “Malın adı” column is required.": "обязателен только столбец «Malın adı».",
+    "Lines": "Строк",
+    "rows read from the file": "строк прочитано из файла",
+    "The file has no header row — its first row is read as an item name too.": "В файле нет строки заголовка — первая строка тоже считается наименованием.",
+    "Imported :n lines": "Импортировано строк: :n",
+    "The file has no column with item names. Name it “Malın adı” (see the template) or upload a list with a single column of names.": "В файле нет столбца с наименованиями. Назовите его «Malın adı» (см. шаблон) или загрузите список из одного столбца с названиями.",
+    "Have a file?": "Есть файл?",
+    "Upload it on the Upload page — a list of item names or an invoice export: a preview first, big files in the background, and the chat sees its lines.": "Загрузите его на странице «Загрузка» — список наименований или выгрузку накладных: сначала предпросмотр, большие файлы обрабатываются в фоне, а строки видит чат.",
+    "Go to Upload →": "Перейти к загрузке →"
 }

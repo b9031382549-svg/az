@@ -16,6 +16,9 @@ class SheetStream
     /** Extensions that can be streamed (the old binary .xls cannot). */
     public const EXTENSIONS = ['xlsx', 'csv'];
 
+    /** The "separator" of a one-column csv — a byte no text holds, so a line is never split. */
+    private const NO_SPLIT = "\x1F";
+
     /** @return Generator<int, array<int, mixed>> */
     public function rows(string $path, string $extension): Generator
     {
@@ -65,7 +68,7 @@ class SheetStream
                 return;
             }
             $first = preg_replace('/^\xEF\xBB\xBF/', '', $first) ?? $first; // UTF-8 BOM
-            $delimiter = $this->delimiter($first);
+            $delimiter = $this->delimiter($first, $this->peek($fh));
 
             yield str_getcsv(rtrim($first, "\r\n"), $delimiter, '"', '');
 
@@ -79,13 +82,64 @@ class SheetStream
         }
     }
 
-    /** The separator the header line uses most: comma, semicolon (Excel in AZ/RU locales) or tab. */
-    private function delimiter(string $header): string
+    /**
+     * The separator, judged on the first line outside quotes: a semicolon (Excel in AZ/RU
+     * locales) or a tab, whichever it holds more of; else a comma — but only when most of the
+     * next lines hold as many commas as the first. Item names carry commas ("PIVƏ 1,0 LT PET"),
+     * so a one-column list of names — with or without a header row — must not be split on them.
+     *
+     * @param  array<int, string>  $next  a few lines after the first
+     */
+    private function delimiter(string $first, array $next): string
     {
-        $counts = [',' => substr_count($header, ','), ';' => substr_count($header, ';'), "\t" => substr_count($header, "\t")];
+        $counts = [';' => self::countOutsideQuotes($first, ';'), "\t" => self::countOutsideQuotes($first, "\t")];
         arsort($counts);
+        if (reset($counts) > 0) {
+            return (string) array_key_first($counts);
+        }
 
-        return (string) array_key_first($counts);
+        $commas = self::countOutsideQuotes($first, ',');
+        if ($commas === 0) {
+            return self::NO_SPLIT;
+        }
+        $same = count(array_filter($next, fn (string $line) => self::countOutsideQuotes($line, ',') === $commas));
+
+        return $next === [] || $same * 2 >= count($next) ? ',' : self::NO_SPLIT;
+    }
+
+    /**
+     * Up to $lines lines after the current position, which is then restored.
+     *
+     * @param  resource  $fh
+     * @return array<int, string>
+     */
+    private function peek($fh, int $lines = 20): array
+    {
+        $at = ftell($fh);
+        $out = [];
+        while (count($out) < $lines && ($line = fgets($fh)) !== false) {
+            if (trim($line) !== '') {
+                $out[] = $line;
+            }
+        }
+        fseek($fh, (int) $at);
+
+        return $out;
+    }
+
+    private static function countOutsideQuotes(string $line, string $separator): int
+    {
+        $n = 0;
+        $quoted = false;
+        for ($i = 0, $len = strlen($line); $i < $len; $i++) {
+            if ($line[$i] === '"') {
+                $quoted = ! $quoted;
+            } elseif (! $quoted && $line[$i] === $separator) {
+                $n++;
+            }
+        }
+
+        return $n;
     }
 
     private function isBlank(array $cells): bool

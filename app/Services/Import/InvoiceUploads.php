@@ -9,10 +9,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
 
-// The Upload page's single entry point for invoice files. Reads a file once, recognises its
-// layout — the line-level export ("Şablon", classified on import) or the legacy 15-column
-// invoice list — and hands it to the matching importer. Every upload is an import batch
-// (source 'invoices'), so it can be listed and deleted on its own.
+// The Upload page's single entry point for files — the only place a file enters the app (the
+// Classify page keeps just its text box). Reads a file once, recognises its layout — the
+// line-level export ("Şablon"), a list of item names (both classified on import) or the legacy
+// 15-column invoice list — and hands it to the matching importer. Every upload is an import
+// batch (source 'invoices'), so it can be listed and deleted on its own.
 class InvoiceUploads
 {
     public function __construct(
@@ -21,8 +22,20 @@ class InvoiceUploads
         private readonly InvoiceLinesImporter $lines,
     ) {}
 
+    /** What the page says when a file has no item-name column and is no invoice list either. */
+    public static function unrecognised(): string
+    {
+        return __('The file has no column with item names. Name it “Malın adı” (see the template) or upload a list with a single column of names.');
+    }
+
+    /** No item-name column and too few columns for the legacy invoice list (mapped by position). */
+    public static function isUnrecognised(array $header): bool
+    {
+        return ! InvoiceLinesImporter::matches($header) && count($header) < count(InvoiceImporter::COLUMNS);
+    }
+
     /**
-     * @return array<string, mixed> the importer's preview plus 'format' (sablon | legacy | null)
+     * @return array<string, mixed> the importer's preview plus 'format' (sablon | names | legacy | null)
      */
     public function preview(string $path): array
     {
@@ -32,8 +45,11 @@ class InvoiceUploads
             return ['format' => null, 'ok' => false, 'error' => __('Cannot read file: :error', ['error' => $e->getMessage()]), 'count' => 0, 'duplicates' => 0, 'sample' => []];
         }
 
-        if (InvoiceLinesImporter::matches($header)) {
-            return ['format' => 'sablon'] + $this->lines->previewRows($header, $rows, (string) hash_file('sha256', $path));
+        if (($layout = InvoiceLinesImporter::layout($header)) !== null) {
+            return ['format' => $layout] + $this->lines->previewRows($header, $rows, (string) hash_file('sha256', $path));
+        }
+        if (self::isUnrecognised($header)) {
+            return ['format' => null, 'ok' => false, 'error' => self::unrecognised(), 'count' => 0, 'duplicates' => 0, 'sample' => []];
         }
 
         return ['format' => 'legacy'] + $this->legacy->previewRows($header, $rows);
@@ -52,8 +68,11 @@ class InvoiceUploads
 
         $checksum = (string) hash_file('sha256', $path);
 
-        if (InvoiceLinesImporter::matches($header)) {
-            return ['format' => 'sablon'] + $this->lines->importRows($header, $rows, $checksum, $label, $userId, $skipDuplicates);
+        if (($layout = InvoiceLinesImporter::layout($header)) !== null) {
+            return ['format' => $layout] + $this->lines->importRows($header, $rows, $checksum, $label, $userId, $skipDuplicates);
+        }
+        if (self::isUnrecognised($header)) {
+            return ['format' => null, 'batch' => null, 'imported' => 0, 'skipped' => 0, 'total' => (int) DB::table('e_invoices')->count(), 'error' => self::unrecognised()];
         }
 
         // Legacy: the invoice list exactly as before, now stamped with its own batch.

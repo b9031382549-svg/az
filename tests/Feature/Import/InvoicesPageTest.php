@@ -30,6 +30,15 @@ class InvoicesPageTest extends TestCase
             ->assertSee('MT·1');             // the legacy invoice row is still listed
     }
 
+    public function test_undated_lines_of_a_names_list_come_after_dated_invoice_lines(): void
+    {
+        EInvoice::create(['series' => 'MT', 'number' => '1', 'invoice_key' => 'MT|1', 'invoice_date' => '2026-01-01', 'total_amount' => 118, 'item_name' => 'Dated item']);
+        EInvoice::create(['item_name' => 'Undated item', 'total_amount' => 0]);   // newer, but no date
+
+        Livewire::actingAs(User::factory()->create())->test(Invoices::class)
+            ->assertSeeInOrder(['Dated item', 'Undated item']);
+    }
+
     public function test_search_matches_item_names_and_the_upload_filter_narrows_to_one_upload(): void
     {
         $a = (string) Str::uuid();

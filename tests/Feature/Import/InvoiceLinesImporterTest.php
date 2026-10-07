@@ -91,6 +91,15 @@ class InvoiceLinesImporterTest extends TestCase
         return $path;
     }
 
+    private function csv(string $content): string
+    {
+        $path = storage_path('app/test-list-'.bin2hex(random_bytes(4)).'.csv');
+        $this->paths[] = $path;
+        file_put_contents($path, $content);
+
+        return $path;
+    }
+
     private function uploads(): InvoiceUploads
     {
         return app(InvoiceUploads::class);
@@ -128,12 +137,136 @@ class InvoiceLinesImporterTest extends TestCase
         $this->assertSame($report['batch'], $line->import_batch);
     }
 
-    public function test_the_legacy_header_is_not_the_line_level_export(): void
+    public function test_the_header_tells_the_export_a_list_of_names_and_the_legacy_list_apart(): void
     {
+        $this->assertSame('sablon', InvoiceLinesImporter::layout(self::HEADER));
+        // The item name without any invoice column: a list of names, read by this importer too.
+        $this->assertSame('names', InvoiceLinesImporter::layout(['Malın adı', 'Qrup adı']));
+        $this->assertNull(InvoiceLinesImporter::layout(['No.', 'Supplier TIN', 'Recipient TIN', 'e-Invoice Date']));
         $this->assertFalse(InvoiceLinesImporter::matches(['No.', 'Supplier TIN', 'Recipient TIN', 'e-Invoice Date']));
-        // An item list without any invoice column is not an invoice file either.
-        $this->assertFalse(InvoiceLinesImporter::matches(['Malın adı', 'Qrup adı']));
-        $this->assertTrue(InvoiceLinesImporter::matches(self::HEADER));
+        $this->assertNull(InvoiceLinesImporter::layout(['e-QF təqdim edənin VÖEN', 'Qrup adı']));   // no item name
+    }
+
+    public function test_a_list_of_names_is_recognised_under_the_headers_it_comes_with(): void
+    {
+        $nameColumn = fn (array $header) => InvoiceLinesImporter::shape($header)['map']['item_name'] ?? null;
+
+        $this->assertSame(0, $nameColumn(['MƏHSULUN ADI', 'GROUP', 'Aİ QRUP']));   // the goods/services samples
+        $this->assertSame(1, $nameColumn([null, 'Mal (əmtəə) adı', 'Miqdar']));    // cash-register exports
+        $this->assertSame(0, $nameColumn(['MALIN ADI']));
+        $this->assertSame(0, $nameColumn(['Malin adi']));                          // typed without AZ letters
+        $this->assertSame(1, $nameColumn(['№', 'Наименование', 'Кол-во']));
+        $this->assertSame(0, $nameColumn(['ITEM', 'Qty']));
+        // The export's own column wins over a look-alike further left.
+        $this->assertSame(2, $nameColumn(['Məhsulun adı', 'e-Qaimənin tarixi', 'Malın adı']));
+        foreach ([['MƏHSULUN ADI', 'GROUP'], ['Mal (əmtəə) adı'], ['ITEM']] as $header) {
+            $this->assertFalse(InvoiceLinesImporter::shape($header)['first_row_is_data']);
+        }
+    }
+
+    public function test_a_list_of_names_is_imported_as_lines_and_each_name_classified_once(): void
+    {
+        $path = $this->xlsx([
+            ['Divan', 'MEBEL'],
+            ['divan ', 'MEBEL'],          // the same name, other spelling
+            ['Noutbuk', 'TEXNIKA'],
+            [null, 'MEBEL'],              // only the group — nothing to keep
+        ], ['MƏHSULUN ADI', 'GROUP']);
+
+        $preview = $this->uploads()->preview($path);
+        $this->assertSame('names', $preview['format']);
+        $this->assertTrue($preview['ok']);
+        $this->assertSame(3, $preview['count']);
+        $this->assertSame(2, $preview['stats']['unique_items']);
+        $this->assertSame(0, $preview['stats']['no_item']);
+        $this->assertFalse($preview['first_row_is_data']);
+
+        $report = $this->uploads()->import($path, 'adlar.xlsx', null, false);
+
+        $this->assertNull($report['error']);
+        $this->assertSame('names', $report['format']);
+        $this->assertSame(3, $report['imported']);
+        $this->assertSame(2, $report['items']);
+        Queue::assertPushed(ClassifyMechanismJob::class, 4);   // 2 items × 2 mechanisms
+
+        $this->assertSame(['Divan', 'divan', 'Noutbuk'], EInvoice::orderBy('row_no')->pluck('item_name')->all());
+        $this->assertSame(0, EInvoice::whereNull('classification_item_id')->count());
+        $this->assertSame(0, EInvoice::whereNotNull('invoice_key')->count());
+        $batch = ImportBatch::where('key', $report['batch'])->sole();
+        $this->assertSame('names', $batch->format);
+        $this->assertSame('invoices', $batch->source);
+        $this->assertSame(2, $batch->item_count);
+    }
+
+    public function test_the_header_row_is_never_taken_for_an_item(): void
+    {
+        // On prod "Malın adı" / "Mal (əmtəə) adı" header rows went through the whole pipeline.
+        $report = $this->uploads()->import($this->xlsx([['COREK ZAVOD NUR 630QR', 2]], ['Mal (əmtəə) adı', 'Miqdar']), 'ecr.xlsx', null, false);
+
+        $this->assertSame(['COREK ZAVOD NUR 630QR'], ClassificationItem::where('batch', $report['batch'])->pluck('source_text')->all());
+    }
+
+    public function test_a_one_column_list_without_a_header_keeps_its_first_row(): void
+    {
+        $path = $this->csv("Divan\nNoutbuk\n");
+
+        $preview = $this->uploads()->preview($path);
+        $this->assertSame('names', $preview['format']);
+        $this->assertTrue($preview['first_row_is_data']);
+        $this->assertSame(2, $preview['count']);
+
+        $report = $this->uploads()->import($path, 'list.csv', null, false);
+        $this->assertSame(2, $report['imported']);
+        $this->assertSame(['Divan', 'Noutbuk'], EInvoice::orderBy('row_no')->pluck('item_name')->all());
+        $this->assertSame([1, 2], EInvoice::orderBy('row_no')->pluck('row_no')->all());
+    }
+
+    public function test_a_one_column_list_under_a_plain_header_word_skips_that_word(): void
+    {
+        $report = $this->uploads()->import($this->csv("Name\nDivan\n"), 'list.csv', null, false);
+
+        $this->assertSame(['Divan'], EInvoice::pluck('item_name')->all());
+        $this->assertSame(['Divan'], ClassificationItem::where('batch', $report['batch'])->pluck('source_text')->all());
+    }
+
+    public function test_commas_inside_names_never_split_a_list(): void
+    {
+        // One column with a header — no separator at all, so the commas belong to the names.
+        $this->uploads()->import($this->csv("Malın adı\nPIVƏ 1,0 LT PET\nSIQARET KENT 8\nDARIDAĞ MINERAL SU 0,5 LT PET\n"), 'a.csv', null, false);
+        $this->assertSame(['PIVƏ 1,0 LT PET', 'SIQARET KENT 8', 'DARIDAĞ MINERAL SU 0,5 LT PET'], EInvoice::orderBy('id')->pluck('item_name')->all());
+        EInvoice::query()->delete();
+
+        // No header and a comma in the very first name: the next lines do not hold one comma
+        // each, so this is no comma-separated table.
+        $preview = $this->uploads()->preview($path = $this->csv("PIVƏ 1,0 LT PET\nSIQARET KENT 8\nSU 0,5 L\nÇÖRƏK\n"));
+        $this->assertSame('names', $preview['format']);
+        $this->assertTrue($preview['first_row_is_data']);
+        $this->uploads()->import($path, 'b.csv', null, false);
+        $this->assertSame(['PIVƏ 1,0 LT PET', 'SIQARET KENT 8', 'SU 0,5 L', 'ÇÖRƏK'], EInvoice::orderBy('id')->pluck('item_name')->all());
+        EInvoice::query()->delete();
+
+        // Excel in AZ/RU locales separates with ';' and leaves the commas unquoted.
+        $this->uploads()->import($this->csv("Malın adı;Malın ölçü vahidi\nPIVƏ 1,0 LT PET;ədəd\n"), 'c.csv', null, false);
+        $this->assertSame([['PIVƏ 1,0 LT PET', 'ədəd']], EInvoice::get(['item_name', 'unit'])->map(fn ($l) => [$l->item_name, $l->unit])->all());
+        EInvoice::query()->delete();
+
+        // Comma-separated with the names quoted — split on the commas outside the quotes only.
+        $this->uploads()->import($this->csv("Malın adı,Malın ölçü vahidi\n\"PIVƏ 1,0 LT PET\",ədəd\n\"SU 0,5 L\",şüşə\n"), 'd.csv', null, false);
+        $this->assertSame([['PIVƏ 1,0 LT PET', 'ədəd'], ['SU 0,5 L', 'şüşə']], EInvoice::orderBy('id')->get(['item_name', 'unit'])->map(fn ($l) => [$l->item_name, $l->unit])->all());
+    }
+
+    public function test_a_file_without_an_item_name_column_is_refused_with_a_clear_message(): void
+    {
+        $path = $this->xlsx([['MEBEL', '9403']], ['Qrup adı', 'Kodu']);
+
+        $preview = $this->uploads()->preview($path);
+        $this->assertFalse($preview['ok']);
+        $this->assertSame(InvoiceUploads::unrecognised(), $preview['error']);
+
+        $report = $this->uploads()->import($path, 'x.csv', null, false);
+        $this->assertSame(InvoiceUploads::unrecognised(), $report['error']);
+        $this->assertSame(0, EInvoice::count());
+        $this->assertSame(0, ImportBatch::count());
     }
 
     public function test_preview_counts_what_can_and_cannot_be_tied_to_an_invoice(): void

@@ -121,31 +121,42 @@ class BackgroundInvoiceUploads
         $source = $this->path((string) $meta['file']);
         $rows = $this->stream->rows($source, pathinfo($source, PATHINFO_EXTENSION));
         $header = $rows->valid() ? $rows->current() : [];
-        $format = InvoiceLinesImporter::matches($header) ? 'sablon' : 'legacy';
+        $shape = InvoiceLinesImporter::shape($header);
+        $format = $shape['layout'] ?? 'legacy';
+        $lineLevel = in_array($format, InvoiceLinesImporter::LAYOUTS, true);
 
-        if ($format === 'legacy' && count($header) < count(InvoiceImporter::COLUMNS)) {
-            $this->ready($batch, $meta, $format, ['ok' => false, 'error' => __('Unexpected columns: expected at least :min, got :got.', [
-                'min' => count(InvoiceImporter::COLUMNS), 'got' => count($header),
-            ]), 'count' => 0, 'duplicates' => 0, 'sample' => []]);
+        if (InvoiceUploads::isUnrecognised($header)) {
+            $this->ready($batch, $meta, null, ['ok' => false, 'error' => InvoiceUploads::unrecognised(), 'count' => 0, 'duplicates' => 0, 'sample' => []]);
 
             return;
         }
 
-        $map = $format === 'sablon'
+        $map = $lineLevel
             ? $this->lines->lineMapper($header)
             : fn (array $row) => $this->legacy->mapRow($row);
-        $stats = new InvoiceLineStats;   // line-level export
+        $stats = new InvoiceLineStats;   // line-level export / names list
         $keyCounts = [];                 // invoice list: series|number => rows
         $sample = [];
         $count = 0;
         $max = (int) config('uploads.max_lines');
         $tooMany = false;
 
+        // The data rows — after the header, or from the very first row of a one-column list of
+        // names that has no header row.
+        $data = (function () use ($rows, $header, $shape) {
+            if ($shape['first_row_is_data']) {
+                yield $header;
+            }
+            for ($rows->next(); $rows->valid(); $rows->next()) {
+                yield $rows->current();
+            }
+        })();
+
         // 'w': a retry after a crash starts the file over — reading is idempotent.
         $out = fopen($this->path($batch->key.'.ndjson'), 'w');
         try {
-            for ($rows->next(); $rows->valid(); $rows->next()) {
-                $line = $map($rows->current(), $count + 1);
+            foreach ($data as $row) {
+                $line = $map($row, $count + 1);
                 if ($line === null) {
                     continue;
                 }
@@ -154,7 +165,7 @@ class BackgroundInvoiceUploads
                     break;
                 }
 
-                if ($format === 'sablon') {
+                if ($lineLevel) {
                     $stats->add($line);
                 } elseif (($invoice = $this->legacy->naturalKey($line)) !== null) {
                     $keyCounts[$invoice] = ($keyCounts[$invoice] ?? 0) + 1;
@@ -176,10 +187,10 @@ class BackgroundInvoiceUploads
         $meta['read'] = min($count, $max);
         if ($tooMany) {
             $preview = ['ok' => false, 'error' => __('The file has more than :max lines.', ['max' => number_format($max, 0, '.', ' ')]), 'count' => $count, 'sample' => []];
-        } elseif ($format === 'sablon') {
+        } elseif ($lineLevel) {
             $preview = $count === 0
                 ? ['ok' => false, 'error' => __('No invoice lines found in the file.'), 'count' => 0, 'sample' => []]
-                : $this->lines->preview($stats, (string) $batch->checksum, $sample, $batch->key);
+                : $this->lines->preview($stats, (string) $batch->checksum, $sample, $batch->key) + ['first_row_is_data' => $shape['first_row_is_data']];
         } else {
             // A row is a duplicate when its series|number is already loaded, or repeats in the file.
             $known = EInvoice::existingKeys(array_keys($keyCounts));
@@ -366,7 +377,7 @@ class BackgroundInvoiceUploads
 
         // Lines and the new offset commit together — a retry resumes exactly after them.
         DB::transaction(function () use ($batch, $lines, $offset, $meta, $import) {
-            $written = $batch->format === 'sablon'
+            $written = in_array($batch->format, InvoiceLinesImporter::LAYOUTS, true)
                 ? $this->lines->writeLines($lines, $batch->key, (bool) $import['skip'])
                 : $this->legacy->writeRows($lines, $batch->key, (bool) $import['skip']);
 
@@ -422,7 +433,7 @@ class BackgroundInvoiceUploads
     }
 
     /** @param array<string, mixed> $meta */
-    private function ready(ImportBatch $batch, array $meta, string $format, array $preview): void
+    private function ready(ImportBatch $batch, array $meta, ?string $format, array $preview): void
     {
         $meta['preview'] = $preview;
         $batch->update(['status' => self::READY, 'format' => $format, 'meta' => $meta]);

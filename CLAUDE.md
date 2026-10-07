@@ -69,12 +69,20 @@ The app is auth-gated (default login user `admin`).
   what the search caught apart from the rules + sorter step.
 - **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
-- **Invoice uploads:** `InvoiceUploads` (the Upload page's one entry point;
-  recognises the layout from the header) → `InvoiceLinesImporter` (line-level
-  export "Şablon": every line → `e_invoices`, every unique item name →
-  classification via `ClassificationQueue`, the shared path with the Classify
-  page) or `InvoiceImporter` (legacy 15-column invoice list). `e_invoices` is one
-  row per invoice LINE (legacy rows = whole invoices, `item_name` NULL);
+- **Uploads — one door for files:** `InvoiceUploads` (the Upload page's one entry
+  point; the Classify page keeps only its text box and links here; recognises the
+  layout from the header) → `InvoiceLinesImporter` for the line-level export
+  "Şablon" (format `sablon`) AND a list of item names (format `names`: a "Malın
+  adı" column or one of `NAME_HEADERS`, or a single column under no known header —
+  then its first row is a name too): every line → `e_invoices`, every unique item
+  name → classification via `ClassificationQueue`, the shared path with the
+  Classify page; or `InvoiceImporter` (legacy 15-column invoice list, by position).
+  No item-name column and < 15 columns → refused with a message pointing to the
+  template (`/upload/template`, `UploadTemplateController`: the Şablon header row,
+  only "Malın adı" required). Small and big CSVs share `SheetStream`'s separator
+  rules — a one-column list keeps the commas in its names ("PIVƏ 1,0 LT PET").
+  `e_invoices` is one row per LINE (legacy rows = whole invoices, `item_name`
+  NULL; names-list rows = the name only, no date — lists sort `NULLS LAST`);
   `invoice_key` = series|number (NULL = line not tied to an invoice). Each upload
   is an `ImportBatch` (source `invoices`). The supplier's `declared_code` is
   stored only — never fed to the classifier or to memory.

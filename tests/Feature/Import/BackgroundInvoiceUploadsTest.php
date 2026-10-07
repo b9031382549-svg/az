@@ -14,6 +14,7 @@ use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\Import\BackgroundInvoiceUploads;
 use App\Services\Import\InvoiceLinesImporter;
+use App\Services\Import\InvoiceUploads;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -212,6 +213,46 @@ class BackgroundInvoiceUploadsTest extends TestCase
         $this->assertSame(['MT|1', 'MT|2'], EInvoice::orderBy('id')->pluck('invoice_key')->all());
         $this->assertSame('2026-01-01', EInvoice::first()->invoice_date->toDateString());
         Queue::assertNotPushed(FeedUploadClassificationJob::class);   // nothing to classify
+    }
+
+    public function test_a_big_list_of_names_without_a_header_row_is_read_and_imported_in_the_background(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'names').'.csv';
+        // No header row, and the first name holds a comma — it is still one column.
+        file_put_contents($path, "\xEF\xBB\xBFPIVƏ 1,0 LT PET\nDivan\nNoutbuk\ndivan\nOturacaq\n");
+
+        $batch = $this->analyzed($path, 'csv');
+
+        $this->assertSame('ready', $batch->status);
+        $this->assertSame('names', $batch->format);
+        $preview = $batch->meta['preview'];
+        $this->assertTrue($preview['ok']);
+        $this->assertTrue($preview['first_row_is_data']);   // "PIVƏ 1,0 LT PET" is a name, not a header
+        $this->assertSame(5, $preview['count']);
+        $this->assertSame(4, $preview['stats']['unique_items']);
+
+        $this->assertTrue($this->uploads()->startImport($batch, false));
+        $this->uploads()->import($batch->key);
+        $batch->refresh();
+
+        $this->assertSame('imported', $batch->status);
+        $this->assertSame(['PIVƏ 1,0 LT PET', 'Divan', 'Noutbuk', 'divan', 'Oturacaq'], EInvoice::where('import_batch', $batch->key)->orderBy('id')->pluck('item_name')->all());
+        $this->assertSame(4, ClassificationItem::where('batch', $batch->key)->count());
+        $this->assertSame(0, EInvoice::whereNull('classification_item_id')->count());
+        Queue::assertPushed(FeedUploadClassificationJob::class);
+    }
+
+    public function test_a_big_file_without_an_item_name_column_gets_the_clear_message(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'groups').'.csv';
+        file_put_contents($path, "Qrup adı;Kodu\nMEBEL;9403\n");
+
+        $batch = $this->analyzed($path, 'csv');
+
+        $this->assertSame('ready', $batch->status);
+        $this->assertNull($batch->format);
+        $this->assertFalse($batch->meta['preview']['ok']);
+        $this->assertSame(InvoiceUploads::unrecognised(), $batch->meta['preview']['error']);
     }
 
     public function test_feeding_waits_while_the_queue_is_deep(): void
