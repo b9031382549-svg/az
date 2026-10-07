@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ReviewExportController;
+use App\Http\Controllers\UploadTemplateController;
 use App\Livewire\AskAi;
 use App\Livewire\Benchmark;
 use App\Livewire\Catalog;
@@ -38,6 +39,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/invoices', Invoices::class)->name('invoices');
     Route::get('/ask', AskAi::class)->name('ask');
     Route::get('/upload', UploadInvoices::class)->name('upload');
+    Route::get('/upload/template', UploadTemplateController::class)->name('upload.template');
 
     // Task 2 — goods/services classifier
     Route::get('/classify', Classify::class)->name('classify');

@@ -36,8 +36,9 @@ class DashboardController extends Controller
             'pct' => $max > 0 ? max(4, round((float) $r->t / $max * 100)) : 0,
         ]);
 
+        // Undated lines (a list of names) go last — Postgres puts NULLs first in a desc sort.
         $recent = EInvoice::query()
-            ->orderByDesc('invoice_date')->orderByDesc('id')
+            ->orderByRaw('invoice_date desc nulls last')->orderByDesc('id')
             ->limit(6)->get();
 
         return view('pages.overview', compact('agg', 'months', 'recent', 'period'));

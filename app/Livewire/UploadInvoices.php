@@ -15,13 +15,13 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
-// One upload for invoice files. The layout is recognised from the header: the line-level
-// export ("Şablon") is imported line by line AND its item names are classified right away
-// (with the same live progress as the Classify page); the legacy 15-column list is imported
-// exactly as before. Small files are handled inside the request; a big .xlsx/.csv goes through
-// the same steps — preview, then Import — in the background (BackgroundInvoiceUploads) while
-// this page polls its progress.
-#[Layout('components.app-layout', ['title' => 'Upload invoices'])]
+// The one upload for files. The layout is recognised from the header: the line-level export
+// ("Şablon") and a list of item names are imported line by line AND their item names are
+// classified right away (with the same live progress as the Classify page); the legacy 15-column
+// list is imported exactly as before. Small files are handled inside the request; a big
+// .xlsx/.csv goes through the same steps — preview, then Import — in the background
+// (BackgroundInvoiceUploads) while this page polls its progress.
+#[Layout('components.app-layout', ['title' => 'Upload'])]
 class UploadInvoices extends Component
 {
     use WithFileUploads;

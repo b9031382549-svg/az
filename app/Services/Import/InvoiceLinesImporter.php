@@ -19,7 +19,8 @@ use Throwable;
 // The line-level e-invoice export ("Şablon"): one row per invoice LINE with the invoice's own
 // fields repeated on every line, plus the item name, the code the supplier declared, unit and
 // quantity. Columns are found by their header text, not position, so a reordered or trimmed
-// export still maps. Every line lands in e_invoices (the chat's data) and every unique item
+// export still maps. A list of item names is the same thing with (almost) every column left out,
+// so it is read here too. Every line lands in e_invoices (the chat's data) and every unique item
 // name is classified right away — classification is what the upload is for.
 class InvoiceLinesImporter
 {
@@ -29,33 +30,56 @@ class InvoiceLinesImporter
      */
     public const MAX_LINES = 20000;
 
-    /** e_invoices column => the export's header text, as folded by headerKey(). */
+    /** The layouts this importer reads: the e-invoice line export and a list of item names. */
+    public const LAYOUTS = ['sablon', 'names'];
+
+    /**
+     * e_invoices column => the export's header text as the export writes it (the upload template
+     * is built from it); a file's header is matched folded by headerKey().
+     */
     private const HEADERS = [
-        'supplier_tax_office' => 'e-qf təqdim edənin vergi orqanı',
-        'supplier_name' => 'e-qf təqdim edənin adı',
-        'supplier_tin' => 'e-qf təqdim edənin vöen',
-        'recipient_tax_office' => 'e-qf əldə edənin vergi orqanı',
-        'recipient_name' => 'e-qf əldə edənin adı',
-        'recipient_tin' => 'e-qf əldə edənin vöen',
-        'invoice_type' => 'e-qaimənin növü',
-        'invoice_date' => 'e-qaimənin tarixi',
-        'approval_date' => 'e-qaimənin təsdiq tarixi',
-        'series' => 'e-qaimənin seriyası',
-        'number' => 'e-qaimənin nömrəsi',
-        'item_name' => 'malın adı',
-        'declared_group' => 'qrup adı',
-        'declared_code' => 'kodu',
-        'unit' => 'malın ölçü vahidi',
-        'quantity' => 'malın miqdarı',
-        'excise_amount' => 'aksiz məbləği',
-        'vat_taxable_amount' => 'ədv-yə cəlb edilən əməliyyatların məbləği',
-        'non_vat_taxable_amount' => 'ədv-yə cəlb edilməyən əməliyyatların məbləği',
-        'vat_exempt_amount' => 'ədv-dən azad olunan əməliyyatların məbləği',
-        'zero_rated_vat_amount' => 'ədv-yə "0" dərəcə ilə cəlb edilən əməliyyatların məbləği',
-        'vat_amount' => 'ədv məbləği',
-        'road_tax' => 'yol vergisi',
-        'total_amount' => 'yekun məbləğ',
+        'supplier_tax_office' => 'e-QF təqdim edənin vergi orqanı',
+        'supplier_name' => 'e-QF təqdim edənin adı',
+        'supplier_tin' => 'e-QF təqdim edənin VÖEN',
+        'recipient_tax_office' => 'e-QF əldə edənin Vergi orqanı',
+        'recipient_name' => 'e-QF əldə edənin adı',
+        'recipient_tin' => 'e-QF əldə edənin VÖEN',
+        'invoice_type' => 'e-Qaimənin növü',
+        'invoice_date' => 'e-Qaimənin tarixi',
+        'approval_date' => 'e-Qaimənin təsdiq tarixi',
+        'series' => 'e-Qaimənin seriyası',
+        'number' => 'e-Qaimənin nömrəsi',
+        'item_name' => 'Malın adı',
+        'declared_group' => 'Qrup adı',
+        'declared_code' => 'Kodu',
+        'unit' => 'Malın ölçü vahidi',
+        'quantity' => 'Malın miqdarı',
+        'excise_amount' => 'Aksiz məbləği',
+        'vat_taxable_amount' => 'ƏDV-yə cəlb edilən əməliyyatların məbləği',
+        'non_vat_taxable_amount' => 'ƏDV-yə cəlb edilməyən əməliyyatların məbləği',
+        'vat_exempt_amount' => 'ƏDV-dən azad olunan əməliyyatların məbləği',
+        'zero_rated_vat_amount' => 'ƏDV-yə "0" dərəcə ilə cəlb edilən əməliyyatların məbləği',
+        'vat_amount' => 'ƏDV məbləği',
+        'road_tax' => 'Yol vergisi',
+        'total_amount' => 'Yekun məbləğ',
     ];
+
+    /**
+     * Other headers lists of names put over the item-name column (the export says "Malın adı").
+     * Compared by nameKey(), so "MƏHSULUN ADI", "Malin adi" and "ITEM" match too. Only names that
+     * cannot mean anything else — a bare "Ad" / "Name" may well be a company's name.
+     */
+    private const NAME_HEADERS = [
+        'Malın adı', 'Məhsulun adı', 'Mal (əmtəə) adı', 'Mal adı', 'Mal_adı',
+        'Наименование', 'Наименование товара', 'Товар',
+        'Item', 'Item name', 'Product', 'Product name',
+    ];
+
+    /**
+     * Header words a one-column list may start with. Such a column is the names all the same,
+     * but this first cell is a header, not an item to classify.
+     */
+    private const LIST_HEADERS = ['Ad', 'Adı', 'Adlar', 'Name', 'Names', 'Description', 'Название', 'Список'];
 
     private const DATE_COLS = ['invoice_date', 'approval_date'];
 
@@ -84,12 +108,73 @@ class InvoiceLinesImporter
         return array_keys(self::HEADERS);
     }
 
-    /** Is this header row the line-level export? It needs the item name AND an invoice column. */
+    /** @return array<string, string> e_invoices column => the export's header text, in export order */
+    public static function headers(): array
+    {
+        return self::HEADERS;
+    }
+
+    /** Can this importer read a sheet that starts with this row? It needs an item-name column. */
     public static function matches(array $header): bool
     {
-        $map = self::columnMap($header);
+        return self::layout($header) !== null;
+    }
 
-        return isset($map['item_name']) && (isset($map['invoice_date']) || isset($map['total_amount']));
+    /**
+     * 'sablon' — the line-level export (the item name plus an invoice column); 'names' — a list
+     * of item names, maybe with a few line fields; null — no item-name column, not ours.
+     */
+    public static function layout(array $header): ?string
+    {
+        return self::shape($header)['layout'];
+    }
+
+    /**
+     * How to read a sheet that starts with $header: the sheet column of every e_invoices column
+     * found, the layout, and whether that first row is in fact the first name of a one-column
+     * list that has no header row (then it is a line, not a header).
+     *
+     * @param  array<int, mixed>  $header
+     * @return array{layout: ?string, map: array<string, int>, first_row_is_data: bool}
+     */
+    public static function shape(array $header): array
+    {
+        static $byHeader = null;
+        $byHeader ??= array_flip(array_map(self::headerKey(...), self::HEADERS));
+
+        $map = [];
+        foreach ($header as $i => $cell) {
+            $column = $byHeader[self::headerKey($cell)] ?? null;
+            if ($column !== null && ! isset($map[$column])) {
+                $map[$column] = $i;
+            }
+        }
+
+        if (! isset($map['item_name'])) {
+            $names = array_map(self::nameKey(...), self::NAME_HEADERS);
+            foreach ($header as $i => $cell) {
+                if (in_array(self::nameKey($cell), $names, true)) {
+                    $map['item_name'] = $i;
+                    break;
+                }
+            }
+        }
+
+        // One column under no header we know: that column is the names — its first cell
+        // included, unless it is plainly a header word.
+        $firstRowIsData = false;
+        if ($map === [] && ($only = self::onlyFilledCell($header)) !== null) {
+            $map['item_name'] = $only;
+            $firstRowIsData = ! in_array(self::nameKey($header[$only]), array_map(self::nameKey(...), self::LIST_HEADERS), true);
+        }
+
+        $layout = match (true) {
+            ! isset($map['item_name']) => null,
+            isset($map['invoice_date']) || isset($map['total_amount']) => 'sablon',
+            default => 'names',
+        };
+
+        return ['layout' => $layout, 'map' => $map, 'first_row_is_data' => $firstRowIsData];
     }
 
     /**
@@ -114,7 +199,8 @@ class InvoiceLinesImporter
             $stats->add($line);
         }
 
-        return $this->preview($stats, $checksum, array_slice($lines, 0, $limit));
+        return $this->preview($stats, $checksum, array_slice($lines, 0, $limit))
+            + ['first_row_is_data' => self::shape($header)['first_row_is_data']];
     }
 
     /**
@@ -183,14 +269,15 @@ class InvoiceLinesImporter
             ->unique(fn ($t) => ItemTranslation::hashFor($t))->values()->all();
 
         $batch = (string) Str::uuid();
+        $format = self::layout($header) ?? 'sablon';
 
         try {
-            $items = DB::transaction(function () use ($keep, $names, $batch, $checksum, $label, $userId, $stats, $skipped) {
+            $items = DB::transaction(function () use ($keep, $names, $batch, $format, $checksum, $label, $userId, $stats, $skipped) {
                 ImportBatch::create([
                     'key' => $batch,
                     'label' => $label,
                     'source' => 'invoices',
-                    'format' => 'sablon',
+                    'format' => $format,
                     'user_id' => $userId,
                     'item_count' => count($names),
                     'checksum' => $checksum,
@@ -276,32 +363,32 @@ class InvoiceLinesImporter
         return null;
     }
 
-    /**
-     * @param  array<int, mixed>  $header
-     * @return array<string, int> e_invoices column => index of that column in a row
-     */
-    private static function columnMap(array $header): array
-    {
-        $byHeader = array_flip(self::HEADERS);
-        $map = [];
-        foreach ($header as $i => $cell) {
-            $column = $byHeader[self::headerKey($cell)] ?? null;
-            if ($column !== null && ! isset($map[$column])) {
-                $map[$column] = $i;
-            }
-        }
-
-        return $map;
-    }
-
     /** Header text folded for matching: Azerbaijani-aware lower case, quotes unified, spaces collapsed. */
     private static function headerKey(mixed $cell): string
     {
-        $s = trim(preg_replace('/\s+/u', ' ', (string) $cell) ?? '');
+        // A streamed xlsx hands a date-formatted cell over as a DateTimeImmutable — never a header.
+        $s = trim(preg_replace('/\s+/u', ' ', is_scalar($cell) ? (string) $cell : '') ?? '');
         $s = str_replace(['İ', 'I'], ['i', 'ı'], $s);
         $s = mb_strtolower($s, 'UTF-8');
 
         return str_replace(["\u{0307}", '“', '”', '„', '«', '»'], ['', '"', '"', '"', '"', '"'], $s);
+    }
+
+    /**
+     * headerKey() with the dotless ı read as i — for the alternative item-name headers, which come
+     * typed in many ways: "MALIN ADI" folds to "malın adı", "Malin adi" and "ITEM" do not.
+     */
+    private static function nameKey(mixed $cell): string
+    {
+        return str_replace('ı', 'i', self::headerKey($cell));
+    }
+
+    /** @param array<int, mixed> $header the position of its only non-blank cell, if it has exactly one */
+    private static function onlyFilledCell(array $header): ?int
+    {
+        $filled = array_keys(array_filter($header, fn ($cell) => $cell !== null && trim(is_scalar($cell) ? (string) $cell : 'x') !== ''));
+
+        return count($filled) === 1 ? (int) $filled[0] : null;
     }
 
     /**
@@ -313,6 +400,10 @@ class InvoiceLinesImporter
      */
     private function mapRows(array $header, array $rows): array
     {
+        if (self::shape($header)['first_row_is_data']) {
+            array_unshift($rows, $header);
+        }
+
         $map = $this->lineMapper($header);
         $lines = [];
         foreach ($rows as $i => $row) {
@@ -334,10 +425,12 @@ class InvoiceLinesImporter
      */
     public function lineMapper(array $header): Closure
     {
-        $map = self::columnMap($header);
+        $map = self::shape($header)['map'];
 
         return function (array $row, int $rowNo) use ($map): ?array {
-            if ($this->isBlank($row)) {
+            // Blank where it matters: a row of a names list with only, say, its group filled in
+            // has nothing to keep.
+            if ($this->isBlank(array_map(fn (int $i) => $row[$i] ?? null, $map))) {
                 return null;
             }
 

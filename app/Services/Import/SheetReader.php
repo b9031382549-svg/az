@@ -10,11 +10,24 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 // upload accepts; a streaming reader is the path for bigger files.
 class SheetReader
 {
+    public function __construct(
+        private readonly SheetStream $stream,
+    ) {}
+
     /**
      * @return array{0: array<int, mixed>, 1: array<int, array<int, mixed>>}
      */
     public function read(string $path): array
     {
+        // A csv is read exactly as a big one is streamed — the same separator rules (a one-column
+        // list keeps the commas inside its names) and the cells as written.
+        if (IOFactory::identify($path) === 'Csv') {
+            $rows = iterator_to_array($this->stream->rows($path, 'csv'), false);
+            $header = array_shift($rows);
+
+            return [is_array($header) ? $header : [], $rows];
+        }
+
         ini_set('memory_limit', '1024M');
 
         $reader = IOFactory::createReaderForFile($path);

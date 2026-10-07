@@ -6,27 +6,20 @@ use App\Models\ImportBatch;
 use App\Services\Classify\BatchProgress;
 use App\Services\Classify\BatchStats;
 use App\Services\Classify\ClassificationQueue;
-use App\Services\Import\ItemFileParser;
 use App\Support\Audit;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
+// A quick check: item names typed or pasted into the text box, classified in the background with
+// live progress. Files go through the Upload page — preview, big files, and lines the chat reads.
 #[Layout('components.app-layout', ['title' => 'Classify'])]
 class Classify extends Component
 {
-    use WithFileUploads;
-
-    /** Max items accepted from one manual (textarea) submission — same cap as a file. */
+    /** Max items accepted from one manual (textarea) submission. */
     private const MANUAL_LIMIT = 100000;
 
-    /** Max items queued from a single file upload. */
-    private const FILE_LIMIT = 100000;
-
     public string $input = '';
-
-    public $file;
 
     /**
      * The upload currently being classified in the background, or null.
@@ -87,62 +80,6 @@ class Classify extends Component
         $this->input = '';
     }
 
-    public function classifyFile(ItemFileParser $parser): void
-    {
-        $this->validate(['file' => 'required|file|max:25600']);
-
-        $ext = strtolower((string) $this->file->getClientOriginalExtension());
-        if (! in_array($ext, ['xlsx', 'xls', 'csv'], true)) {
-            $this->addError('file', __('Please upload a .xlsx, .xls or .csv file.'));
-
-            return;
-        }
-
-        // Parsing + enqueuing up to 10k rows can take a moment (kept under the
-        // nginx fastcgi_read_timeout of 120s).
-        ini_set('memory_limit', '768M');
-        set_time_limit(110);
-
-        $path = $this->file->getRealPath();
-        // Parse once and de-duplicate up front (items are also de-duped per
-        // (batch, source_hash) when the parent rows are created).
-        $items = array_values(array_unique($parser->parse($path, self::FILE_LIMIT)));
-        $total = count($items);
-
-        if (empty($items)) {
-            $this->addError('file', __('No item names found in the file.'));
-
-            return;
-        }
-
-        $batch = (string) Str::uuid();
-        $label = $this->file->getClientOriginalName() ?: 'File import';
-        ImportBatch::create([
-            'key' => $batch,
-            'label' => $label,
-            'source' => 'file',
-            'user_id' => auth()->id(),
-            'item_count' => $total,
-        ]);
-
-        $count = $this->enqueue($items, $batch);
-        Audit::log('classify.file_upload', [
-            'file' => $label,
-            'queued' => $count,
-            'total' => $total,
-            'batch' => $batch,
-        ]);
-
-        $this->queued = [
-            'batch' => $batch,
-            'count' => $count,
-            'total' => $total,
-            'source' => 'file',
-            'label' => $label,
-        ];
-        $this->reset('file');
-    }
-
     /** Put the texts on the shared classification pipeline; returns the distinct item count. */
     private function enqueue(array $texts, string $batch): int
     {
@@ -152,7 +89,7 @@ class Classify extends Component
     /** Dismiss the progress panel and start a fresh classification. */
     public function startOver(): void
     {
-        $this->reset('queued', 'input', 'file');
+        $this->reset('queued', 'input');
     }
 
     public function render()
@@ -172,7 +109,6 @@ class Classify extends Component
             'batchStats' => $batchStats,
             'headingNames' => $headingNames,
             'manualLimit' => self::MANUAL_LIMIT,
-            'fileLimit' => self::FILE_LIMIT,
         ]);
     }
 }

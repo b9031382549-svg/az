@@ -7,6 +7,8 @@ use App\Livewire\UploadInvoices;
 use App\Models\ClassificationItem;
 use App\Models\EInvoice;
 use App\Models\User;
+use App\Services\Import\InvoiceLinesImporter;
+use App\Services\Import\SheetReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -85,13 +87,60 @@ class UploadInvoicesPageTest extends TestCase
         $page->assertDontSee('Şablon.xlsx');
     }
 
-    public function test_a_file_that_is_neither_layout_is_refused_in_the_preview(): void
+    public function test_a_list_of_names_is_previewed_imported_and_classified_like_the_export(): void
     {
-        $page = $this->page()->set('file', UploadedFile::fake()->createWithContent('names.csv', "Malın adı\nDivan\n"));
+        $page = $this->page()->set('file', UploadedFile::fake()->createWithContent('adlar.csv', "Malın adı\nDivan\nNoutbuk\ndivan\n"));
+
+        $page->assertSet('preview.format', 'names')
+            ->assertSet('preview.ok', true)
+            ->assertSet('preview.stats.unique_items', 2)
+            ->assertSee('Noutbuk')
+            ->assertSee(__('List of item names'));
+
+        $page->call('import')
+            ->assertSet('report.format', 'names')
+            ->assertSet('report.imported', 3)
+            ->assertSet('queued.count', 2)
+            ->assertSee('Classifying…');
+
+        $this->assertSame(3, EInvoice::count());
+        $this->assertSame(2, ClassificationItem::count());
+        Queue::assertPushed(ClassifyMechanismJob::class, 2);
+    }
+
+    public function test_a_file_without_an_item_name_column_is_refused_in_the_preview(): void
+    {
+        $book = new Spreadsheet;
+        $book->getActiveSheet()->fromArray([['Qrup adı', 'Kodu'], ['MEBEL', '9403']], null, 'A1', true);
+        $path = tempnam(sys_get_temp_dir(), 'nonames');
+        (new Xlsx($book))->save($path);
+        $file = UploadedFile::fake()->createWithContent('qruplar.xlsx', (string) file_get_contents($path));
+        @unlink($path);
+
+        $page = $this->page()->set('file', $file);
 
         $page->assertSet('preview.ok', false)
+            ->assertSee('Malın adı')               // the message says what the column must be called
             ->call('import')
             ->assertSet('report', null);
         $this->assertSame(0, EInvoice::count());
+    }
+
+    public function test_the_template_is_the_export_header_and_reads_back_as_the_export(): void
+    {
+        $response = $this->actingAs(User::factory()->create())->get(route('upload.template'));
+
+        $response->assertOk()->assertDownload();
+        // Browsers take the UTF-8 name; "Sablon.xlsx" is only the ASCII fallback.
+        $this->assertStringContainsString("filename*=utf-8''".rawurlencode('Şablon.xlsx'), (string) $response->headers->get('Content-Disposition'));
+        $path = tempnam(sys_get_temp_dir(), 'template').'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+        [$header, $rows] = app(SheetReader::class)->read($path);
+        @unlink($path);
+
+        $this->assertSame(array_values(InvoiceLinesImporter::headers()), $header);
+        $this->assertSame([], $rows);
+        $this->assertSame('sablon', InvoiceLinesImporter::layout($header));
+        $this->assertSame(array_search('item_name', array_keys(InvoiceLinesImporter::headers()), true), InvoiceLinesImporter::shape($header)['map']['item_name']);
     }
 }

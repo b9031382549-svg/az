@@ -837,5 +837,17 @@
     "meaningless characters": "mənasız simvollar",
     "no code was forced on it": "ona kod məcburi verilmədi",
     "Web search: no product named": "Vebdə axtarış: məhsul adı yoxdur",
-    "Web search: no product named — caught :caught of :rows trash rows": "Vebdə axtarış: məhsul adı yoxdur — :rows zibil sətrindən :caught tutuldu"
+    "Web search: no product named — caught :caught of :rows trash rows": "Vebdə axtarış: məhsul adı yoxdur — :rows zibil sətrindən :caught tutuldu",
+    "List of item names": "Mal adlarının siyahısı",
+    "Three layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; a <b>list of item names</b> — a “Malın adı” column (or “Məhsulun adı”, “Mal (əmtəə) adı”), or just one column of names; the items of both are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.": "Üç format avtomatik tanınır: <b>sətir səviyyəli ixrac (Şablon)</b> — malın adı ilə hər qaimə sətri üçün bir sətir; <b>mal adlarının siyahısı</b> — «Malın adı» sütunu (və ya «Məhsulun adı», «Mal (əmtəə) adı»), yaxud adlardan ibarət tək sütun; hər ikisinin malları <b>dərhal təsnif edilir</b>; və 15 standart sütunlu <b>qaimə siyahısı</b> (№, təchizatçı/alıcı VÖEN, tarixlər, seriya, nömrə, ƏDV məbləği sütunları və cəmi). Böyük fayllar <b>arxa planda</b> oxunur və idxal edilir — bu vaxt səhifəni bağlaya bilərsiniz.",
+    "Download the template": "Şablonu yükləyin",
+    "only the “Malın adı” column is required.": "yalnız «Malın adı» sütunu mütləqdir.",
+    "Lines": "Sətir",
+    "rows read from the file": "fayldan oxunan sətir",
+    "The file has no header row — its first row is read as an item name too.": "Faylda başlıq sətri yoxdur — birinci sətir də mal adı kimi oxunur.",
+    "Imported :n lines": ":n sətir idxal edildi",
+    "The file has no column with item names. Name it “Malın adı” (see the template) or upload a list with a single column of names.": "Faylda mal adları olan sütun yoxdur. Onu «Malın adı» adlandırın (şablona baxın) və ya adlardan ibarət tək sütunlu siyahı yükləyin.",
+    "Have a file?": "Faylınız var?",
+    "Upload it on the Upload page — a list of item names or an invoice export: a preview first, big files in the background, and the chat sees its lines.": "Onu «Yükləmə» səhifəsində yükləyin — mal adlarının siyahısı və ya qaimə ixracı: əvvəlcə önbaxış, böyük fayllar arxa planda, sətirləri isə çat görür.",
+    "Go to Upload →": "Yükləməyə keç →"
 }

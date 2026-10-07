@@ -62,7 +62,8 @@ class Invoices extends Component
                     ->orWhere('supplier_name', $likeOp, $like)
                     ->orWhere('recipient_name', $likeOp, $like));
             })
-            ->orderByDesc('invoice_date')
+            // Undated lines (a list of names) go last — Postgres puts NULLs first in a desc sort.
+            ->orderByRaw('invoice_date desc nulls last')
             ->orderByDesc('id')
             ->paginate(20);
 

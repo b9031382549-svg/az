@@ -3,15 +3,17 @@
     $nf = fn ($n) => number_format((float) $n, 0, '.', ' ');
     $formatLabel = fn ($f) => match ($f) {
         'sablon' => __('Line-level export (Şablon)'),
+        'names' => __('List of item names'),
         'legacy' => __('Invoice list (15 columns)'),
         default => '—',
     };
+    $lineLevel = fn ($f) => in_array($f, ['sablon', 'names'], true);
   @endphp
 
   <div class="flex items-end justify-between flex-wrap gap-3 mb-6">
     <div>
       <p class="kicker mb-1.5">{{ __('Data import') }}</p>
-      <h1 class="font-display text-4xl">{{ __('Upload invoices') }}</h1>
+      <h1 class="font-display text-4xl">{{ __('Upload') }}</h1>
     </div>
     <div class="flex items-center gap-3">
       <div class="card-flat px-4 py-2.5 text-sm">
@@ -70,7 +72,7 @@
         <div class="h-2 rounded-full bg-line/40 overflow-hidden mt-4">
           <div class="h-full bg-ledger transition-all duration-500" style="width: {{ $pct }}%"></div>
         </div>
-        <p class="text-faint text-xs mt-1.5 tnum">{{ $pct }}%@if($background['format'] === 'sablon') · {{ __('the items are classified once the import is done') }}@endif</p>
+        <p class="text-faint text-xs mt-1.5 tnum">{{ $pct }}%@if($lineLevel($background['format'])) · {{ __('the items are classified once the import is done') }}@endif</p>
       @endif
     </div>
   @endif
@@ -100,7 +102,8 @@
     @error('file') <p class="text-sm text-stamp mt-3">{{ $message }}</p> @enderror
     <div class="mt-4 flex items-start gap-2.5 text-sm text-muted card-flat p-3.5">
       <span class="text-amber">ℹ</span>
-      <span>{!! __('Two layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; its items are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.') !!}</span>
+      <span>{!! __('Three layouts are recognised automatically: the <b>line-level export (Şablon)</b> — one row per invoice line with the item name; a <b>list of item names</b> — a “Malın adı” column (or “Məhsulun adı”, “Mal (əmtəə) adı”), or just one column of names; the items of both are <b>classified right away</b>; and the <b>invoice list</b> with the 15 standard columns (No., supplier/recipient TIN, dates, series, number, the VAT amount columns and total). Big files are read and imported <b>in the background</b> — you can leave the page meanwhile.') !!}
+        <a href="{{ route('upload.template') }}" class="link-under text-ink whitespace-nowrap">{{ __('Download the template') }}</a> — {{ __('only the “Malın adı” column is required.') }}</span>
     </div>
     @if($existing > 0)
       <div class="mt-3 flex items-start gap-2.5 text-sm card-flat p-3.5 border-amber/40">
@@ -127,6 +130,13 @@
         @endif
       </div>
     </div>
+
+    @if($preview['ok'] && ($preview['same_file'] ?? null))
+      <div class="mb-4 card-flat p-3.5 text-sm flex items-start gap-2.5 border-amber/40">
+        <span class="text-amber">⚠</span>
+        <span>{!! __('This exact file was already uploaded as <b>:label</b> (:at). Importing it again adds its lines a second time — lines without an invoice number cannot be recognised as duplicates.', ['label' => e($preview['same_file']['label']), 'at' => $preview['same_file']['at']]) !!}</span>
+      </div>
+    @endif
 
     @if($preview['ok'] && ($preview['format'] ?? null) === 'sablon')
       {{-- Line-level export: how much of it can be tied to specific invoices. --}}
@@ -155,12 +165,6 @@
       </div>
       @if($s['no_date'] > 0)
         <p class="text-amber text-sm mb-3">⚠ {{ __(':n lines have no invoice date.', ['n' => $nf($s['no_date'])]) }}</p>
-      @endif
-      @if($preview['same_file'])
-        <div class="mb-4 card-flat p-3.5 text-sm flex items-start gap-2.5 border-amber/40">
-          <span class="text-amber">⚠</span>
-          <span>{!! __('This exact file was already uploaded as <b>:label</b> (:at). Importing it again adds its lines a second time — lines without an invoice number cannot be recognised as duplicates.', ['label' => e($preview['same_file']['label']), 'at' => $preview['same_file']['at']]) !!}</span>
-        </div>
       @endif
 
       <div class="card-flat overflow-hidden">
@@ -214,6 +218,58 @@
             <span wire:loading wire:target="import">{{ __('Importing…') }}</span>
           </button>
         </div>
+      </div>
+    @elseif($preview['ok'] && ($preview['format'] ?? null) === 'names')
+      {{-- A list of item names: no invoices to tie lines to — only what goes to classification. --}}
+      @php $s = $preview['stats']; @endphp
+      <div class="grid grid-cols-2 gap-3 mb-4 max-w-[560px]">
+        <div class="card-flat p-3.5">
+          <p class="kicker mb-1">{{ __('Lines') }}</p>
+          <p class="font-display text-2xl tnum">{{ $nf($s['lines']) }}</p>
+          <p class="text-faint text-xs">{{ $s['no_item'] > 0 ? __(':n lines without a name', ['n' => $nf($s['no_item'])]) : __('rows read from the file') }}</p>
+        </div>
+        <div class="card-flat p-3.5">
+          <p class="kicker mb-1">{{ __('To classify') }}</p>
+          <p class="font-display text-2xl tnum">{{ $nf($s['unique_items']) }}</p>
+          <p class="text-faint text-xs">{{ __('unique item names') }}</p>
+        </div>
+      </div>
+      @if($preview['first_row_is_data'] ?? false)
+        <p class="text-muted text-sm mb-3">ℹ {{ __('The file has no header row — its first row is read as an item name too.') }}</p>
+      @endif
+
+      <div class="card-flat overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-muted border-b hair bg-paper/50">
+                <th class="font-medium px-4 py-2.5 w-14">№</th>
+                <th class="font-medium px-4 py-2.5">{{ __('Item') }}</th>
+                <th class="font-medium px-4 py-2.5">{{ __('Unit') }}</th>
+                <th class="font-medium px-4 py-2.5 text-right">{{ __('Qty') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach($preview['sample'] as $r)
+                <tr class="border-b hair last:border-0">
+                  <td class="px-4 py-2.5 tnum text-faint">{{ $r['row_no'] ?? '' }}</td>
+                  <td class="px-4 py-2.5 max-w-[420px] truncate" title="{{ $r['item_name'] }}">{{ $r['item_name'] ?? '—' }}</td>
+                  <td class="px-4 py-2.5 whitespace-nowrap">{{ $r['unit'] ?? '—' }}</td>
+                  <td class="px-4 py-2.5 tnum text-right">{{ $r['quantity'] !== null ? rtrim(rtrim(number_format((float) $r['quantity'], 4, '.', ' '), '0'), '.') : '—' }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p class="text-faint text-xs mt-2">{{ __('Preview of the first :n rows.', ['n' => count($preview['sample'])]) }}</p>
+
+      <div class="flex justify-end gap-2 mt-5">
+        <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('Choose another') }}</button>
+        <button wire:click="import" wire:loading.attr="disabled" wire:target="import" class="btn btn-ink btn-sm">
+          <span wire:loading.remove wire:target="import">{{ __('Import :n lines and classify →', ['n' => $nf($preview['count'])]) }}</span>
+          <span wire:loading wire:target="import">{{ __('Importing…') }}</span>
+        </button>
       </div>
     @elseif($preview['ok'])
       <div class="card-flat overflow-hidden">
@@ -283,7 +339,10 @@
         </div>
       </div>
     @else
-      <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('← Choose another file') }}</button>
+      <div class="flex items-center gap-4 flex-wrap">
+        <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('← Choose another file') }}</button>
+        <a href="{{ route('upload.template') }}" class="link-under text-sm">{{ __('Download the template') }}</a>
+      </div>
     @endif
   @endif
 
@@ -305,6 +364,10 @@
           <p class="text-muted text-sm">{{ __(':n lines of invoices already in the database skipped', ['n' => $nf($report['skipped'])]) }}</p>
         @endif
         <p class="text-muted">{{ __(':n unique item names sent to classification.', ['n' => $nf($report['items'] ?? 0)]) }}</p>
+      @elseif(($report['format'] ?? null) === 'names')
+        <div class="mx-auto w-12 h-12 grid place-items-center rounded-2xl bg-ledger/12 text-ledger text-2xl mb-3">✓</div>
+        <h2 class="font-display text-2xl mb-1">{{ __('Imported :n lines', ['n' => $nf($report['imported'])]) }}</h2>
+        <p class="text-muted">{{ __(':n unique item names sent to classification.', ['n' => $nf($report['items'] ?? 0)]) }}</p>
       @else
         <div class="mx-auto w-12 h-12 grid place-items-center rounded-2xl bg-ledger/12 text-ledger text-2xl mb-3">✓</div>
         <h2 class="font-display text-2xl mb-1">{{ __('Imported') }} {{ $nf($report['imported']) }} {{ __('invoices') }}</h2>
@@ -314,7 +377,7 @@
         <p class="text-muted">{{ $nf($report['total']) }} {{ __('rows in the database now.') }}</p>
       @endif
       <div class="flex justify-center gap-2 mt-6">
-        <a href="{{ route('invoices') }}" class="btn btn-ink btn-sm">{{ __('Open in table') }}</a>
+        <a href="{{ route('invoices', ($report['batch'] ?? null) ? ['upload' => $report['batch']] : []) }}" class="btn btn-ink btn-sm">{{ __('Open in table') }}</a>
         <button wire:click="startOver" class="btn btn-ghost btn-sm">{{ __('Upload more') }}</button>
       </div>
     </div>

@@ -21,22 +21,13 @@
     </div>
   </div>
 
-  {{-- File upload — batch classification in the background --}}
-  <div class="card-flat p-5 mt-4">
-    <div class="flex items-center justify-between flex-wrap gap-3">
-      <div>
-        <p class="font-medium">{{ __('Or upload a file') }}</p>
-        <p class="text-muted text-sm">{{ __('.xlsx / .xls / .csv — one item name per row. Classified in the background (up to :n rows).', ['n' => number_format($fileLimit)]) }}</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <input type="file" wire:model="file" accept=".xlsx,.xls,.csv" class="text-sm max-w-[230px]">
-        <button wire:click="classifyFile" wire:loading.attr="disabled" wire:target="classifyFile,file" class="btn btn-ink btn-sm">
-          <span wire:loading.remove wire:target="classifyFile,file">{{ __('Queue file →') }}</span>
-          <span wire:loading wire:target="classifyFile,file">{{ __('Queuing…') }}</span>
-        </button>
-      </div>
+  {{-- Files have one door — the Upload page (preview, big files, lines the chat reads). --}}
+  <div class="card-flat p-5 mt-4 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <p class="font-medium">{{ __('Have a file?') }}</p>
+      <p class="text-muted text-sm">{{ __('Upload it on the Upload page — a list of item names or an invoice export: a preview first, big files in the background, and the chat sees its lines.') }}</p>
     </div>
-    @error('file') <p class="text-sm text-stamp mt-2">{{ $message }}</p> @enderror
+    <a href="{{ route('upload') }}" class="btn btn-ghost btn-sm">{{ __('Go to Upload →') }}</a>
   </div>
 
   {{-- Live progress for the active upload --}}
