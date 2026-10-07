@@ -33,4 +33,9 @@ return [
 
     // Previews nobody imported, and failed ones, are removed (row + files) after this.
     'prune_after_hours' => 24,
+
+    // Lines per file of the invoice-lines export (InvoiceLinesExporter). An .xlsx goes out only
+    // once it is zipped — 100k lines ≈ 24 s here, 700k ≈ 230 s — and nginx gives a request
+    // 120 s, so a bigger selection is downloaded in parts.
+    'export_part_lines' => 100000,
 ];

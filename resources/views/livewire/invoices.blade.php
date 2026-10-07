@@ -13,6 +13,14 @@
           @endforeach
         </select>
       @endif
+      <select wire:model.live="status" class="h-10 px-2.5 rounded-xl border hair bg-surface text-sm outline-none hover:border-ink transition cursor-pointer">
+        <option value="">{{ __('All statuses') }}</option>
+        <option value="classified">{{ __('Classified') }}</option>
+        <option value="needs_review">{{ __('Needs review') }}</option>
+        <option value="in_progress">{{ __('In progress') }}</option>
+        <option value="trash">{{ __('Not a product') }}</option>
+        <option value="rejected">{{ __('Rejected') }}</option>
+      </select>
       <div class="flex items-center gap-2 bg-surface border hair rounded-xl px-3.5 h-10 w-full sm:w-80">
         <span class="text-faint">⌕</span>
         <input wire:model.live.debounce.400ms="q" placeholder="{{ __('Search item, TIN, series, number…') }}"
@@ -21,8 +29,23 @@
           <button wire:click="clear" class="text-faint hover:text-ink">✕</button>
         @endif
       </div>
+      {{-- The lines the filters select, with our answer per line. A plain link: the file streams. --}}
+      @if($invoices->total() > 0 && $exportParts === 1)
+        <a href="{{ route('invoices.export', $exportFilters) }}" class="btn btn-ink btn-sm h-10">⤓ {{ __('Download Excel') }}</a>
+      @endif
     </div>
   </div>
+
+  @if($invoices->total() > 0 && $exportParts > 1)
+    {{-- Past one file's worth of lines: one file per part, each small enough to stream in time. --}}
+    <div class="card-flat px-4 py-3 mb-4 flex items-center gap-2 flex-wrap text-sm">
+      <span class="text-muted">⤓ {{ __('Excel in :n parts of up to :lines lines:', ['n' => $exportParts, 'lines' => number_format($exportPartLines, 0, '.', ' ')]) }}</span>
+      @for($p = 1; $p <= $exportParts; $p++)
+        <a href="{{ route('invoices.export', $exportFilters + ['part' => $p]) }}" class="btn btn-ghost btn-sm"
+           title="{{ number_format(($p - 1) * $exportPartLines + 1, 0, '.', ' ') }}–{{ number_format(min($p * $exportPartLines, $invoices->total()), 0, '.', ' ') }}">{{ __('Part :n', ['n' => $p]) }}</a>
+      @endfor
+    </div>
+  @endif
 
   <div class="card-flat overflow-hidden">
     <div class="overflow-x-auto">

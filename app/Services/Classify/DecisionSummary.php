@@ -80,6 +80,32 @@ final class DecisionSummary
     }
 
     /**
+     * Just the method per item, keyed by item id — for exports of many lines, where the reason
+     * is not shown. Reads only the light columns of the result rows (no candidates, no trace),
+     * so a Direct + vector agreement on a service that the sorter also backs reads as 'sorter'
+     * rather than 'consensus' — rare, and both are the same kind of evidence.
+     *
+     * @param  Collection<int, ClassificationItem>  $items
+     * @return array<int, array{method: string}>
+     */
+    public function methodsFor(Collection $items): array
+    {
+        $out = [];
+        foreach ($items->chunk(self::CHUNK * 2) as $chunk) {
+            $results = ClassificationResult::query()
+                ->whereIn('classification_item_id', $chunk->pluck('id'))
+                ->get(['classification_item_id', 'mechanism', 'matched_code', 'kind', 'confidence', 'status'])
+                ->groupBy('classification_item_id');
+
+            foreach ($chunk as $item) {
+                $out[$item->id] = ['method' => $this->describe($item, $results->get($item->id, collect()))['method']];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  Collection<int, ClassificationResult>  $results  the item's result rows
      * @param  array{user: string, action: ?ActivityLog}|null  $human  see humanDecisions()
      * @return array{method: string, reason: string}

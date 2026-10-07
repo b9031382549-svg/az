@@ -849,5 +849,20 @@
     "The file has no column with item names. Name it “Malın adı” (see the template) or upload a list with a single column of names.": "Faylda mal adları olan sütun yoxdur. Onu «Malın adı» adlandırın (şablona baxın) və ya adlardan ibarət tək sütunlu siyahı yükləyin.",
     "Have a file?": "Faylınız var?",
     "Upload it on the Upload page — a list of item names or an invoice export: a preview first, big files in the background, and the chat sees its lines.": "Onu «Yükləmə» səhifəsində yükləyin — mal adlarının siyahısı və ya qaimə ixracı: əvvəlcə önbaxış, böyük fayllar arxa planda, sətirləri isə çat görür.",
-    "Go to Upload →": "Yükləməyə keç →"
+    "Go to Upload →": "Yükləməyə keç →",
+    "Our code": "Bizim kod",
+    "Category": "Kateqoriya",
+    "Good or service": "Mal və ya xidmət",
+    "Reliability, %": "Etibarlılıq, %",
+    "Matches the declared code": "Bəyan edilmiş kodla üst-üstə düşür",
+    "Decision page": "Qərar səhifəsi",
+    "not a product": "məhsul deyil",
+    "Not a product": "Məhsul deyil",
+    "yes": "bəli",
+    "no": "xeyr",
+    "All statuses": "Bütün statuslar",
+    "Download Excel": "Excel-i yüklə",
+    "Excel in :n parts of up to :lines lines:": "Excel :n hissədə, hər birində :lines sətirədək:",
+    "Part :n": "Hissə :n",
+    "Lines of this upload with our answer per line": "Bu yükləmənin sətirləri, hər sətir üzrə cavabımızla"
 }

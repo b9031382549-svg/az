@@ -849,5 +849,20 @@
     "The file has no column with item names. Name it “Malın adı” (see the template) or upload a list with a single column of names.": "В файле нет столбца с наименованиями. Назовите его «Malın adı» (см. шаблон) или загрузите список из одного столбца с названиями.",
     "Have a file?": "Есть файл?",
     "Upload it on the Upload page — a list of item names or an invoice export: a preview first, big files in the background, and the chat sees its lines.": "Загрузите его на странице «Загрузка» — список наименований или выгрузку накладных: сначала предпросмотр, большие файлы обрабатываются в фоне, а строки видит чат.",
-    "Go to Upload →": "Перейти к загрузке →"
+    "Go to Upload →": "Перейти к загрузке →",
+    "Our code": "Наш код",
+    "Category": "Категория",
+    "Good or service": "Товар или услуга",
+    "Reliability, %": "Надёжность, %",
+    "Matches the declared code": "Совпадает с заявленным кодом",
+    "Decision page": "Страница решения",
+    "not a product": "не товар",
+    "Not a product": "Не товар",
+    "yes": "да",
+    "no": "нет",
+    "All statuses": "Все статусы",
+    "Download Excel": "Скачать Excel",
+    "Excel in :n parts of up to :lines lines:": "Excel частями (:n) — до :lines строк в каждой:",
+    "Part :n": "Часть :n",
+    "Lines of this upload with our answer per line": "Строки этой загрузки с нашим ответом по каждой"
 }

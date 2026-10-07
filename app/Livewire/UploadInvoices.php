@@ -6,6 +6,7 @@ use App\Models\EInvoice;
 use App\Models\ImportBatch;
 use App\Services\Classify\BatchProgress;
 use App\Services\Classify\BatchStats;
+use App\Services\Export\InvoiceLinesExporter;
 use App\Services\Import\BackgroundInvoiceUploads;
 use App\Services\Import\InvoiceUploads;
 use App\Services\Import\SheetStream;
@@ -226,6 +227,7 @@ class UploadInvoices extends Component
             'existing' => (int) EInvoice::count(),
             'uploads' => app(InvoiceUploads::class)->recent(),
             'maxMegabytes' => (int) round(config('uploads.max_kilobytes') / 1024),
+            'exportPartLines' => InvoiceLinesExporter::partLines(),
             'progress' => $progress,
             'headingNames' => $headingNames,
             'batchStats' => $batchStats,
