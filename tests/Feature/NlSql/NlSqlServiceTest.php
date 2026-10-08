@@ -110,6 +110,36 @@ class NlSqlServiceTest extends TestCase
         $this->assertStringContainsString('upload_name', $system);
     }
 
+    public function test_the_prompt_compares_names_through_az_fold(): void
+    {
+        // Postgres' ILIKE turns I into i, never ı: "qazlı içki" missed QAZLI İÇKİ (2026-10-03).
+        $system = $this->messagesFor('qazlı içki nə qədər alınıb?', [])[0]['content'];
+
+        $this->assertStringContainsString("az_fold(item_name) LIKE '%' || az_fold('qazlı içki') || '%'", $system);
+        $this->assertStringContainsString('Never use ILIKE or lower()', $system);
+    }
+
+    public function test_line_breaks_written_as_backslash_n_do_not_break_the_query(): void
+    {
+        // Seen on prod's model 2026-10-08: "... AS total \\nFROM invoice_lines" — the backslash
+        // is a syntax error in Postgres.
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->once()->andReturn([
+            'model' => 'm', 'usage' => [], 'latency_ms' => 1, 'raw' => '{}',
+            // No table: the test's read-only connection is an empty in-memory database.
+            'data' => ['sql' => 'SELECT 1 AS n \\nWHERE 1 = 1', 'answer' => null, 'explanation' => 'one'],
+        ]);
+        $schema = Mockery::mock(SchemaContext::class);
+        $schema->shouldReceive('describe')->andReturn('Table invoice_lines:');
+        $schema->shouldReceive('allowedTables')->andReturn(['invoice_lines']);
+
+        $result = (new NlSqlService($llm, $schema))->ask('how many lines?');
+
+        $this->assertNull($result['error']);
+        $this->assertSame("SELECT 1 AS n \nWHERE 1 = 1", $result['sql']);
+        $this->assertSame([['n' => 1]], $result['rows']);
+    }
+
     public function test_turns_with_no_sql_and_no_answer_are_skipped(): void
     {
         $history = [

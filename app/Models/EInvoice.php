@@ -17,6 +17,9 @@ class EInvoice extends Model
      */
     public const STATUSES = ['classified', 'needs_review', 'in_progress', 'trash', 'rejected'];
 
+    /** The columns the Invoices search looks in. */
+    private const SEARCHABLE = ['supplier_tin', 'recipient_tin', 'number', 'series', 'item_name', 'declared_code', 'supplier_name', 'recipient_name'];
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -48,22 +51,21 @@ class EInvoice extends Model
     public function scopeFiltered(Builder $query, string $term = '', string $upload = '', string $status = ''): Builder
     {
         $term = trim($term);
-        // ILIKE on Postgres, LIKE on sqlite (tests) — both case-insensitive for the search.
-        $likeOp = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        // On Postgres through az_fold(), so "qazli icki" finds QAZLI İÇKİ (ILIKE turns I into i,
+        // never ı); plain LIKE on sqlite (tests), case-insensitive for ASCII.
+        $pgsql = $query->getConnection()->getDriverName() === 'pgsql';
 
         return $query
             ->when($upload !== '', fn (Builder $q) => $q->where('import_batch', $upload))
-            ->when($term !== '', function (Builder $q) use ($term, $likeOp) {
+            ->when($term !== '', function (Builder $q) use ($term, $pgsql) {
                 $like = '%'.$term.'%';
-                $q->where(fn (Builder $w) => $w
-                    ->where('supplier_tin', $likeOp, $like)
-                    ->orWhere('recipient_tin', $likeOp, $like)
-                    ->orWhere('number', $likeOp, $like)
-                    ->orWhere('series', $likeOp, $like)
-                    ->orWhere('item_name', $likeOp, $like)
-                    ->orWhere('declared_code', $likeOp, $like)
-                    ->orWhere('supplier_name', $likeOp, $like)
-                    ->orWhere('recipient_name', $likeOp, $like));
+                $q->where(function (Builder $w) use ($like, $pgsql) {
+                    foreach (self::SEARCHABLE as $column) {
+                        $pgsql
+                            ? $w->orWhereRaw("az_fold({$column}) like az_fold(?)", [$like])
+                            : $w->orWhere($column, 'like', $like);
+                    }
+                });
             })
             ->when(in_array($status, self::STATUSES, true), fn (Builder $q) => $q->whereHas('classificationItem', function (Builder $item) use ($status) {
                 match ($status) {

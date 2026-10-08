@@ -94,6 +94,11 @@ class NlSqlService
 
         $sql = $json['sql'] ?? null;
         $sql = is_string($sql) && trim($sql) !== '' ? trim($sql) : null;
+        // Now and then the model writes its line breaks as the two characters "\n" (escaped once
+        // too often in its JSON) — Postgres reads that backslash as a syntax error.
+        if ($sql !== null) {
+            $sql = str_replace(['\r\n', '\n', '\r', '\t'], ["\n", "\n", "\n", ' '], $sql);
+        }
 
         $answer = $json['answer'] ?? null;
         $answer = is_string($answer) && trim($answer) !== '' ? trim($answer) : null;
@@ -226,8 +231,14 @@ class NlSqlService
           "declared_code" / "declared_heading" / "declared_group" are what the
           SUPPLIER wrote on the invoice — unverified; use them only when the
           question is about the declared codes.
-        - Match names case-insensitively with ILIKE (item_name, supplier_name,
-          …); units vary in case, compare lower(unit).
+        - Item, company and unit names are Azerbaijani, typed in any case and with
+          or without the Azerbaijani letters: QAZLI İÇKİ, qazlı içki and qazli
+          icki are one name. To match words from the question against item_name,
+          supplier_name, recipient_name, unit or any other text, compare BOTH
+          sides through az_fold() — it lower-cases and turns ı/İ/I→i, ə→e, ş→s,
+          ç→c, ğ→g, ö→o, ü→u:
+          az_fold(item_name) LIKE '%' || az_fold('qazlı içki') || '%'.
+          Never use ILIKE or lower() for this — they miss such spellings.
         - Dates are SQL DATE values. The current real-world date is given in
           CONTEXT above — use it when the user refers to "today" / "now" / a
           specific calendar date, and when answering conversationally about dates.

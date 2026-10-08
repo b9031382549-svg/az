@@ -99,7 +99,9 @@ The app is auth-gated (default login user `admin`).
   `SqlGuard`/`SqlGuardException` (enforce read-only + table allow-list). The chat
   reads only the `invoice_lines` VIEW (e_invoices + each line's classification +
   upload). A read-only DB role `app_ro` is used for the actual query
-  (`nlsql:grant`).
+  (`nlsql:grant`). Names are compared through the Postgres function `az_fold()`
+  (lower case + ı/İ/I→i, ə→e, ş→s, ç→c, ğ→g, ö→o, ü→u) — ILIKE turns I into i,
+  never ı, so `'QAZLI' ILIKE '%qazlı%'` is false; the Invoices search uses it too.
 - **LLM:** `OpenRouterClient`, `JsonExtractor`. Query-expansion model via
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,
