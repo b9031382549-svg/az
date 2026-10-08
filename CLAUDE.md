@@ -102,6 +102,11 @@ The app is auth-gated (default login user `admin`).
   (`nlsql:grant`). Names are compared through the Postgres function `az_fold()`
   (lower case + ı/İ/I→i, ə→e, ş→s, ç→c, ğ→g, ö→o, ü→u) — ILIKE turns I into i,
   never ı, so `'QAZLI' ILIKE '%qazlı%'` is false; the Invoices search uses it too.
+  "This taxpayer" mode (`AskAi::$tin`, `?tin=` — the Invoices page links each VÖEN;
+  a VÖEN column in an answer is clickable): the model writes the placeholder `:tin`,
+  `NlSqlService` quotes the VÖEN in on our side (never sent to the model) and refuses
+  a query without it; `chat_messages.context_tin` keeps the replayed history to the
+  turns of the same taxpayer. `Taxpayers` looks the VÖEN up (name, lines sold/bought).
 - **LLM:** `OpenRouterClient`, `JsonExtractor`. Query-expansion model via
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,

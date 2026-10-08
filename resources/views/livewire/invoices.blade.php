@@ -100,8 +100,22 @@
                   <div class="text-faint text-xs font-mono" title="{{ $inv->declared_group }}">{{ __('decl.') }} {{ $inv->declared_code }}</div>
                 @endif
               </td>
-              <td class="px-4 py-3 font-mono">{{ $inv->supplier_tin ?? '—' }}</td>
-              <td class="px-4 py-3 font-mono">{{ $inv->recipient_tin ?? '—' }}</td>
+              <td class="px-4 py-3 font-mono">
+                @if($inv->supplier_tin)
+                  {{-- Opens the AI chat on this taxpayer ("this taxpayer" mode). --}}
+                  <a href="{{ route('ask', ['tin' => $inv->supplier_tin]) }}" class="hover:text-stamp" title="{{ __('Ask the AI chat about this taxpayer') }}">{{ $inv->supplier_tin }}</a>
+                @else
+                  —
+                @endif
+              </td>
+              <td class="px-4 py-3 font-mono">
+                @if($inv->recipient_tin)
+                  {{-- Opens the AI chat on this taxpayer ("this taxpayer" mode). --}}
+                  <a href="{{ route('ask', ['tin' => $inv->recipient_tin]) }}" class="hover:text-stamp" title="{{ __('Ask the AI chat about this taxpayer') }}">{{ $inv->recipient_tin }}</a>
+                @else
+                  —
+                @endif
+              </td>
               <td class="px-4 py-3 tnum text-right whitespace-nowrap">{{ number_format($inv->vat_amount, 2, '.', ' ') }}</td>
               <td class="px-4 py-3 tnum text-right whitespace-nowrap font-medium">{{ number_format($inv->total_amount, 2, '.', ' ') }}</td>
             </tr>
