@@ -10,6 +10,16 @@ use Throwable;
 
 class NlSqlService
 {
+    /**
+     * The selected taxpayer in the SQL the model writes — the server puts the VÖEN in its place,
+     * so the number never reaches the external model and cannot be mistyped by it. Not the
+     * "::tin" of a cast, not part of a longer name.
+     */
+    private const TIN_PLACEHOLDER = '/(?<![:\w]):tin\b/';
+
+    /** A VÖEN as the data holds it — 10 digits, or the demo data's "A_00000001". */
+    public const TIN_FORMAT = '/^[A-Za-z0-9_]{1,32}$/';
+
     public function __construct(
         private readonly OpenRouterClient $llm,
         private readonly SchemaContext $schema,
@@ -19,12 +29,15 @@ class NlSqlService
      * Translate a natural-language question into SQL, execute it read-only and
      * return the result set together with the SQL and a short explanation.
      *
+     * With $tin the conversation is about that one taxpayer ("this taxpayer" mode): the model
+     * writes the placeholder :tin, the server binds the VÖEN, and a query without it is not run.
+     *
      * @param  array<int, array<string, mixed>>  $history  Prior turns (oldest→newest),
      *                                                     each carrying 'q'/'sql'/'answer'/'explanation', so a follow-up like
      *                                                     "from the previous query" can build on earlier requests.
      * @return array{question: string, sql: ?string, answer: ?string, explanation: ?string, columns: array<int,string>, rows: array<int,array<string,mixed>>, error: ?string}
      */
-    public function ask(string $question, array $history = []): array
+    public function ask(string $question, array $history = [], ?string $tin = null): array
     {
         $result = [
             'question' => $question,
@@ -37,7 +50,11 @@ class NlSqlService
         ];
 
         try {
-            $generated = $this->generate($question, $history);
+            if ($tin !== null && ! preg_match(self::TIN_FORMAT, $tin)) {
+                throw new SqlGuardException(__('No lines with this VÖEN in the loaded data.'));
+            }
+
+            $generated = $this->generate($question, $history, $tin);
             $result['sql'] = $generated['sql'];
             $result['answer'] = $generated['answer'];
             $result['explanation'] = $generated['explanation'];
@@ -47,8 +64,17 @@ class NlSqlService
                 return $result;
             }
 
+            $sql = $generated['sql'];
+            if ($tin !== null) {
+                if (! preg_match(self::TIN_PLACEHOLDER, $sql)) {
+                    throw new SqlGuardException(__('The query was not limited to the selected taxpayer — please rephrase the question.'));
+                }
+                // Quoted here, on our side; the guard then checks the query as it will run.
+                $sql = (string) preg_replace(self::TIN_PLACEHOLDER, DB::connection('pgsql_ro')->getPdo()->quote($tin), $sql);
+            }
+
             $guard = new SqlGuard($this->schema->allowedTables());
-            $safeSql = $guard->sanitize($generated['sql']);
+            $safeSql = $guard->sanitize($sql);
 
             $rows = DB::connection('pgsql_ro')->select($safeSql);
             $rows = array_map(fn ($r) => (array) $r, $rows);
@@ -61,6 +87,7 @@ class NlSqlService
 
         Audit::log('nlsql.query', [
             'question' => $question,
+            'context_tin' => $tin,
             'sql' => $result['sql'],
             'conversational' => $result['answer'] !== null,
             'rows' => count($result['rows']),
@@ -74,9 +101,9 @@ class NlSqlService
      * @param  array<int, array<string, mixed>>  $history
      * @return array{sql: ?string, answer: ?string, explanation: ?string}
      */
-    private function generate(string $question, array $history): array
+    private function generate(string $question, array $history, ?string $tin = null): array
     {
-        $messages = $this->buildMessages($question, $history);
+        $messages = $this->buildMessages($question, $history, $tin);
 
         try {
             $response = $this->llm->jsonWithUsage($messages);
@@ -118,9 +145,9 @@ class NlSqlService
      * @param  array<int, array<string, mixed>>  $history
      * @return array<int, array{role: string, content: string}>
      */
-    private function buildMessages(string $question, array $history): array
+    private function buildMessages(string $question, array $history, ?string $tin = null): array
     {
-        $messages = [['role' => 'system', 'content' => $this->systemPrompt()]];
+        $messages = [['role' => 'system', 'content' => $this->systemPrompt($tin)]];
 
         foreach ($history as $turn) {
             $q = trim((string) ($turn['q'] ?? $turn['question'] ?? ''));
@@ -188,10 +215,23 @@ class NlSqlService
         return true;
     }
 
-    private function systemPrompt(): string
+    private function systemPrompt(?string $tin = null): string
     {
         $schema = $this->schema->describe();
-        $context = $this->dataContext();
+        $context = $this->dataContext($tin);
+        $taxpayer = $tin === null ? '' : <<<'TAXPAYER'
+
+        THIS TAXPAYER:
+        The user is asking about ONE taxpayer. In SQL name its VÖEN (TIN) only by the
+        placeholder :tin — unquoted, exactly so; the server puts the real VÖEN in its
+        place. Never write a VÖEN number for it yourself. Every query must be limited
+        to this taxpayer: supplier_tin = :tin for what it sells or supplies,
+        recipient_tin = :tin for what it buys or receives, and
+        (supplier_tin = :tin OR recipient_tin = :tin) when the question covers both or
+        does not say. "It", "he", "she", "this company", "this taxpayer" mean it; its
+        counterparties are the other side of its lines.
+
+        TAXPAYER;
 
         return <<<PROMPT
         You are a senior data analyst that writes PostgreSQL queries over an
@@ -199,7 +239,7 @@ class NlSqlService
 
         CONTEXT:
         {$context}
-
+        {$taxpayer}
         DATABASE SCHEMA (only these tables and columns exist):
         {$schema}
 
@@ -271,7 +311,7 @@ class NlSqlService
      * the prompt so the model knows "today" (it otherwise defaults to its
      * training cutoff) and can reconcile it with the historical snapshot.
      */
-    private function dataContext(): string
+    private function dataContext(?string $tin = null): string
     {
         $now = now();
         $lines = [
@@ -293,6 +333,20 @@ class NlSqlService
             }
         } catch (Throwable) {
             // Coverage is best-effort; current date alone is still useful.
+        }
+
+        if ($tin !== null) {
+            try {
+                // Counts only — the VÖEN itself stays on our side.
+                $own = DB::connection('pgsql_ro')->selectOne(
+                    'SELECT count(*) FILTER (WHERE supplier_tin = ?) AS sold, count(*) FILTER (WHERE recipient_tin = ?) AS bought FROM invoice_lines',
+                    [$tin, $tin],
+                );
+                $lines[] = '- The selected taxpayer (:tin) has '.number_format((int) $own->sold).' invoice lines as the seller and '
+                    .number_format((int) $own->bought).' as the buyer.';
+            } catch (Throwable) {
+                // Best-effort, like the coverage above.
+            }
         }
 
         return implode("\n", $lines);

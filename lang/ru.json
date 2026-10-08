@@ -864,5 +864,20 @@
     "Download Excel": "Скачать Excel",
     "Excel in :n parts of up to :lines lines:": "Excel частями (:n) — до :lines строк в каждой:",
     "Part :n": "Часть :n",
-    "Lines of this upload with our answer per line": "Строки этой загрузки с нашим ответом по каждой"
+    "Lines of this upload with our answer per line": "Строки этой загрузки с нашим ответом по каждой",
+    "Taxpayer": "Налогоплательщик",
+    "Ask about all the data again": "Снова спрашивать обо всех данных",
+    ":sold lines as seller · :bought as buyer · the VÖEN is not sent to the external model": ":sold строк как продавец · :bought как покупатель · VÖEN не отправляется во внешнюю модель",
+    "Ask about one taxpayer": "Спросить про налогоплательщика",
+    "VÖEN, e.g. 1808172501": "VÖEN, например 1808172501",
+    "Choose": "Выбрать",
+    "Ask about this taxpayer…": "Спросите про этого налогоплательщика…",
+    "Ask about this taxpayer": "Спросить про этого налогоплательщика",
+    "Ask the AI chat about this taxpayer": "Спросить ИИ-чат про этого налогоплательщика",
+    "No lines with this VÖEN in the loaded data.": "В загруженных данных нет строк с этим VÖEN.",
+    "The query was not limited to the selected taxpayer — please rephrase the question.": "Запрос не был ограничен выбранным налогоплательщиком — переформулируйте вопрос.",
+    "What does this taxpayer sell?": "Что продаёт этот налогоплательщик?",
+    "What does this taxpayer buy?": "Что покупает этот налогоплательщик?",
+    "Who are its counterparties?": "Кто его контрагенты?",
+    "Its categories by month": "Его категории по месяцам"
 }

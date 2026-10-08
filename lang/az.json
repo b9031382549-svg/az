@@ -864,5 +864,20 @@
     "Download Excel": "Excel-i yüklə",
     "Excel in :n parts of up to :lines lines:": "Excel :n hissədə, hər birində :lines sətirədək:",
     "Part :n": "Hissə :n",
-    "Lines of this upload with our answer per line": "Bu yükləmənin sətirləri, hər sətir üzrə cavabımızla"
+    "Lines of this upload with our answer per line": "Bu yükləmənin sətirləri, hər sətir üzrə cavabımızla",
+    "Taxpayer": "Vergi ödəyicisi",
+    "Ask about all the data again": "Yenidən bütün məlumatlar haqqında soruş",
+    ":sold lines as seller · :bought as buyer · the VÖEN is not sent to the external model": ":sold sətir satıcı kimi · :bought alıcı kimi · VÖEN xarici modelə göndərilmir",
+    "Ask about one taxpayer": "Bir vergi ödəyicisi haqqında soruş",
+    "VÖEN, e.g. 1808172501": "VÖEN, məsələn 1808172501",
+    "Choose": "Seç",
+    "Ask about this taxpayer…": "Bu vergi ödəyicisi haqqında soruşun…",
+    "Ask about this taxpayer": "Bu vergi ödəyicisi haqqında soruş",
+    "Ask the AI chat about this taxpayer": "Bu vergi ödəyicisi haqqında Aİ çatından soruş",
+    "No lines with this VÖEN in the loaded data.": "Yüklənmiş məlumatlarda bu VÖEN ilə sətir yoxdur.",
+    "The query was not limited to the selected taxpayer — please rephrase the question.": "Sorğu seçilmiş vergi ödəyicisi ilə məhdudlaşdırılmadı — sualı başqa cür verin.",
+    "What does this taxpayer sell?": "Bu vergi ödəyicisi nə satır?",
+    "What does this taxpayer buy?": "Bu vergi ödəyicisi nə alır?",
+    "Who are its counterparties?": "Onun kontragentləri kimlərdir?",
+    "Its categories by month": "Aylar üzrə kateqoriyaları"
 }

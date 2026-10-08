@@ -30,7 +30,7 @@ class NlSqlServiceTest extends TestCase
      * @param  array<int, array<string, mixed>>  $history
      * @return array<int, array{role: string, content: string}>
      */
-    private function messagesFor(string $question, array $history): array
+    private function messagesFor(string $question, array $history, ?string $tin = null): array
     {
         $captured = [];
 
@@ -47,9 +47,66 @@ class NlSqlServiceTest extends TestCase
         $schema->shouldReceive('describe')->andReturn('Table invoice_lines:');
         $schema->shouldReceive('allowedTables')->andReturn(['invoice_lines']);
 
-        (new NlSqlService($llm, $schema))->ask($question, $history);
+        (new NlSqlService($llm, $schema))->ask($question, $history, $tin);
 
         return $captured;
+    }
+
+    /** The service with a model that answers $sql, for the "this taxpayer" checks. */
+    private function serviceAnswering(?string $sql): NlSqlService
+    {
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')->andReturn([
+            'model' => 'm', 'usage' => [], 'latency_ms' => 1, 'raw' => '{}',
+            'data' => ['sql' => $sql, 'answer' => $sql === null ? 'ok' : null, 'explanation' => 'x'],
+        ]);
+        $schema = Mockery::mock(SchemaContext::class);
+        $schema->shouldReceive('describe')->andReturn('Table invoice_lines:');
+        $schema->shouldReceive('allowedTables')->andReturn(['invoice_lines']);
+
+        return new NlSqlService($llm, $schema);
+    }
+
+    public function test_in_taxpayer_mode_the_vöen_never_reaches_the_model(): void
+    {
+        $messages = $this->messagesFor('Что продаёт этот налогоплательщик?', [], '1808172501');
+
+        $this->assertStringContainsString('THIS TAXPAYER', $messages[0]['content']);
+        $this->assertStringContainsString('supplier_tin = :tin', $messages[0]['content']);
+        foreach ($messages as $message) {
+            $this->assertStringNotContainsString('1808172501', $message['content']);
+        }
+        // Without a taxpayer the prompt has no such section.
+        $this->assertStringNotContainsString('THIS TAXPAYER', $this->messagesFor('total?', [])[0]['content']);
+    }
+
+    public function test_the_server_puts_the_vöen_in_place_of_the_placeholder(): void
+    {
+        // No table: the test's read-only connection is an empty in-memory database.
+        $result = $this->serviceAnswering('SELECT :tin AS t WHERE 1 = 1')->ask('who?', [], '1808172501');
+
+        $this->assertNull($result['error']);
+        $this->assertSame([['t' => '1808172501']], $result['rows']);
+        $this->assertSame('SELECT :tin AS t WHERE 1 = 1', $result['sql']);   // history keeps the placeholder
+    }
+
+    public function test_a_query_not_limited_to_the_taxpayer_is_not_run(): void
+    {
+        $result = $this->serviceAnswering('SELECT 1 AS n WHERE 1 = 1')->ask('how many?', [], '1808172501');
+
+        $this->assertSame(__('The query was not limited to the selected taxpayer — please rephrase the question.'), $result['error']);
+        $this->assertSame([], $result['rows']);
+    }
+
+    public function test_a_malformed_vöen_is_refused_before_the_model_is_asked(): void
+    {
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldNotReceive('jsonWithUsage');
+        $schema = Mockery::mock(SchemaContext::class);
+
+        $result = (new NlSqlService($llm, $schema))->ask('x', [], "1' OR '1'='1");
+
+        $this->assertNotNull($result['error']);
     }
 
     public function test_without_history_only_system_and_current_question_are_sent(): void
