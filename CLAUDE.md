@@ -107,6 +107,11 @@ The app is auth-gated (default login user `admin`).
   `NlSqlService` quotes the VÖEN in on our side (never sent to the model) and refuses
   a query without it; `chat_messages.context_tin` keeps the replayed history to the
   turns of the same taxpayer. `Taxpayers` looks the VÖEN up (name, lines sold/bought).
+  The model: `nlsql.model` (`NLSQL_MODEL`, default `gpu:base` = our stock Llama on the
+  GPU server, the Token Factory fallback while none is serving), called with
+  `touch: false` so a chat question never keeps a paid GPU awake. Prompt changes are
+  measured with a local harness (`research-data/chat-llama-eval-2026-10-09`, not in
+  git; DB `chat_eval`, hand-graded) — Llama ≈ gpt-4o-mini there.
 - **LLM:** `OpenRouterClient`, `JsonExtractor`. Query-expansion model via
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,

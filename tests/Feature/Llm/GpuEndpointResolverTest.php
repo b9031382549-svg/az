@@ -137,6 +137,32 @@ class GpuEndpointResolverTest extends TestCase
         Http::assertSent(fn ($r) => str_starts_with($r->url(), 'https://tokenfactory.test/v1/chat/completions'));
     }
 
+    public function test_a_call_counts_as_a_use_of_the_gpu_server(): void
+    {
+        $this->activateServer('A', 'https://gpu-a.test:8000/v1', 'sk-a');
+
+        OpenRouterClient::fromConfig()->complete([['role' => 'user', 'content' => 'hi']], ['model' => 'gpu:base']);
+
+        $this->assertNotNull(GpuServer::query()->where('slot', 'A')->value('last_request_at'));
+    }
+
+    public function test_touch_false_uses_the_gpu_server_without_keeping_it_awake(): void
+    {
+        // The chat: it rides the GPU while it is up, but must not feed the idle autostop.
+        $this->activateServer('A', 'https://gpu-a.test:8000/v1', 'sk-a');
+
+        OpenRouterClient::fromConfig()->complete(
+            [['role' => 'user', 'content' => 'hi']],
+            ['model' => 'gpu:base', 'touch' => false],
+        );
+
+        Http::assertSent(fn ($r) => str_starts_with($r->url(), 'https://gpu-a.test:8000/v1/chat/completions')
+            && $r['model'] === 'base'
+            // our own option, never sent to the API
+            && ! array_key_exists('touch', $r->data()));
+        $this->assertNull(GpuServer::query()->where('slot', 'A')->value('last_request_at'));
+    }
+
     private function activateServer(string $slot, string $baseUrl, string $key): void
     {
         $adapter = FinetuneAdapter::create(['version' => 'test-'.$slot]);

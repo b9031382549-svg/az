@@ -79,8 +79,11 @@ class OpenRouterClient
         // prefixed "nebius:") from the per-call model, so a single stage can be
         // routed to either provider by config alone.
         $model = (string) ($options['model'] ?? $this->defaultModel);
-        unset($options['model']);
-        $provider = $this->resolveProvider($model);
+        // touch = false: the call may use the GPU server but does not count as a use of it, so
+        // it never keeps a paid GPU from idling down on its own (the chat). Not an API parameter.
+        $touch = (bool) ($options['touch'] ?? true);
+        unset($options['model'], $options['touch']);
+        $provider = $this->resolveProvider($model, $touch);
 
         if (empty($provider['api_key'])) {
             throw new RuntimeException($provider['key_env'].' is not configured.');
