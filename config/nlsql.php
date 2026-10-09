@@ -15,4 +15,12 @@ return [
         // each line's item — see the create_invoice_lines_view migration.
         'invoice_lines',
     ],
+
+    /*
+    | The model that writes the chat's SQL. "gpu:base" = the stock Llama on our active GPU
+    | server, or the Token Factory fallback model while none is serving
+    | (InferenceEndpointResolver). A chat question rides the GPU while it is up but never
+    | keeps it from idling down. Measured 2026-10-09: Llama ≈ gpt-4o-mini on the chat's SQL.
+    */
+    'model' => env('NLSQL_MODEL', 'gpu:base'),
 ];

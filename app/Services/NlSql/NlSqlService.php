@@ -104,11 +104,14 @@ class NlSqlService
     private function generate(string $question, array $history, ?string $tin = null): array
     {
         $messages = $this->buildMessages($question, $history, $tin);
+        $model = (string) config('nlsql.model');
 
         try {
-            $response = $this->llm->jsonWithUsage($messages);
+            // touch: false — a question uses the GPU server while classification keeps it up,
+            // but must not keep a paid GPU running on its own.
+            $response = $this->llm->jsonWithUsage($messages, ['model' => $model, 'touch' => false]);
         } catch (Throwable $e) {
-            LlmLog::record('nlsql', (string) config('services.openrouter.model'), [], 0, 'error', null, $messages, null, $e->getMessage());
+            LlmLog::record('nlsql', $model, [], 0, 'error', null, $messages, null, $e->getMessage());
             throw $e;
         }
 

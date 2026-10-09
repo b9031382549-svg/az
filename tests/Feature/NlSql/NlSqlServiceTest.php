@@ -67,6 +67,23 @@ class NlSqlServiceTest extends TestCase
         return new NlSqlService($llm, $schema);
     }
 
+    public function test_the_chat_asks_its_own_model_without_keeping_the_gpu_awake(): void
+    {
+        config()->set('nlsql.model', 'gpu:base');
+        $llm = Mockery::mock(OpenRouterClient::class);
+        $llm->shouldReceive('jsonWithUsage')
+            ->once()
+            ->withArgs(fn (array $messages, array $options) => $options === ['model' => 'gpu:base', 'touch' => false])
+            ->andReturn(['model' => 'base', 'usage' => [], 'latency_ms' => 1, 'raw' => '{}', 'data' => ['sql' => null, 'answer' => 'ok', 'explanation' => null]]);
+        $schema = Mockery::mock(SchemaContext::class);
+        $schema->shouldReceive('describe')->andReturn('Table invoice_lines:');
+        $schema->shouldReceive('allowedTables')->andReturn(['invoice_lines']);
+
+        $result = (new NlSqlService($llm, $schema))->ask('Что ты умеешь?');
+
+        $this->assertSame('ok', $result['answer']);
+    }
+
     public function test_in_taxpayer_mode_the_vöen_never_reaches_the_model(): void
     {
         $messages = $this->messagesFor('Что продаёт этот налогоплательщик?', [], '1808172501');
