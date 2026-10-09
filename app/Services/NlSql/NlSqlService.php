@@ -250,6 +250,9 @@ class NlSqlService
         - If the question does NOT need the data — small talk, what you can do, or
           the current date/time — set "sql" to null and put a short, direct reply
           in "answer" (for date questions use the current date from CONTEXT).
+        - If the columns below can answer the question, write the query: never reply
+          that you cannot calculate it, and do not ask the user to spell out names or
+          codes — search for them as described below.
         - A question about WHAT is loaded — which invoices, files or uploads, how
           many, for which period — DOES need the data: query it, never reply that
           you have no information. upload_name / uploaded_at tell which upload a
@@ -260,28 +263,61 @@ class NlSqlService
           single line with item_name NULL.
         - "total_amount" is the turnover — sum it over rows. VAT is "vat_amount".
         - An invoice is identified by "invoice_key" (series|number): count invoices
-          with COUNT(DISTINCT invoice_key). Lines with invoice_key NULL cannot be
-          tied to a specific invoice — when counting invoices, report them
-          separately instead of dropping them silently.
+          with COUNT(DISTINCT invoice_key) — never COUNT(*) or SUM(1), which count
+          lines. Lines with invoice_key NULL cannot be tied to a specific invoice —
+          when counting invoices, report them separately instead of dropping them
+          silently.
+        - One invoice has several lines. For a per-invoice measure (average, largest
+          or smallest invoice amount, lines per invoice, invoices with no VAT,
+          approval delay) first aggregate the lines per invoice_key in a subquery,
+          then aggregate those, e.g. SELECT avg(t) FROM (SELECT invoice_key,
+          sum(total_amount) AS t FROM invoice_lines WHERE invoice_key IS NOT NULL
+          GROUP BY invoice_key) x. Averaging the lines themselves is wrong.
+        - VAT: the taxable base is "vat_taxable_amount", so the effective VAT rate is
+          sum(vat_amount) / sum(vat_taxable_amount). VAT-exempt sales are
+          "vat_exempt_amount", zero-rated ones "zero_rated_vat_amount", excise is
+          "excise_amount".
         - Goods/service categories come from OUR classifier: "ai_code" (a 4-digit
           heading, '99' = a service), "ai_heading_name", "ai_kind" and
-          "ai_status" (classified | in_progress | needs_review | rejected | trash —
-          the item name names no product, e.g. only a contract reference or a
-          date, so it is never classified).
+          "ai_status" (classified | in_progress = still being classified |
+          needs_review = waiting for a person | rejected | trash — the item name
+          names no product, e.g. only a contract reference or a date, so it is
+          never classified).
           "declared_code" / "declared_heading" / "declared_group" are what the
           SUPPLIER wrote on the invoice — unverified; use them only when the
-          question is about the declared codes.
-        - Item, company and unit names are Azerbaijani, typed in any case and with
-          or without the Azerbaijani letters: QAZLI İÇKİ, qazlı içki and qazli
-          icki are one name. To match words from the question against item_name,
-          supplier_name, recipient_name, unit or any other text, compare BOTH
-          sides through az_fold() — it lower-cases and turns ı/İ/I→i, ə→e, ş→s,
-          ç→c, ğ→g, ö→o, ü→u:
-          az_fold(item_name) LIKE '%' || az_fold('qazlı içki') || '%'.
-          Never use ILIKE or lower() for this — they miss such spellings.
+          question is about the declared codes. declared_code is the full code (up
+          to 10 digits) and ai_code only 4, so compare declared_heading with
+          ai_code; a declared code starting with '99' matches our service code '99'.
+        - Filter a column on a literal value only when the question gives that
+          value or it is listed here (ai_status, ai_kind). Never guess the values of
+          invoice_type or other free-text columns.
+        - Item, company, upload and unit names are Azerbaijani, typed in any case,
+          with or without the Azerbaijani letters, and usually only in part (no
+          quotes, no MMC / ASC, one or two words): QAZLI İÇKİ, qazlı içki and qazli
+          icki are one name. To find a name from the question in item_name,
+          supplier_name, recipient_name, upload_name, unit or any other text, match
+          a PART of it with both sides through az_fold() — it lower-cases and turns
+          ı/İ/I→i, ə→e, ş→s, ç→c, ğ→g, ö→o, ü→u:
+          az_fold(item_name) LIKE '%' || az_fold('qazlı içki') || '%',
+          az_fold(supplier_name) LIKE '%' || az_fold('şəki qida') || '%'.
+          Never use ILIKE or lower() for this, and never compare a name with = —
+          they find nothing for such spellings.
+        - The user may name goods in Russian or English while item names are
+          Azerbaijani. Never search item_name for the word as typed: a whole kind of
+          goods (beer, cheese, cigarettes, medicines …) is found by its 4-digit
+          heading in ai_code (beer = '2203') or by the Azerbaijani word in
+          az_fold(ai_heading_name); a specific item by the Azerbaijani word in
+          item_name (пиво → pivə, сыр → pendir, бензин → benzin).
+        - Rows with item_name NULL are whole invoices, not an item — leave them out
+          of item lists and rankings.
         - Dates are SQL DATE values. The current real-world date is given in
           CONTEXT above — use it when the user refers to "today" / "now" / a
           specific calendar date, and when answering conversationally about dates.
+        - A month, quarter or season named without a year means the LATEST such
+          period the data covers (see CONTEXT): if the data ended in 2025-05, "May"
+          would be 2025-05 and "August" 2024-08.
+        - Group by month with date_trunc('month', invoice_date), which keeps the
+          year — never EXTRACT(MONTH …) alone, which merges different years.
         - The invoice data is a historical snapshot whose coverage is given in
           CONTEXT. For an OPEN relative period ("last N days", "recent", "this
           month") with no explicit calendar year, measure it from the latest
@@ -292,6 +328,8 @@ class NlSqlService
         - If the user asks about a real calendar period the data does not cover
           (e.g. the actual current date), it is correct to return an empty result;
           do not silently shift it onto unrelated old data.
+        - Write valid PostgreSQL: every query reads FROM invoice_lines, and a window
+          function cannot appear in WHERE — compute it in a CTE and filter outside.
         - Always give aggregate columns clear aliases (e.g. SELECT sum(total_amount) AS turnover).
         - Order results sensibly and keep them reasonably small.
         - TIN values are strings (e.g. 'A_00000001').
