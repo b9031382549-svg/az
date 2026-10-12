@@ -115,7 +115,11 @@ The app is auth-gated (default login user `admin`).
 - **LLM:** `OpenRouterClient`, `JsonExtractor`. Query-expansion model via
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,
-  `ItemTranslation`, `SetLocale` middleware (en/az/ru display).
+  `ItemTranslation`, `SetLocale` middleware (en/az/ru display). Item names go to
+  `classify.translate_model` (default `gpu:base`: our Llama while a GPU slot is serving,
+  the gpu: fallback otherwise); `item_translations.model` keeps who wrote each row, so
+  `items:translate --redo-model=base` can redo Llama's (weaker at Azerbaijani, measured in
+  `research-data/translate-eval-2026-10-12`). Testing-tab runs are never translated.
 - **API tokens:** Laravel Sanctum, token-only (`config/sanctum.php` guard `[]` — no
   session auth on the API). Issued and revoked on Settings → API tokens (`ApiTokens`),
   shown once; abilities in `App\Support\ApiAbilities`. Every `/api` route needs
