@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Classification;
+use App\Models\ClassificationItem;
 use App\Models\ItemTranslation;
+use App\Services\Llm\OpenRouterClient;
 use App\Services\Translate\ItemTranslator;
 use Illuminate\Console\Command;
 
@@ -11,13 +13,15 @@ use Illuminate\Console\Command;
  * Backfills the item-translation dictionary for items that were classified
  * before translation existed (or whose translation LLM call failed): sets the
  * missing source_hash on classifications, then translates every distinct item
- * that has no complete (en + ru) dictionary entry yet.
+ * that has no complete (en + ru) dictionary entry yet. --redo-model re-translates
+ * the rows one model wrote (e.g. Llama's, once a better route exists).
  */
 class TranslateItems extends Command
 {
     protected $signature = 'items:translate
         {--limit=0 : max distinct items to translate this run (0 = all)}
-        {--fresh : re-translate every item, overwriting existing translations}';
+        {--fresh : re-translate every item, overwriting existing translations}
+        {--redo-model= : re-translate the items this model translated (base = Llama on our GPU)}';
 
     protected $description = 'Backfill uploaded-item display translations (en/ru) into item_translations';
 
@@ -36,27 +40,47 @@ class TranslateItems extends Command
             });
         $this->info("source_hash backfilled on {$backfilled} classification(s).");
 
-        // 2) Distinct items to translate. With --fresh, every item is re-done
-        //    (overwriting existing translations); otherwise only items that lack
-        //    a complete (en + ru) dictionary entry.
+        // 2) Distinct items to translate. --fresh redoes the whole dictionary and
+        //    --redo-model the rows one model wrote (both overwrite); otherwise only
+        //    names without a complete (en + ru) entry: a failed call leaves its row
+        //    empty, a name whose job never ran has no row at all.
         $fresh = (bool) $this->option('fresh');
+        $redo = trim((string) $this->option('redo-model'));
 
-        $hashesDone = $fresh ? collect() : ItemTranslation::query()
-            ->whereNotNull('en')->where('en', '!=', '')
-            ->whereNotNull('ru')->where('ru', '!=', '')
-            ->pluck('source_hash')
-            ->flip();
+        if ($fresh || $redo !== '') {
+            $items = ItemTranslation::query()
+                ->when($redo !== '', fn ($q) => $q->where('model', $redo))
+                ->orderBy('id')
+                ->pluck('source_text');
+        } else {
+            $hashesDone = ItemTranslation::query()
+                ->whereNotNull('en')->where('en', '!=', '')
+                ->whereNotNull('ru')->where('ru', '!=', '')
+                ->pluck('source_hash')
+                ->flip();
 
-        $items = Classification::query()
-            ->whereNotNull('source_text')
-            ->where('source_text', '!=', '')
-            ->orderBy('id')
-            ->pluck('source_text')
+            // Names live in the dictionary itself, in the pipeline's items (Testing-tab runs
+            // are never translated) and in the legacy classifications table.
+            $items = ItemTranslation::query()->orderBy('id')->pluck('source_text')
+                ->merge(ClassificationItem::query()->whereNull('test_run_id')->distinct()->pluck('source_text'))
+                ->merge(Classification::query()->whereNotNull('source_text')->orderBy('id')->pluck('source_text'))
+                ->reject(fn ($t) => $hashesDone->has(ItemTranslation::hashFor(trim((string) $t))));
+        }
+
+        $items = $items
             ->map(fn ($t) => trim((string) $t))
             ->filter()
             ->unique(fn ($t) => ItemTranslation::hashFor($t))
-            ->reject(fn ($t) => $hashesDone->has(ItemTranslation::hashFor($t)))
             ->values();
+
+        // Redoing a model's rows while the route still leads to that same model would only
+        // write the same translations again.
+        if ($redo !== '') {
+            $route = app(OpenRouterClient::class)->resolveProvider((string) config('classify.translate_model'), false);
+            if ($route['model'] === $redo) {
+                $this->warn("Translations still go to {$route['name']} ({$redo}) — the redo will reproduce them.");
+            }
+        }
 
         $limit = (int) $this->option('limit');
         if ($limit > 0) {
@@ -77,7 +101,7 @@ class TranslateItems extends Command
         $ok = 0;
         $failed = 0;
         foreach ($items as $text) {
-            $row = $translator->ensure($text, $fresh);
+            $row = $translator->ensure($text, $fresh || $redo !== '');
             if ($row && ($row->en ?? '') !== '' && ($row->ru ?? '') !== '') {
                 $ok++;
             } else {

@@ -44,16 +44,18 @@ class ItemTranslator
         }
 
         try {
-            [$en, $ru] = $this->translate($text);
+            [$en, $ru, $model] = $this->translate($text);
             $row->forceFill([
                 'en' => $en !== '' ? $en : null,
                 'ru' => $ru !== '' ? $ru : null,
+                'model' => $model,
             ])->save();
         } catch (Throwable $e) {
             // Leave en/ru null — display falls back to the original text and a
-            // later backfill/retry can fill it. Never break the caller.
+            // later backfill/retry can fill it. Never break the caller. Logged under
+            // the model it was sent to (the error text names the provider that failed).
             LlmLog::record(
-                'translate_item', (string) config('services.openrouter.model'),
+                'translate_item', (string) config('classify.translate_model'),
                 ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0],
                 0, 'error', null, [], null, $e->getMessage(),
                 ['item' => mb_substr($text, 0, 120)],
@@ -64,9 +66,9 @@ class ItemTranslator
     }
 
     /**
-     * One translation LLM call. Returns [en, ru].
+     * One translation LLM call. Returns [en, ru, the model that answered].
      *
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: string, 2: string}
      */
     private function translate(string $text): array
     {
@@ -87,7 +89,7 @@ class ItemTranslator
 
         $d = $response['data'];
 
-        return [trim((string) ($d['en'] ?? '')), trim((string) ($d['ru'] ?? ''))];
+        return [trim((string) ($d['en'] ?? '')), trim((string) ($d['ru'] ?? '')), (string) $response['model']];
     }
 
     private function prompt(): string

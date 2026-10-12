@@ -361,11 +361,13 @@ return [
     // missing. Set false to skip translation entirely (originals only).
     'translate_items' => (bool) env('CLASSIFY_TRANSLATE_ITEMS', true),
 
-    // Model used to translate item names. gpt-4o-mini handles Azerbaijani food/
-    // nomenclature vocabulary poorly (hallucinates flavours, e.g. çiyələkli
-    // "strawberry" -> "chocolate", and leaves words untranslated), so item
-    // translation uses the stronger model by default.
-    'translate_model' => (string) env('CLASSIFY_TRANSLATE_MODEL', 'openai/gpt-4o'),
+    // Model used to translate item names. gpu:base = our Llama on the GPU server while a slot
+    // is serving, otherwise the gpu: fallback (Token Factory) — the GPU is the one resource
+    // left once the cloud providers go. Llama reads Azerbaijani worse than gpt-4o / DeepSeek
+    // (≈1 name in 4 got a wrong meaning on 80 real names, 2026-10-12, research-data/
+    // translate-eval-2026-10-12): item_translations.model records who translated each row,
+    // so `items:translate --redo-model=base` can redo those once a better route exists.
+    'translate_model' => (string) env('CLASSIFY_TRANSLATE_MODEL', 'gpu:base'),
 
     // Domain disambiguation map for Azerbaijani invoice traps: homonyms / false
     // friends / abbreviations whose sub-word matches the wrong category. When a
