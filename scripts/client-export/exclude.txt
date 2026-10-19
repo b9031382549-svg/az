@@ -11,10 +11,9 @@ scripts
 CLAUDE.md
 experiments
 
-# Evaluation data (gold labels), design mockups, prompt dumps, old explainers.
-start-data/gold
-start-data/design
-start-data/DataCatalogAı.docx
+# Source files (task samples, the XİF MN registry, gold labels, mockups): the app never reads
+# them; a database is filled from a dump of ours. Prompt dumps, old explainers.
+start-data
 файл Фдора.xlsx
 файл Ивана.xlsx
 fedor_test_100.xlsx
