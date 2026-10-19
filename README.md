@@ -1,58 +1,122 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# eInvoice AI
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Сервис над электронными счетами-фактурами Азербайджана:
 
-## About Laravel
+- **Классификатор.** Строка счёта («название товара или услуги») превращается в код
+  XİF MN (каталог около 11,6 тыс. кодов). Сервис определяет товар это или услуга,
+  выдаёт код и его надёжность. Спорные строки уходят на проверку человеку.
+- **Чат по счетам.** Вопрос на естественном языке превращается в SQL. Модель пишет
+  только читающие запросы: они проверяются и выполняются под отдельной ролью БД
+  только на чтение.
+- **API для интеграции:** `POST /api/classify`, `GET /api/classify/{id}`,
+  `/api/health-check`, `/api/version`. Описание: [API.md](API.md) и страница
+  `/api-docs` в самом приложении.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Вход в веб-интерфейс по логину и паролю. API работает по токенам, их выпускают
+в Settings → API tokens.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Состав
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Всё работает в Docker, прод описан в `docker-compose.prod.yml`:
 
-## Learning Laravel
+| Сервис | Что делает |
+|---|---|
+| `app` | nginx + php-fpm (Laravel 13, Livewire 4), порт 80 |
+| `worker` | фоновые задачи через Laravel Horizon: классификация, загрузки, эмбеддинги |
+| `scheduler` | периодические задачи (`routes/console.php`) |
+| `pgsql` | PostgreSQL 16 + pgvector (HNSW-индекс для векторного поиска) |
+| `redis` | очередь Horizon |
+| `ollama` | эмбеддинги (модель `bge-ft-v3`, 1024 измерения) |
+| `sorter` | небольшая модель XLM-R (ONNX, CPU): товар / услуга / мусор |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Вне этого набора:
+- **GPU-сервер с vLLM:** Llama-3.3-70B-Instruct и LoRA-адаптер `xif`. Это модели
+  `gpu:base` и `gpu:tuned` в настройках.
+- **OpenAI-совместимые провайдеры LLM:** веб-поиск по спорным строкам и запасная
+  модель на время, когда GPU не отвечает.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Какая модель отвечает за какой этап, задаётся в `.env`
+(см. [.env.prod.example](.env.prod.example)).
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## Чего нет в git
 
-## Agentic Development
+Эти файлы передаются отдельно:
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- модель сортера: `model.onnx`, `tokenizer.json`, `meta.json` с sha256 → каталог на
+  хосте, который монтируется в `sorter` (в `docker-compose.prod.yml` это
+  `/opt/az-assets/sorter-v2`);
+- модель эмбеддингов `bge-ft-v3` (GGUF + Modelfile) → `ollama create bge-ft-v3 -f Modelfile`
+  внутри контейнера `ollama`;
+- LoRA-адаптер `xif` для Llama-3.3-70B → на GPU-сервер;
+- корпус таможенных прецедентов (JSONL) и память ответов (`answer_cache`) — данные
+  в БД, которые сильно влияют на качество;
+- секреты: пароли БД, `APP_KEY`, ключи провайдеров LLM.
+
+## Установка
 
 ```bash
-composer require laravel/boost --dev
+cp .env.prod.example .env            # заполнить пустые значения
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d pgsql redis ollama sorter
 
-php artisan boost:install
+run() { docker compose -f docker-compose.prod.yml run --rm app php artisan "$@"; }
+run migrate --force
+run db:seed --force                  # учётка admin / admin — сменить пароль сразу
+run data:import-catalog              # реестр XİF MN из start-data/task 2/eqm_mal_kodlari-v1.xls
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Прецеденты (около 105 тыс. строк) и память ответов переносятся дампом этих таблиц
+вместе с векторами: пересчитывать их на CPU пришлось бы много часов. Из JSONL
+прецеденты загружает `data:import-precedents <файл>`, векторы к ним строит
+`data:embed-precedents --queue`.
 
-## Contributing
+Дальше выполняются шаги обновления (ниже). После них строим векторы каталога: на 4 ядрах
+CPU это около двух часов. Задачу выполняет `worker`, её можно прервать и продолжить:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+run data:embed-catalog --queue
+```
 
-## Code of Conduct
+## Обновление
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+На каждом выпуске выполняется одно и то же. Все шаги идемпотентны:
 
-## Security Vulnerabilities
+```bash
+run() { docker compose -f docker-compose.prod.yml run --rm app php artisan "$@"; }
+docker compose -f docker-compose.prod.yml build
+run migrate --force
+run nlsql:grant                                                       # права роли чата
+run db:seed --class='Database\Seeders\MetadataCatalogSeeder' --force  # описания колонок для чата
+run data:build-rubricator                                             # дерево рубрикатора
+run db:seed --class='Database\Seeders\HsCardsSeeder' --force          # карточки ТН ВЭД
+run catalog:sync-card-synonyms
+run catalog:build-search-text
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml exec -T -u www-data app php artisan optimize
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+`optimize` запускается от `www-data`, как и php-fpm. Если запустить его от root,
+кэши будут принадлежать root, и часть страниц начнёт отдавать 500.
 
-## License
+Миграции выполняются только этим шагом, никогда не из entrypoint контейнера. После
+изменения `.env` нужно снова выполнить `optimize`: в проде настройки кэшируются.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Проверка
+
+- `GET /up` — приложение отвечает.
+- `GET /api/health-check` (с токеном) — БД, Redis, воркеры Horizon, сортер,
+  модель эмбеддингов, векторный индекс, доступность моделей. Все проверки мгновенные
+  и бесплатные: классификацию они не запускают.
+
+## Разработка
+
+```bash
+docker compose up -d                 # dev-стек: исходники смонтированы, php artisan serve
+composer setup                       # первый запуск
+composer dev                         # сервер + очередь + логи + vite
+php artisan test                     # PHPUnit, sqlite в памяти, внешние сервисы не нужны
+./vendor/bin/pint                    # форматирование (Laravel Pint)
+```
+
+PHP 8.3, Node 22 (`npm ci`). Настройки читаются через `config()` (`config/*.php`), не
+через `env()` вне конфигов. Фоновая работа идёт через Horizon (Redis), не через `sync`.
