@@ -1,0 +1,23 @@
+# Paths left out of the client's snapshot (scripts/client-export/build.sh).
+# One path per line, relative to the repo root; a directory drops everything under it.
+# The script stops when a line no longer matches anything, so the list can't go stale quietly.
+
+# Our CI and the deploy to our own server; ops helpers that name our hosts.
+.github
+docker-compose.tools.yml
+scripts
+
+# Notes for the AI assistant, measurements, one-off experiments.
+CLAUDE.md
+experiments
+
+# Source files (task samples, the XİF MN registry, gold labels, mockups): the app never reads
+# them; a database is filled from a dump of ours. Prompt dumps, old explainers.
+start-data
+файл Фдора.xlsx
+файл Ивана.xlsx
+fedor_test_100.xlsx
+broker_prompt_11878.txt
+product_brief_prompt.txt
+how_it_works.html
+how_it_works.ru.html

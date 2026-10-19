@@ -224,6 +224,14 @@ The app is auth-gated (default login user `admin`).
   `.env` on the server requires a redeploy / `php artisan optimize`.
 - The deploy also re-runs `nlsql:grant` (chat role grants ← `config/nlsql.php`)
   and `MetadataCatalogSeeder` (chat column descriptions) — both idempotent.
+- **The client's copy** (State Tax Service GitLab, remote `client` =
+  `gitlab.e-taxes.gov.az/e-services/algoritmika-classificator`, only over their VPN,
+  HTTPS + token). Our history never goes there: a release is ONE commit "Release N" on
+  top of their `dev`, holding our `main` minus `scripts/client-export/exclude.txt`, made by
+  `scripts/client-export/build.sh` (`preview` → `commit` → `push`; `push` tags our rev
+  `client-rN`). Merge to our `main` first, then build from `origin/main`. Never edit
+  their repo by hand; if they commit, take that change into our `main` first (the
+  script stops until then). We are Developer there: `dev` / `preprod`, no force-push.
 
 ## Env & secrets
 
