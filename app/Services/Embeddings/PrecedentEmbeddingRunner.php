@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  */
 class PrecedentEmbeddingRunner
 {
-    public function __construct(private readonly OllamaEmbedder $embedder) {}
+    public function __construct(private readonly Embedder $embedder) {}
 
     public function pendingCount(): int
     {
@@ -76,7 +76,7 @@ class PrecedentEmbeddingRunner
             foreach ($rows->values() as $i => $row) {
                 DB::update(
                     'UPDATE precedents SET embedding = ?::vector, embedded_at = now() WHERE id = ?',
-                    [OllamaEmbedder::toSqlVector($vectors[$i]), $row->id],
+                    [Embedder::toSqlVector($vectors[$i]), $row->id],
                 );
             }
         });

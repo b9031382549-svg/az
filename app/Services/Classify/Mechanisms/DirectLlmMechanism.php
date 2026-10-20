@@ -3,6 +3,7 @@
 namespace App\Services\Classify\Mechanisms;
 
 use App\Models\CatalogCode;
+use App\Services\Llm\ModelUnavailable;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
 use Throwable;
@@ -57,6 +58,12 @@ final class DirectLlmMechanism implements ClassifierMechanism
 
             $d = $this->parse((string) ($resp['content'] ?? ''));
         } catch (Throwable $e) {
+            // On premise the model server is required: one that cannot answer is waited for
+            // (the job retries), never turned into an abstaining vote.
+            if ($e instanceof ModelUnavailable && config('classify.wait_for_models.enabled')) {
+                throw $e;
+            }
+
             // A slow reasoning model may time out — abstain (an empty vote), never block.
             return new MechanismResult(null, null, null, null, 'no_match',
                 explanation: 'Direct model unavailable: '.mb_substr($e->getMessage(), 0, 120), model: $model);

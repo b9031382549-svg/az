@@ -23,6 +23,11 @@ class GpuServers extends Component
     /** Adapter chosen in the "serve an existing adapter" picker, per slot id. */
     public array $serveAdapter = [];
 
+    public function mount(): void
+    {
+        abort_unless(config('gpu.provisioning'), 404); // on premise: no GPU renting at all
+    }
+
     public function provisionServing(int $serverId): void
     {
         $adapterId = (int) ($this->serveAdapter[$serverId] ?? 0);

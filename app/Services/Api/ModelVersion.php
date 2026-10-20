@@ -2,6 +2,8 @@
 
 namespace App\Services\Api;
 
+use App\Services\Embeddings\Embedder;
+
 /**
  * GET /api/version — which classifier is answering. The classifier is a chain of models, so
  * besides our release version it names each model the chain is configured to use, read
@@ -28,10 +30,12 @@ class ModelVersion
 
         return array_filter([
             'sorter' => config('classify.sorter.url') ? (string) config('classify.sorter.model') : '',
-            'embedder' => (string) config('services.ollama.embed_model'),
+            'embedder' => Embedder::configuredModel(),
             'direct' => $direct,
             // A "gpu:" model runs on our own GPU slot; with no slot up, it falls back to this one.
-            'direct_fallback' => str_starts_with($direct, 'gpu:') ? (string) config('services.nebius.fallback_model') : '',
+            // A fixed server (on premise, services.llm) has no fallback.
+            'direct_fallback' => str_starts_with($direct, 'gpu:') && blank(config('services.llm.base_url'))
+                ? (string) config('services.nebius.fallback_model') : '',
             'web_search' => config('classify.search_resolver.enabled') ? (string) config('classify.search_resolver.model') : '',
             // The web search's understanding step also sets aside lines that name no product.
             'web_search_trash_check' => config('classify.search_resolver.enabled') && config('classify.flow.ensemble_resolver')

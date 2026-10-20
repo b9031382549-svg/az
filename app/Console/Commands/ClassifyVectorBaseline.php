@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Embeddings\OllamaEmbedder;
+use App\Services\Embeddings\Embedder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +33,7 @@ class ClassifyVectorBaseline extends Command
     /** Recall cutoffs (in candidate CODES) reported in the summary. */
     private const CUTOFFS = [1, 3, 5, 10, 20, 30, 40, 50];
 
-    public function handle(OllamaEmbedder $embedder): int
+    public function handle(Embedder $embedder): int
     {
         $path = base_path((string) $this->option('file'));
         if (! is_file($path)) {
@@ -101,7 +101,7 @@ class ClassifyVectorBaseline extends Command
             $vectors = array_values($vectors);
 
             foreach (array_values($chunk) as $j => $item) {
-                $vec = OllamaEmbedder::toSqlVector($vectors[$j]);
+                $vec = Embedder::toSqlVector($vectors[$j]);
 
                 /** @var Collection $rows ranked nearest-first, with cosine sim */
                 $rows = DB::table($table)

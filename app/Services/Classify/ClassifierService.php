@@ -3,6 +3,7 @@
 namespace App\Services\Classify;
 
 use App\Models\CatalogCode;
+use App\Services\Llm\ModelUnavailable;
 use App\Services\Llm\OpenRouterClient;
 use App\Support\LlmLog;
 use Illuminate\Support\Arr;
@@ -147,6 +148,11 @@ class ClassifierService
                 ],
             ];
         } catch (Throwable $e) {
+            // On premise the embedding / model server is required: one that cannot answer is
+            // waited for (the mechanism job retries), never turned into an abstaining vote.
+            if ($e instanceof ModelUnavailable && config('classify.wait_for_models.enabled')) {
+                throw $e;
+            }
             $result['error'] = $e->getMessage();
             $result['status'] = 'error';
             $result['trace'] = ['input' => $text, 'error' => $e->getMessage()];

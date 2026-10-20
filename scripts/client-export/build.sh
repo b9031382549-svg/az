@@ -34,7 +34,9 @@ snapshot_tree() {
             missing=1
             continue
         fi
-        git rm -r --cached -q -- ":(literal)$line"
+        # -f: the scratch index holds $rev, not HEAD, so git's "differs from HEAD" guard
+        # would refuse whenever $rev is not the checked-out commit.
+        git rm -r --cached -q -f -- ":(literal)$line"
     done < <(git show "$rev:$exclude")
     git write-tree
     unset GIT_INDEX_FILE

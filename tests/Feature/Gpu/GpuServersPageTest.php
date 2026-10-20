@@ -109,4 +109,13 @@ class GpuServersPageTest extends TestCase
             ->assertHasErrors('gpu');
         Bus::assertNotDispatched(GpuActionJob::class);
     }
+
+    public function test_the_page_and_its_menu_link_are_gone_when_provisioning_is_off(): void
+    {
+        config()->set('gpu.provisioning', false);
+        $this->login();
+
+        $this->get('/gpu-servers')->assertNotFound();
+        $this->get(route('classify'))->assertOk()->assertDontSee(route('gpu-servers'));
+    }
 }

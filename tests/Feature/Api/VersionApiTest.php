@@ -76,4 +76,17 @@ class VersionApiTest extends TestCase
                 'components' => ['embedder' => 'bge-ft-v3', 'direct' => 'openai/gpt-oss-120b'],
             ]);
     }
+
+    public function test_an_on_premise_install_names_its_embedder_and_has_no_fallback(): void
+    {
+        config()->set('services.llm.base_url', 'http://vllm:8000/v1');
+        config()->set('services.embeddings.driver', 'openai');
+        config()->set('services.embeddings.model', 'bge-ft-v3-hf');
+
+        $this->getJson('/api/version', $this->auth())
+            ->assertOk()
+            ->assertJsonPath('components.embedder', 'bge-ft-v3-hf')
+            ->assertJsonPath('components.direct', 'gpu:tuned')
+            ->assertJsonMissingPath('components.direct_fallback');
+    }
 }

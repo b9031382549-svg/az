@@ -2,6 +2,7 @@
 
 namespace App\Services\Llm;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Throwable;
@@ -36,7 +37,7 @@ class OpenRouterClient
      * config alone, e.g. classify.direct.model = "gpu:tuned". $touch = false looks the
      * provider up without counting a use of the GPU server (health checks).
      *
-     * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string}
+     * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string, keyless?: bool}
      */
     public function resolveProvider(string $model, bool $touch = true): array
     {
@@ -85,7 +86,7 @@ class OpenRouterClient
         unset($options['model'], $options['touch']);
         $provider = $this->resolveProvider($model, $touch);
 
-        if (empty($provider['api_key'])) {
+        if (empty($provider['api_key']) && empty($provider['keyless'])) {
             throw new RuntimeException($provider['key_env'].' is not configured.');
         }
 
@@ -99,20 +100,28 @@ class OpenRouterClient
             'messages' => $messages,
         ], $options, ['model' => $provider['model']]);
 
-        $response = Http::withToken($provider['api_key'])
-            ->withHeaders([
-                // Optional attribution headers recommended by OpenRouter.
-                'HTTP-Referer' => config('app.url'),
-                'X-Title' => config('app.name'),
-            ])
-            ->timeout($timeout)
-            ->acceptJson()
-            ->post($provider['base_url'].'/chat/completions', $payload);
+        $request = Http::withHeaders([
+            // Optional attribution headers recommended by OpenRouter.
+            'HTTP-Referer' => config('app.url'),
+            'X-Title' => config('app.name'),
+        ])->timeout($timeout)->acceptJson();
+        if (filled($provider['api_key'])) {
+            $request->withToken($provider['api_key']);
+        }
+
+        try {
+            $response = $request->post($provider['base_url'].'/chat/completions', $payload);
+        } catch (ConnectionException $e) {
+            throw new ModelUnavailable($provider['name'].' unreachable: '.$e->getMessage(), 0, $e);
+        }
 
         if ($response->failed()) {
-            throw new RuntimeException(
-                $provider['name'].' request failed ('.$response->status().'): '.$response->body()
-            );
+            $message = $provider['name'].' request failed ('.$response->status().'): '.$response->body();
+            // Down / overloaded / model not loaded is told apart from a bad request: the
+            // on-premise wait retries the first kind and never the second.
+            throw ModelUnavailable::isUnavailableStatus($response->status())
+                ? new ModelUnavailable($message)
+                : new RuntimeException($message);
         }
 
         $content = $response->json('choices.0.message.content');

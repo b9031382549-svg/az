@@ -168,6 +168,17 @@ return [
         ))),
     ],
 
+    // On premise the GPU server and the embedding server are required, with no fallback:
+    // when one cannot answer (down, timed out, overloaded, model not loaded), a mechanism job
+    // waits and retries (30 s doubling to every 10 min) for up to `hours`, instead of storing
+    // an abstaining vote that quietly sends the line to the web search or a human. Off (our
+    // servers) = a failed call abstains, as before. Keep CLASSIFY_DIRECT_TIMEOUT and
+    // EMBED_TIMEOUT below the mechanism job's 120 s, or a hung server is killed as an error.
+    'wait_for_models' => [
+        'enabled' => (bool) env('CLASSIFY_WAIT_FOR_MODELS', false),
+        'hours' => (int) env('CLASSIFY_WAIT_FOR_MODELS_HOURS', 24),
+    ],
+
     // Broker-descent mechanism: walks the rubricator top-down, deciding each fork
     // by the sample leaves under its children (not the bare title). Strong model
     // only — the local tier is too weak for functional/GIR reasoning.
