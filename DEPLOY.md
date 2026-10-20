@@ -153,7 +153,7 @@ change. Without it the app reads the environment directly.
 - **Building the images** needs Docker Hub (`php:8.3-fpm-bookworm`, `composer:2`,
   `node:22-alpine`, `python:3.12-slim`), Debian apt, Packagist + GitHub (composer), npm and
   PyPI, or your mirrors of them.
-- **Browsers:** the UI currently loads Tailwind and fonts from public CDNs.
+- **Browsers:** nothing from the internet; the UI's CSS and fonts are built into the image.
 
 ## Checks
 

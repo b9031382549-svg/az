@@ -18,7 +18,11 @@ The app is auth-gated (default login user `admin`).
 
 ## Stack
 
-- PHP **8.3**, Laravel **13**, Livewire **4**, Vite + Tailwind **4**.
+- PHP **8.3**, Laravel **13**, Livewire **4**, Vite + Tailwind **3.4** (`tailwind.config.js`,
+  PostCSS; the design's engine — it ran from the Play CDN until 2026-10-20) with the fonts
+  bundled from Fontsource: the UI loads nothing from the internet. `@vite` in
+  `partials/theme`; tests run `withoutVite()`. Tailwind only emits classes found in its
+  content files: never build a class name from pieces.
 - **PostgreSQL + pgvector** (HNSW index) for vector search.
 - **Redis + Laravel Horizon** for queues/workers.
 - **Ollama** (`bge-m3`, 1024-dim) for local embeddings; **OpenRouter** for cloud LLM.
