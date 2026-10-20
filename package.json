@@ -7,10 +7,13 @@
         "dev": "vite"
     },
     "devDependencies": {
-        "@tailwindcss/vite": "^4.0.0",
+        "@fontsource-variable/fraunces": "^5.3.0",
+        "@fontsource-variable/spline-sans": "^5.3.0",
+        "@fontsource-variable/spline-sans-mono": "^5.3.0",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^3.1",
-        "tailwindcss": "^4.0.0",
+        "postcss": "^8.5.31",
+        "tailwindcss": "^3.4.19",
         "vite": "^8.0.0"
     }
 }

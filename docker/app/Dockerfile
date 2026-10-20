@@ -65,16 +65,20 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev --no-scripts
 
 # ============================================================================
-# assets — compiled front-end (Vite + Tailwind 4) -> public/build. No Node at
-# runtime. Requires a committed package-lock.json for `npm ci`.
+# assets — compiled front-end (Vite + Tailwind 3.4 + the fonts) -> public/build.
+# No Node at runtime. Requires a committed package-lock.json for `npm ci`.
+# Tailwind only emits classes found in its content files (tailwind.config.js), so
+# every one of them has to be here, Livewire's pagination view included.
 # ============================================================================
 FROM node:22-alpine AS assets
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY vite.config.js ./
+COPY vite.config.js postcss.config.js tailwind.config.js ./
 COPY resources ./resources
+COPY app ./app
+COPY --from=vendor /var/www/html/vendor/livewire/livewire/src/Features/SupportPagination/views ./vendor/livewire/livewire/src/Features/SupportPagination/views
 COPY public ./public
 RUN npm run build
 
