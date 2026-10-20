@@ -35,9 +35,18 @@ sha256:
 | Package / version | Files | Goes to |
 |---|---|---|
 | `xif-lora` / `test-45k` | `xif-lora-test-45k.tar` | unpack on the GPU server; vLLM `--lora-modules xif=<dir>` |
-| `bge-ft-v3` / `v3` | `bge-ft-v3.gguf`, `Modelfile` | the embedding server |
+| `bge-ft-v3` / `v3` | `bge-ft-v3.gguf` in two parts, `Modelfile` | the embedding server: llama.cpp or Ollama |
+| `bge-ft-v3` / `v3-hf` | `bge-ft-v3-hf.tar` in two parts (Hugging Face format) | the embedding server: vLLM or TEI |
 | `sorter` / `v2` | `model.onnx`, `tokenizer.json`, `meta.json` | the sorter's `SORTER_MODEL_DIR` |
-| `classifier-data` / date | `classifier-data.sql.gz`, `README.txt` | the database, once (below) |
+| `classifier-data` / `2026-10-20` | `classifier-data.sql.gz` | the database, once (below) |
+
+This GitLab takes at most ~1 GB per upload, so the bigger files come in parts. Each
+package has a `README.txt` and, where there are parts, a `SHA256SUMS`:
+
+```bash
+cat bge-ft-v3.gguf.part0 bge-ft-v3.gguf.part1 > bge-ft-v3.gguf
+sha256sum -c SHA256SUMS
+```
 
 Download with a token that can read the project:
 
@@ -74,15 +83,25 @@ vllm serve <Llama-3.3-70B-Instruct dir> \
 `bge-ft-v3` is our fine-tune of `BAAI/bge-m3` (1024 dims, CLS pooling, cosine). The vectors
 in the data dump were made with it, so the server must serve exactly this model.
 
-- **llama.cpp**, OpenAI-compatible, straight from the GGUF:
-  `llama-server -m bge-ft-v3.gguf --embeddings --pooling cls --host 0.0.0.0 --port 8080`
-  → `EMBED_DRIVER=openai`, `EMBED_BASE_URL=http://<host>:8080/v1`, `EMBED_MODEL` = the name
-  it serves the model under.
-- **vLLM / TEI** need the model in Hugging Face format; we add it to the `bge-ft-v3` package.
+- **vLLM**, with the Hugging Face version (`v3-hf`, unpacked to `bge-ft-v3-hf/`):
+  ```bash
+  vllm serve ./bge-ft-v3-hf --runner pooling --served-model-name bge-ft-v3 --dtype float32 \
+    --pooler-config '{"pooling_type": "CLS", "use_activation": true}' --host 0.0.0.0 --port 8001
+  ```
+  float32 matches production best; float16 also matches (cosine ≥ 0.9997).
+- **TEI**, with the same directory: `text-embeddings-router --model-id ./bge-ft-v3-hf --pooling cls`.
+- **llama.cpp**, straight from the GGUF:
+  `llama-server -m bge-ft-v3.gguf --embeddings --pooling cls --host 0.0.0.0 --port 8080`.
 - **Ollama:** `ollama create bge-ft-v3 -f Modelfile` next to the GGUF →
   `EMBED_DRIVER=ollama`, `OLLAMA_URL`, `OLLAMA_EMBED_MODEL=bge-ft-v3`.
 
-If you ever change the embedding server, re-make the stored vectors with it once:
+For vLLM, TEI and llama.cpp: `EMBED_DRIVER=openai`, `EMBED_BASE_URL=http://<host>:<port>/v1`,
+`EMBED_MODEL` = the name the server serves the model under. The Hugging Face version was
+rebuilt from the GGUF and checked against production: cosine 0.99999 to the dump's catalog
+vectors and to production's query vectors.
+
+Any of these four serves the same vectors. Only if you serve a different or re-trained
+model, re-make the stored vectors with it once:
 `php artisan data:embed-catalog --refresh` and `php artisan data:embed-precedents --refresh`.
 
 ## Database rights
