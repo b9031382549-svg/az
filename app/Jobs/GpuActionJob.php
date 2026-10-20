@@ -50,6 +50,10 @@ class GpuActionJob implements ShouldQueue
 
     public function handle(GpuServerManager $servers, FinetuneManager $finetune, GpuCoordinator $coordinator): void
     {
+        if (! config('gpu.provisioning')) {
+            return; // on premise: nothing to rent, whatever queued this
+        }
+
         if ($this->action === 'tick') {
             // Clear the page's single-flight flag when done so the next poll can dispatch
             // the following tick immediately — giving near-continuous progress updates.

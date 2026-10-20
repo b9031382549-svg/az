@@ -70,6 +70,29 @@ return [
         'fallback_model' => env('NEBIUS_FALLBACK_MODEL', 'meta-llama/Llama-3.3-70B-Instruct'),
     ],
 
+    // A fixed OpenAI-compatible server for the "gpu:" models: an on-premise vLLM serving the
+    // stock model and our LoRA. With the base URL set, gpu:base / gpu:tuned go straight there:
+    // no gpu_servers slot, no Token Factory fallback. Empty = the slot / fallback routing.
+    // The base URL includes /v1. See App\Services\Llm\InferenceEndpointResolver.
+    'llm' => [
+        'base_url' => env('LLM_BASE_URL'),
+        'api_key' => env('LLM_API_KEY'),
+        'base_model' => env('LLM_BASE_MODEL', 'base'),
+        'tuned_model' => env('LLM_TUNED_MODEL', 'xif'),
+    ],
+
+    // Which server turns text into vectors (catalog / precedent similarity search):
+    // "ollama" = Ollama's /api/embed (the block below); "openai" = any OpenAI-compatible
+    // POST /embeddings (vLLM, TEI, llama.cpp server, Ollama's own /v1). The vectors stored in
+    // the DB must come from the same model, or retrieval quietly degrades.
+    'embeddings' => [
+        'driver' => env('EMBED_DRIVER', 'ollama'),
+        'base_url' => env('EMBED_BASE_URL'),
+        'api_key' => env('EMBED_API_KEY'),
+        'model' => env('EMBED_MODEL', env('OLLAMA_EMBED_MODEL', 'bge-m3')),
+        'timeout' => (int) env('EMBED_TIMEOUT', 300),
+    ],
+
     // Local embedding model served by Ollama (catalog similarity search).
     'ollama' => [
         'url' => env('OLLAMA_URL', 'http://ollama:11434'),

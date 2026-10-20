@@ -145,4 +145,39 @@ class HealthCheckApiTest extends TestCase
 
         Http::assertSentCount(2 + 2 + 2); // sorter + Ollama twice; each provider's model list once
     }
+
+    public function test_checks_an_on_premise_llm_server_and_embedding_server(): void
+    {
+        config()->set('services.llm.base_url', 'http://vllm.test:8000/v1');
+        config()->set('services.llm.api_key', null);
+        config()->set('services.embeddings.driver', 'openai');
+        config()->set('services.embeddings.base_url', 'http://embed.test/v1');
+        config()->set('services.embeddings.model', 'bge-ft-v3');
+        $this->services([
+            'vllm.test:8000/v1/models' => Http::response(['data' => [['id' => 'base'], ['id' => 'xif']]]),
+            'embed.test/v1/models' => Http::response(['data' => [['id' => 'bge-ft-v3']]]),
+        ]);
+
+        $this->get('/api/health-check', $this->auth)->assertOk();
+
+        Http::assertSent(fn ($r) => $r->url() === 'http://vllm.test:8000/v1/models' && ! $r->hasHeader('Authorization'));
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'tokenfactory.test') || str_contains($r->url(), 'ollama.test'));
+    }
+
+    public function test_an_on_premise_server_missing_the_adapter_or_the_embedding_model_fails(): void
+    {
+        config()->set('services.llm.base_url', 'http://vllm.test:8000/v1');
+        config()->set('services.embeddings.driver', 'openai');
+        config()->set('services.embeddings.base_url', 'http://embed.test/v1');
+        config()->set('services.embeddings.model', 'bge-ft-v3');
+        $this->services([
+            'vllm.test:8000/v1/models' => Http::response(['data' => [['id' => 'base']]]), // LoRA not loaded
+            'embed.test/v1/models' => Http::response(['data' => [['id' => 'bge-m3']]]),
+        ]);
+
+        $this->get('/api/health-check', $this->auth)
+            ->assertStatus(500)
+            ->assertSeeText('llm: LLM server does not offer xif', false)
+            ->assertSeeText('embedder: the embedding server does not offer bge-ft-v3', false);
+    }
 }

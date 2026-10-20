@@ -38,5 +38,6 @@ Schedule::call(fn () => app(ClassifyRequests::class)->tend())->name('api-classif
 // training that must keep advancing, plus the idle-autostop + 24h-ceiling "forgot" safety.
 Schedule::job(new GpuActionJob('tick'))
     ->everyMinute()
-    ->when(fn () => GpuServer::whereNotIn('status', [GpuServer::STATUS_OFF, GpuServer::STATUS_ERROR])->exists()
-        || FinetuneRun::whereNotIn('status', [FinetuneRun::STATUS_DONE, FinetuneRun::STATUS_FAILED])->exists());
+    ->when(fn () => config('gpu.provisioning') && (
+        GpuServer::whereNotIn('status', [GpuServer::STATUS_OFF, GpuServer::STATUS_ERROR])->exists()
+        || FinetuneRun::whereNotIn('status', [FinetuneRun::STATUS_DONE, FinetuneRun::STATUS_FAILED])->exists()));

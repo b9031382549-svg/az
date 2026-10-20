@@ -7,7 +7,7 @@ use App\Services\Classify\Mechanisms\ClassifierMechanism;
 use App\Services\Classify\Mechanisms\DirectLlmMechanism;
 use App\Services\Classify\Mechanisms\MechanismRegistry;
 use App\Services\Classify\Mechanisms\VectorMechanism;
-use App\Services\Embeddings\OllamaEmbedder;
+use App\Services\Embeddings\Embedder;
 use App\Services\Llm\OpenRouterClient;
 use Illuminate\Support\ServiceProvider;
 
@@ -34,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(OpenRouterClient::class, fn () => OpenRouterClient::fromConfig());
-        $this->app->singleton(OllamaEmbedder::class, fn () => OllamaEmbedder::fromConfig());
+        $this->app->singleton(Embedder::class, fn () => Embedder::fromConfig());
 
         $this->app->singleton(MechanismRegistry::class, function ($app) {
             $registry = new MechanismRegistry;

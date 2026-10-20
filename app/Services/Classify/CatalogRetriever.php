@@ -2,7 +2,7 @@
 
 namespace App\Services\Classify;
 
-use App\Services\Embeddings\OllamaEmbedder;
+use App\Services\Embeddings\Embedder;
 use App\Support\AzFold;
 use Illuminate\Support\Facades\DB;
 
@@ -18,7 +18,7 @@ class CatalogRetriever
 
     private readonly int $headingCodes;
 
-    public function __construct(private readonly OllamaEmbedder $embedder)
+    public function __construct(private readonly Embedder $embedder)
     {
         $this->precedentsEnabled = (bool) config('classify.precedents.enabled', false);
         $this->precedentTopK = max(1, (int) config('classify.precedents.top_k', 40));
@@ -60,7 +60,7 @@ class CatalogRetriever
         $headingLists = [];
         $primaryVector = null;
         foreach ($queries as $i => $q) {
-            $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($this->normalize($q)));
+            $vector = Embedder::toSqlVector($this->embedder->embedOne($this->normalize($q)));
             if ($i === 0) {
                 $primaryVector = $vector;
             }
@@ -237,7 +237,7 @@ class CatalogRetriever
             return null;
         }
 
-        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($q));
+        $vector = Embedder::toSqlVector($this->embedder->embedOne($q));
         $row = DB::selectOne(
             'SELECT 1 - (embedding <=> ?::vector) AS sim
              FROM catalog WHERE code = ? AND embedding IS NOT NULL',
@@ -296,7 +296,7 @@ class CatalogRetriever
         // Configurable index table so a fine-tuned embedder can search its own
         // catalog (e.g. ft.catalog) without touching the stock one. Identifier only.
         $table = preg_replace('/[^a-z0-9_.]/i', '', (string) config('classify.catalog_table', 'catalog'));
-        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($q));
+        $vector = Embedder::toSqlVector($this->embedder->embedOne($q));
         $kindSql = $kind ? 'AND kind = ?' : '';
         $bind = $kind ? [$vector, $kind, $vector] : [$vector, $vector];
 
@@ -330,7 +330,7 @@ class CatalogRetriever
             return [];
         }
         $table = preg_replace('/[^a-z0-9_.]/i', '', (string) config('classify.catalog_table', 'catalog'));
-        $vector = OllamaEmbedder::toSqlVector($this->embedder->embedOne($q));
+        $vector = Embedder::toSqlVector($this->embedder->embedOne($q));
 
         // Semantic, over-fetched, then thinned to one code per heading.
         $sem = DB::select(

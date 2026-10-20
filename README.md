@@ -38,6 +38,9 @@
 Какая модель отвечает за какой этап, задаётся в `.env`
 (см. [.env.prod.example](.env.prod.example)).
 
+Установка у заказчика (свой GPU, без Nebius, наружу только OpenRouter для веб-поиска):
+[DEPLOY.md](DEPLOY.md) (на английском) и шаблон настроек [.env.onprem.example](.env.onprem.example).
+
 ## Чего нет в git
 
 Эти файлы передаются отдельно:
@@ -62,7 +65,8 @@ docker compose -f docker-compose.prod.yml up -d pgsql redis ollama sorter
 
 run() { docker compose -f docker-compose.prod.yml run --rm app php artisan "$@"; }
 run migrate --force
-run db:seed --force                  # учётка admin / admin — сменить пароль сразу
+run db:seed --force                  # учётка admin / admin
+run user:password admin              # сразу сменить пароль (не короче 12 символов)
 ```
 
 Затем загружаем дамп с нашей установки: каталог, прецеденты и память ответов вместе

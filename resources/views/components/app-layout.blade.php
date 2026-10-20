@@ -53,8 +53,10 @@
       {{-- Benchmark hidden from the menu (route still exists, just not linked). --}}
       <a href="{{ route('testing') }}" class="{{ $nav('testing*') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v5L4 15a1.5 1.5 0 001.3 2.3h9.4A1.5 1.5 0 0016 15l-4-7.5v-5"/><path d="M6.5 2.5h7M7 12h6"/></svg>{{ __('Testing') }}</a>
+      @if(config('gpu.provisioning'))
       <a href="{{ route('gpu-servers') }}" class="{{ $nav('gpu-servers*') }}">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="15" height="5" rx="1.2"/><rect x="2.5" y="11" width="15" height="5" rx="1.2"/><path d="M5 6.5h.01M5 13.5h.01"/></svg>{{ __('GPU servers') }}</a>
+      @endif
 
       <a href="{{ route('api-docs') }}" class="{{ $nav('api-docs') }} mt-2">
         <svg fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 20 20" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6l-4 4 4 4M13 6l4 4-4 4M11.2 4l-2.4 12"/></svg>{{ __('API docs') }}</a>

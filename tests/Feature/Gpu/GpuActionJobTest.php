@@ -58,4 +58,21 @@ class GpuActionJobTest extends TestCase
         $this->assertNull($run->source_dataset_id);
         @unlink((string) $run->corpus_path);
     }
+
+    public function test_does_nothing_when_provisioning_is_off(): void
+    {
+        config()->set('gpu.provisioning', false);
+        $orchestrator = new FakeOrchestrator;
+        $this->app->instance(GpuOrchestrator::class, $orchestrator);
+        $slot = GpuServer::where('slot', 'B')->firstOrFail();
+
+        (new GpuActionJob('serve-base', $slot->id))->handle(
+            $this->app->make(GpuServerManager::class),
+            $this->app->make(FinetuneManager::class),
+            $this->app->make(GpuCoordinator::class),
+        );
+
+        $this->assertFalse($orchestrator->servedBase);
+        $this->assertSame(GpuServer::STATUS_OFF, $slot->fresh()->status);
+    }
 }

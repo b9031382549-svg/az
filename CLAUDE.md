@@ -67,7 +67,7 @@ The app is auth-gated (default login user `admin`).
   no further paid call is made; off → the old prompt, byte for byte. A Testing run has its own
   switch (`mechanisms.trash_check`, the "Web search: no product named" box), and its funnel shows
   what the search caught apart from the rules + sorter step.
-- **Embeddings:** `OllamaEmbedder` + `CatalogEmbeddingRunner` (resumable, batched
+- **Embeddings:** `Embedder` (Ollama `/api/embed` or OpenAI-compatible `/embeddings`) + `CatalogEmbeddingRunner` (resumable, batched
   job). HNSW index on `catalog.embedding`.
 - **Uploads — one door for files:** `InvoiceUploads` (the Upload page's one entry
   point; the Classify page keeps only its text box and links here; recognises the
@@ -114,6 +114,17 @@ The app is auth-gated (default login user `admin`).
   git; DB `chat_eval`, hand-graded) — Llama ≈ gpt-4o-mini there.
 - **LLM:** `OpenRouterClient`, `JsonExtractor`. Query-expansion model via
   `CLASSIFY_EXPAND_MODEL`. Every call is logged to `llm_usage`.
+- **On premise (the client's own GPU, `DEPLOY.md` + `.env.onprem.example`):** `LLM_BASE_URL`
+  (+ `LLM_API_KEY`, `LLM_BASE_MODEL`/`LLM_TUNED_MODEL`, default `base`/`xif`) makes
+  `InferenceEndpointResolver` send every `gpu:` call to that fixed vLLM — no `gpu_servers`
+  slot, no Token Factory fallback. `EMBED_DRIVER=openai` (`EMBED_BASE_URL`/`EMBED_MODEL`)
+  makes `Embedder` call any OpenAI-compatible `/embeddings` instead of Ollama.
+  `ModelUnavailable` (connection / 404 / 429 / 5xx from either) + `CLASSIFY_WAIT_FOR_MODELS`
+  → `DirectLlmMechanism` / `ClassifierService` rethrow it and `ClassifyMechanismJob` releases
+  itself (30 s doubling to 10 min, `retryUntil` = `…_HOURS`, `maxExceptions` 3) instead of an
+  abstaining vote. `GPU_PROVISIONING=false` removes the `/gpu-servers` page, its menu link
+  and the scheduled tick. Only web search (OpenRouter) goes out. All default OFF: our prod
+  is unchanged. `user:password admin [--stdin]` replaces the seeded admin / admin.
 - **Translations:** `ItemTranslator`, `TranslateItems`/`TranslateItemJob`,
   `ItemTranslation`, `SetLocale` middleware (en/az/ru display). Item names go to
   `classify.translate_model` (default `gpu:base`: our Llama while a GPU slot is serving,

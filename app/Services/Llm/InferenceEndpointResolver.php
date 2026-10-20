@@ -12,7 +12,8 @@ use App\Models\GpuServer;
  * host. This resolver turns those into the currently-active GPU server's connection data,
  * or, when no server is active, falls back to Token Factory serving the base model (no
  * fine-tune). Flipping which GpuServer is active is the zero-downtime switch — no config
- * edit, no redeploy. On owned fixed servers later, the slot rows just hold static data.
+ * edit, no redeploy. An owned fixed server (on premise) is set in config instead
+ * (services.llm: LLM_BASE_URL …) and then takes every gpu: call, with no fallback.
  *
  * Read fresh from the DB on every call (OpenRouterClient::resolveProvider re-resolves per
  * request), so long-lived queue workers never serve a stale endpoint after a switch.
@@ -30,7 +31,7 @@ class InferenceEndpointResolver
      * $touch = false resolves without counting it as a use of the server — for a health check,
      * which must not keep a GPU slot from idling down.
      *
-     * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string}|null
+     * @return array{name: string, base_url: string, api_key: ?string, model: string, key_env: string, keyless?: bool}|null
      */
     public function resolve(string $model, bool $touch = true): ?array
     {
@@ -39,6 +40,25 @@ class InferenceEndpointResolver
         }
 
         $logical = substr($model, strlen(self::PREFIX)); // 'tuned' | 'base' | explicit
+
+        // A fixed server (on premise): it serves both the stock model and the adapter, so
+        // nothing degrades and there is no fallback — if it is down, the call fails and the
+        // caller waits for it (config classify.wait_for_models).
+        if (filled($static = config('services.llm.base_url'))) {
+            return [
+                'name' => 'LLM server',
+                'base_url' => rtrim((string) $static, '/'),
+                'api_key' => config('services.llm.api_key'),
+                'model' => match ($logical) {
+                    'tuned' => (string) config('services.llm.tuned_model'),
+                    'base' => (string) config('services.llm.base_model'),
+                    default => $logical,
+                },
+                'key_env' => 'LLM_API_KEY',
+                'keyless' => true, // a vLLM started without --api-key takes no key
+            ];
+        }
+
         $server = GpuServer::active();
 
         if ($server !== null && $server->isServing()) {

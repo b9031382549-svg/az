@@ -12,6 +12,11 @@ return [
     | "gpu:" resolver falls back to Token Factory (base model) and nothing provisions.
     */
 
+    // Renting GPU servers from the app at all (the /gpu-servers page, its actions and the
+    // scheduled tick). Off on premise, where the GPU is the customer's own fixed server
+    // (services.llm) and there is no Nebius: the page is gone and no job provisions.
+    'provisioning' => (bool) env('GPU_PROVISIONING', true),
+
     // Runner for the orchestrator subprocess.
     'python_bin' => env('GPU_PYTHON_BIN', 'python3'),
     'orchestrator' => base_path('resources/gpu-scripts/orchestrator.py'),

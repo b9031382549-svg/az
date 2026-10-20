@@ -3,6 +3,7 @@
 namespace App\Services\Api;
 
 use App\Services\Classify\SorterClient;
+use App\Services\Embeddings\Embedder;
 use App\Services\Llm\OpenRouterClient;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -102,7 +103,14 @@ class HealthCheck
 
     private function embedder(): ?string
     {
-        $model = (string) config('services.ollama.embed_model');
+        $model = Embedder::configuredModel();
+
+        if (Embedder::driver() === Embedder::DRIVER_OPENAI) {
+            $offered = $this->offeredModels(rtrim((string) config('services.embeddings.base_url'), '/'), config('services.embeddings.api_key'));
+
+            return in_array($model, $offered, true) ? null : "the embedding server does not offer {$model}";
+        }
+
         $names = (array) Http::timeout(self::TIMEOUT)->acceptJson()
             ->get(rtrim((string) config('services.ollama.url'), '/').'/api/tags')
             ->throw()->json('models.*.name');
@@ -160,7 +168,7 @@ class HealthCheck
     {
         return Cache::remember('health:models:'.md5($baseUrl), self::MODELS_TTL, fn () => (array) Http::timeout(self::TIMEOUT)
             ->acceptJson()
-            ->withToken((string) $apiKey)
+            ->when(filled($apiKey), fn ($request) => $request->withToken((string) $apiKey))
             ->get($baseUrl.'/models')
             ->throw()
             ->json('data.*.id'));
