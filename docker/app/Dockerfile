@@ -5,8 +5,11 @@
 # extension set so dev and prod never drift. Built on the -fpm image because
 # prod serves via php-fpm; the php CLI binary is also present, so the dev
 # stage's `php artisan serve` keeps working exactly as before.
+# Pinned to the patch release, not the moving `8.3` tag: a builder that already holds an
+# older 8.3 image keeps building on it. 8.3.36 closes PHP2Shell (CVE-2026-109618/-109619,
+# unauthenticated RCE in php-fpm); raise it with every PHP security release.
 # ============================================================================
-FROM php:8.3-fpm-bookworm AS base
+FROM php:8.3.36-fpm-bookworm AS base
 
 # System libraries needed for the PHP extensions Laravel + Postgres use, plus the
 # GPU-orchestration toolchain: python3 runs resources/gpu-scripts/orchestrator.py and
