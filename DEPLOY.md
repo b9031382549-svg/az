@@ -150,7 +150,7 @@ change. Without it the app reads the environment directly.
 - **Outbound at runtime:** only `https://openrouter.ai` (443), for the web search. It
   receives the item name and public catalog texts, never invoice data, VÖEN or amounts.
   Everything else is internal: vLLM, the embedding server, PostgreSQL, Redis, sorter.
-- **Building the images** needs Docker Hub (`php:8.3-fpm-bookworm`, `composer:2`,
+- **Building the images** needs Docker Hub (`php:8.3.36-fpm-bookworm`, `composer:2`,
   `node:22-alpine`, `python:3.12-slim`), Debian apt, Packagist + GitHub (composer), npm and
   PyPI, or your mirrors of them.
 - **Browsers:** nothing from the internet; the UI's CSS and fonts are built into the image.
