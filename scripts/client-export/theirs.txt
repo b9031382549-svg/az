@@ -1,0 +1,7 @@
+# Paths the client owns in their repo (scripts/client-export/build.sh).
+# A release takes them from their dev as they are: our repo never holds them (it is public,
+# and they name the client's internal hosts). Their commits that touch only these paths
+# don't stop a release.
+
+# Their CI/CD: the images to their registry, the deploy through their GitOps repo.
+.gitlab-ci.yml

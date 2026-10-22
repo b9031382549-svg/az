@@ -245,8 +245,12 @@ The app is auth-gated (default login user `admin`).
   top of their `dev`, holding our `main` minus `scripts/client-export/exclude.txt`, made by
   `scripts/client-export/build.sh` (`preview` → `commit` → `push`; `push` tags our rev
   `client-rN`). Merge to our `main` first, then build from `origin/main`. Never edit
-  their repo by hand; if they commit, take that change into our `main` first (the
-  script stops until then). We are Developer there: `dev` / `preprod`, no force-push.
+  their repo by hand. Their own files (`scripts/client-export/theirs.txt`: their
+  `.gitlab-ci.yml`, which names their internal hosts) go out as their `dev` has them and
+  never enter our public repo. Any other commit of theirs: take that change into our
+  `main` first (the script stops until then). We are Developer there: `dev` / `preprod`,
+  no force-push. A push to their `dev` starts their pipeline (images to their Nexus);
+  their deploy to k8s is a manual job.
 
 ## Env & secrets
 
